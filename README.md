@@ -33,6 +33,29 @@ VERDICT: correction lands mid-sentence (< 3400 ms): YES
 Receipt: [`docs/proof/probe_subscribe.json`](docs/proof/probe_subscribe.json) ·
 Reproduce: `npm install && npm run probe`
 
+**Day-2 safety properties pass** — `npm run verify` asserts the reads that MUST fail, do:
+
+```
+1. audience partition
+  ✓ care-internal://ray/risk unreachable with care.read.user
+  ✓ care-internal://ray/adherence unreachable with care.read.user
+  ✓ both readable WITH care.read.assistant
+2. existence is not leaked
+  ✓ list() with user scope returns no care-internal:// URI  — 4 user URIs
+  ✓ care:// URI cannot reach an assistant-only record
+3. version chain
+  ✓ chain intact · ✓ tampering v1 breaks it and is located
+4. self-announcing staleness
+  ✓ anticoagulant past stale_after (9.0d) · ✓ exercise NOT flagged (1.0d)
+5. ✓ publishing an assistant-only record as audience:user is refused
+
+PASS — 0 failing assertion(s)
+```
+
+The partition is enforced **server-side by two URI schemes behind two OAuth scopes**, not by
+trusting `annotations.audience` — because the spec places no obligation on a client to honour
+it. See [`FRICTION.md`](FRICTION.md) F-002.
+
 ## Friction log
 
 [`FRICTION.md`](FRICTION.md) — four entries so far, including two proposed changes to the

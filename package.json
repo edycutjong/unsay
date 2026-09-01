@@ -5,10 +5,13 @@
   "type": "module",
   "description": "An MCP server whose resources can be corrected mid-sentence.",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "probe": "node --experimental-strip-types scripts/probe_subscribe.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "node --experimental-strip-types scripts/verify.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
