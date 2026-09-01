@@ -1,0 +1,16 @@
+{
+  "probe": "subscribe_updated_streamable_http",
+  "ranAt": "2026-09-01T20:16:46.024Z",
+  "sdk": "@modelcontextprotocol/sdk@1.30.0",
+  "transport": "StreamableHTTP",
+  "serverCapabilities": {
+    "subscribe": true,
+    "listChanged": true
+  },
+  "uri": "care://ray/weight_bearing",
+  "notificationReceived": true,
+  "writeToNotificationMs": 0.742,
+  "reReadReturnedNewValue": true,
+  "speechWindowMs": 3400,
+  "landsMidSentence": true
+}
