@@ -63,16 +63,26 @@ export interface PublishInput {
 }
 
 export type UpdatedListener = (uri: string) => void
+export type ListChangedListener = () => void
 
 export class LiveResourceStore {
   /** key = `${patient}/${domain}` → versions, oldest first */
   #chains = new Map<string, CareRecord[]>()
   #listeners: UpdatedListener[] = []
+  #listChangedListeners: ListChangedListener[] = []
 
   onUpdated(fn: UpdatedListener) {
     this.#listeners.push(fn)
     return () => {
       this.#listeners = this.#listeners.filter((f) => f !== fn)
+    }
+  }
+
+  /** Fires when a domain appears that did not exist before. */
+  onListChanged(fn: ListChangedListener) {
+    this.#listChangedListeners.push(fn)
+    return () => {
+      this.#listChangedListeners = this.#listChangedListeners.filter((f) => f !== fn)
     }
   }
 
@@ -118,6 +128,10 @@ export class LiveResourceStore {
     if (prev) {
       const uri = uriFor(input.patient, input.domain, input.audience)
       for (const fn of this.#listeners) fn(uri)
+    } else {
+      // A domain that did not exist before changes the resource LIST, not a
+      // resource. We declare capabilities.resources.listChanged, so we must send it.
+      for (const fn of this.#listChangedListeners) fn()
     }
     return record
   }

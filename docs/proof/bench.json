@@ -1,0 +1,19 @@
+{
+  "ranAt": "2026-09-01T21:30:48.712Z",
+  "n": 200,
+  "transport": "streamable-http-loopback",
+  "speechWindowMs": 3400,
+  "endToEnd": {
+    "p50": 0.817,
+    "p95": 2.022,
+    "max": 4.626
+  },
+  "writeToNotification": {
+    "p50": 0.244,
+    "p95": 0.414
+  },
+  "midSentence": {
+    "count": 200,
+    "of": 200
+  }
+}

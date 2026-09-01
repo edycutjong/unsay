@@ -1,0 +1,11 @@
+{"t":"2026-09-01T21:33:42.596Z","event":"initialize","capabilities":{"completions":{},"resources":{"subscribe":true,"listChanged":true},"tools":{}}}
+{"t":"2026-09-01T21:33:42.600Z","event":"templates/list","count":2}
+{"t":"2026-09-01T21:33:42.603Z","event":"completion/complete","arg":"version","context":{"domain":"weight_bearing"},"values":["v1"]}
+{"t":"2026-09-01T21:33:42.608Z","event":"resources/read","uri":"care://ray/weight_bearing","audience":"user"}
+{"t":"2026-09-01T21:33:42.610Z","event":"resources/read","uri":"care-internal://ray/risk","audience":"assistant","spoken":false}
+{"t":"2026-09-01T21:33:42.612Z","event":"resources/subscribe","uri":"care://ray/weight_bearing"}
+{"t":"2026-09-01T21:33:42.613Z","event":"notifications/resources/updated","uri":"care://ray/weight_bearing","latencyMs":0.896}
+{"t":"2026-09-01T21:33:42.616Z","event":"resources/read","uri":"care://ray/weight_bearing","afterCorrection":true,"value":"Full weight-bearing as tolerated."}
+{"t":"2026-09-01T21:33:42.619Z","event":"resources/read","uri":"care://ray/anticoagulant","stale":true}
+{"t":"2026-09-01T21:33:42.621Z","event":"tools/call","tool":"whats_changed","changedCount":1}
+{"t":"2026-09-01T21:33:42.622Z","event":"summary","writeToNotificationMs":0.896,"speechWindowMs":3400,"landsMidSentence":true,"correctionApplied":true,"staleFactAnnouncedAge":true,"fallbackExercised":true,"verdict":"PASS"}

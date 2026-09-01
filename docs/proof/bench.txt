@@ -1,0 +1,15 @@
+unsay bench · 200 revisions · 2026-09-01T21:30:48.712Z
+transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk 1.30.0
+
+segment                             p50        p95        max
+write → notification              0.2ms      0.4ms      1.4ms
+notification → re-read            0.6ms      1.6ms      3.6ms
+─────────────────────────────────────────────────────────────
+END-TO-END (write → value)        0.8ms      2.0ms      4.6ms
+
+speech window: a 12-word utterance ≈ 3400 ms
+retraction lands mid-sentence in 200/200 runs (100%)
+
+NOTE: loopback transport. The deployed path adds API Gateway → DynamoDB Streams
+→ Lambda; those segments are measured separately once deployed and this file is
+regenerated. Do not quote this number as the production figure.

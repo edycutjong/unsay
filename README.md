@@ -56,6 +56,12 @@ The partition is enforced **server-side by two URI schemes behind two OAuth scop
 trusting `annotations.audience` — because the spec places no obligation on a client to honour
 it. See [`FRICTION.md`](FRICTION.md) F-002.
 
+## Tests
+
+**27 tests**, all passing (`npm test`). Coverage is deliberately not headlined — see
+[`DEMO.md`](DEMO.md#the-tests) for why, and `./scripts/fresh_clone_check.sh` for the gate
+that actually catches what tests miss.
+
 ## Friction log
 
 [`FRICTION.md`](FRICTION.md) — four entries so far, including two proposed changes to the
