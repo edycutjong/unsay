@@ -394,17 +394,19 @@ footer a{color:var(--muted)}
          produces docs/proof/bench.json, rounded up to one decimal so it can never be
          faster than the measurement. web/web.test.ts fails if one is edited by hand. -->
     <script type="application/json" id="bench" data-source="/docs/proof/bench.json">
-      {"endToEnd":{"p50":1.8,"p95":3.3},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
+      {"endToEnd":{"p50":1.7,"p95":3.3},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
     </script>
     <div class="stat">
-      <div><div class="v"><span data-bench="endToEnd.p50">1.8</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p50">1.7</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
       <div><div class="v"><span data-bench="endToEnd.p95">3.3</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
       <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
     </div>
     <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
       200 revisions, produced by <code>npm run bench -- --n 200</code> and committed to
-      <code>docs/proof/bench.txt</code>. The deployed path adds API&nbsp;Gateway, DynamoDB Streams and
-      Lambda; those segments are measured separately and this page is updated when they are. It is
+      <code>docs/proof/bench.txt</code>. The change bus is <b>in-process</b> &mdash; the notifier in
+      <code>packages/live-resources</code>, not a queue and not a stream &mdash; because the build plan
+      said to move it in-process unless this p95 went past 500&nbsp;ms, and it did not. Nothing is
+      deployed, so no network hop between the clinician and the host is inside these figures. It is
       not a production figure and is never quoted as one.</p>
   </section>
 

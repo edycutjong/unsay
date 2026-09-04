@@ -1,19 +1,23 @@
-unsay bench · 200 revisions · 2026-09-04T13:04:59.348Z
+unsay bench · 200 revisions · 2026-09-04T20:01:38.758Z
 transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk 1.30.0
 path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read
 at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)
 
 segment                             p50        p95        max
-signed write → notification       0.8ms      2.0ms      5.1ms
-notification → re-read            0.9ms      2.2ms      3.6ms
+signed write → notification       0.8ms      1.2ms      3.8ms
+notification → re-read            0.9ms      2.2ms      5.0ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.7ms      3.3ms      8.6ms
+END-TO-END (write → value)        1.7ms      3.3ms      8.5ms
 
 speech window: a 12-word utterance ≈ 3400 ms (an assumed speech rate, not a
 measurement of Alexa+ TTS)
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
 
-NOTE: loopback transport. The deployed path adds API Gateway → DynamoDB Streams
-→ Lambda; those segments are measured separately once deployed and this file is
-regenerated. Do not quote this number as the production figure.
+NOTE: loopback transport, and the change bus is in-process — the notifier in
+packages/live-resources, not a queue and not a stream. The build plan's Week-1
+gate was: if write → the client holds the new value exceeds 500 ms at p95, the
+mid-sentence claim is false; move the change bus in-process. It is 3.3 ms
+here, so it moved, and no API Gateway, DynamoDB Stream or Lambda was ever built.
+Nothing is deployed: no network hop between clinician and host is inside these
+figures. Do not quote this number as the production figure.

@@ -1,0 +1,61 @@
+# The seven commands a judge is told to run, run on every push.
+#
+# There is no `continue-on-error` anywhere in this file, and there will not be: a
+# gate that reports green while a step failed is worse than no gate at all, because
+# the badge outlives the memory of why it was allowed to be yellow.
+#
+# The order is DEMO.md's order — the suite and the type-check first, then the four
+# scripts that stand a real HTTP server up and talk to it over Streamable HTTP.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# A push on top of a push cancels the older run. Nothing here is a deployment, so
+# there is nothing to half-finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: suite, types, and the four scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 is not a preference. `npm start` runs TypeScript through native type
+      # stripping with no build step, which is a 22 feature — see FRICTION.md F-009.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      # The reads and writes that MUST fail, do. This is the safety property, and it
+      # is the one step whose failure means the product is not the product.
+      - name: npm run verify
+        run: npm run verify
+
+      - name: npm run e2e
+        run: npm run e2e
+
+      - name: npm run probe
+        run: npm run probe
+
+      # A correction has to survive the network dropping under it.
+      - name: npm run probe:resume
+        run: npm run probe:resume

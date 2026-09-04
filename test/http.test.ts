@@ -384,6 +384,27 @@ describe('GET /verify', () => {
     expect(text).toContain(WB)
   })
 
+  it('serves the report, not JSON, to a browser — the caller it was written for', async () => {
+    // Chrome's real Accept header. It contains `*/*`, which used to match first and
+    // hand a judge clicking this link a wall of JSON instead of the chain report.
+    const res = await fetch(`${srv.baseUrl}/verify`, {
+      headers: {
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      },
+    })
+    expect(res.headers.get('content-type')).toContain('text/plain')
+    const text = await res.text()
+    expect(text).toContain('INTACT')
+    expect(text).not.toContain('{"')
+  })
+
+  it('still serves JSON to curl, which sends */* or nothing', async () => {
+    for (const accept of ['*/*', '']) {
+      const res = await fetch(`${srv.baseUrl}/verify`, { headers: { accept } })
+      expect(res.headers.get('content-type')).toContain('application/json')
+    }
+  })
+
   it('locates the exact version a tampered chain breaks at', async () => {
     const tampered = seedDemo(new LiveResourceStore())
     const solo = await createHttpServer({

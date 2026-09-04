@@ -1093,6 +1093,12 @@ const header = (req: IncomingMessage, name: string): string | undefined => {
 
 function wantsJson(req: IncomingMessage): boolean {
   const accept = header(req, 'accept') ?? ''
+  // A browser sends `text/html,...,*/*;q=0.8`, so matching `*/*` first served JSON to
+  // the one caller the report was written for: a judge clicking GET /verify. Asking
+  // for HTML is the strongest signal there is a human on the other end, so it wins over
+  // the wildcard. An explicit application/json still gets JSON, and curl — which sends
+  // `*/*` or nothing — is unchanged.
+  if (accept.includes('text/html')) return false
   return accept.includes('application/json') || accept.includes('*/*') || accept === ''
 }
 

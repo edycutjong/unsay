@@ -1,0 +1,11 @@
+# No contact link points at this repository's own URL: there is no remote yet, and a
+# link invented ahead of one is exactly the kind of claim this project does not make.
+# GitHub surfaces SECURITY.md on its own; a security finding goes there, never here.
+blank_issues_enabled: true
+contact_links:
+  - name: The MCP specification
+    url: https://github.com/modelcontextprotocol/modelcontextprotocol
+    about: Friction that is really a gap in the spec belongs upstream as well as in FRICTION.md — F-002 and F-003 are both headed there.
+  - name: The MCP TypeScript SDK
+    url: https://github.com/modelcontextprotocol/typescript-sdk
+    about: Six of the friction entries are about the reference SDK. If yours is too, file it there as well.

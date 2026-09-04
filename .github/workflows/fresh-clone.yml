@@ -1,0 +1,45 @@
+# The gate a test suite structurally cannot be.
+#
+# LESSONS R11: two sibling projects shipped 458 and 404 passing tests at 100% coverage
+# and both had a DEMO.md walkthrough that failed from an empty clone — one silently
+# required fifteen prior commands, the other had fixtures generated against older code.
+# Unit tests never test the sequence a human types, and never test the absence of state
+# you forgot you had. `scripts/fresh_clone_check.sh` clones this repository to a temp
+# directory, installs from scratch, and runs DEMO.md verbatim including its curl
+# walkthrough against a real `npm start`.
+#
+# Nightly rather than per-push because the failure it catches is usually caused by
+# something outside the diff: a transitive dependency moving, or a receipt going stale
+# against the code that claims to produce it.
+name: fresh-clone
+
+on:
+  schedule:
+    # 03:17 UTC. Off the hour on purpose — the top of the hour is the busiest slot on
+    # shared runners and a delayed cron is a cron that silently did not run.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-clone:
+    name: DEMO.md, verbatim, from an empty clone
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # fetch-depth 0: the script runs `git clone` against this checkout, and a
+      # shallow checkout is not reliably cloneable.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # No `cache: npm` here, deliberately. The point of this job is the install a
+      # stranger gets, and a warm cache is state the stranger does not have.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ./scripts/fresh_clone_check.sh
+        run: ./scripts/fresh_clone_check.sh

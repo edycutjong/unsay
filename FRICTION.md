@@ -595,6 +595,53 @@ or the measurement it came from, and all carry the same send-by date.*
 
 ---
 
+# Decisions recorded here rather than in a commit message
+
+Not friction — the tools did not cost us these. They are trades this build made on purpose,
+where the road not taken is still visible in the repository and a reader would otherwise have
+to guess why. Numbered apart from the `F-` entries so the count above stays the count.
+
+## D-001 · the change bus is in-process, and the AWS path was never built
+
+**Date:** 2026-09-04 · **Severity:** n/a — a trade, not a defect · **Touches:**
+`packages/live-resources/src/notifier.ts`, `scripts/bench.ts`, `web/index.html`
+
+**The gate, written before any code.** The build plan's week 1 put a DynamoDB table, a stream
+and a `notifyHandler` Lambda on days 3–4, and then set a gate against them: *if `write → client
+has new value` exceeds 500 ms at p95, the "mid-sentence" claim is false — move the change bus
+in-process and keep the Stream for durability. Decide by Sep 8, not week 5.*
+
+**What was measured.** `npm run bench -- --n 200` puts the whole claimed path inside one number:
+the clinician's HMAC-signed write, the verification, the store, the notification, and an
+authorized re-read by a subscribed client over Streamable HTTP. The p95 it prints is in
+`docs/proof/bench.txt`, more than an order of magnitude inside the 500 ms the gate allowed, and
+all 200 runs landed inside the 3,400 ms speech window.
+
+**The decision.** The change bus stays in-process — the notifier in `packages/live-resources`,
+not a queue and not a stream — and no API Gateway, DynamoDB Stream or Lambda was built. The
+other half of the gate's sentence, *keep the Stream for durability*, was not taken either: there
+is no stream to keep. So the trade is not "we chose the fast path and kept the durable one". It
+is: **latency bought outright, durability deferred, and nothing about durability claimed.** The
+store, the `MemoryEventStore` behind resumability and the audit log are all in memory, which is
+already written down under *Durability* below and is the price of this decision.
+
+**What is therefore not true.** One process. No horizontal scale — a second instance would hold
+its own subscriptions and its own chain. Subscriptions and replay history die with the process.
+And no network hop between the clinician's browser and the host is inside the measured number,
+because there is nowhere for one to be: nothing is deployed.
+
+**Why it is written down here rather than in a commit message.** Because two files went on
+describing the road not taken as though it were merely work that had not happened yet.
+`scripts/bench.ts` printed, into a committed receipt, *"the deployed path adds API Gateway →
+DynamoDB Streams → Lambda; those segments are measured separately once deployed and this file is
+regenerated"*, and the landing page's own caveat said the same thing in the same future tense.
+None of it exists and none of it is planned before 2026-10-23. A future tense is the easiest
+place in a repository to keep a claim alive after the decision that killed it, and it survives
+review because it never quite asserts anything. Both files now describe the in-process bus and
+the p95 that bought it, and both keep the caveat that these are loopback figures.
+
+---
+
 # What this build does NOT do
 
 Friction above is what the tools cost us. This is what **we** did not finish, or finished

@@ -607,6 +607,16 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
    */
   let lastError = null    // { uri, head, sub }
 
+  /**
+   * The last successful write, held outside the panel for the same reason — and it
+   * was worse than the failure case. On success the panel does not just repaint, it
+   * CLOSES (`openUri = null`), so the receipt had nowhere left to live: on loopback
+   * it existed for a few milliseconds. The one thing a physio needs to see — that
+   * the change actually reached the assistant — was the one thing the page threw
+   * away. Rendered against the fact it revised, so it outlives the close.
+   */
+  let lastReceipt = null  // { uri, json, text, roundTrip, notifyMs }
+
   function banner() {
     const b = $('banner'); b.textContent = ''
     if (state.phase === 'down') {
@@ -682,10 +692,14 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
         tap.addEventListener('click', () => {
           openUri = openUri === f.uri ? null : f.uri
           if (openUri !== f.uri) lastError = null
+          lastReceipt = null
           render()
         })
         li.appendChild(tap)
         if (openUri === f.uri) li.appendChild(revisionPanel(f))
+        else if (lastReceipt && lastReceipt.uri === f.uri) {
+          li.appendChild(receipt(lastReceipt.json, lastReceipt.text, lastReceipt.roundTrip, lastReceipt.notifyMs))
+        }
       } else {
         const box = el('div', 'static')
         box.appendChild(head)
@@ -831,7 +845,12 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
         out.appendChild(n); return
       }
 
-      out.appendChild(receipt(json, text, roundTrip, notifiedAt === null ? null : notifiedAt - t0))
+      // Recorded before connect(), which repaints AND closes this panel — see
+      // `lastReceipt` above. render() re-emits it against the fact it revised.
+      lastReceipt = {
+        uri: fact.uri, json, text, roundTrip,
+        notifyMs: notifiedAt === null ? null : notifiedAt - t0,
+      }
       openUri = null
       await connect()
     })

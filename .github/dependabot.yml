@@ -1,0 +1,24 @@
+# One runtime dependency, on purpose (`@modelcontextprotocol/sdk`), and that is the
+# one this repository most needs to hear about: the friction log is largely a record
+# of its behaviour, and half those entries would change meaning under a new version.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # The SDK's own version is quoted in docs/proof/bench.txt and in scripts/bench.ts.
+    # Its bumps get their own PR rather than being grouped away, because each one needs
+    # the receipts regenerated and the friction entries re-read.
+    groups:
+      dev-tooling:
+        patterns:
+          - typescript
+          - vitest
+          - '@types/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,53 @@
+name: A command did not do what the document said
+description: Something in README.md, DEMO.md or the running server behaved differently from how it is written down.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every figure and every command in this repository is meant to be reproducible from
+        an empty clone. If one is not, that is the bug — whether the code is wrong or the
+        sentence is.
+  - type: input
+    id: command
+    attributes:
+      label: The command you ran
+      description: Verbatim, including flags. `npm run bench -- --n 200`, not "the bench".
+      placeholder: npm run verify
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the document says should happen
+      description: Quote the line and name the file, so it can be fixed if the document is the thing that is wrong.
+      placeholder: "README.md, Engineering Rigor: `PASS — 0 failing assertion(s)`"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the output. It is rendered as a code block; no fences needed.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: "`node -v`. Below 22 the server does not run at all — there is no build step, and type stripping is a 22 feature."
+      placeholder: v22.11.0
+    validations:
+      required: true
+  - type: dropdown
+    id: fresh
+    attributes:
+      label: Does it also fail from a fresh clone?
+      description: "`./scripts/fresh_clone_check.sh` — the answer tells us whether this is your state or our code."
+      options:
+        - "Yes — fresh_clone_check.sh fails too"
+        - "No — it passes from a fresh clone, so this is state on my machine"
+        - "I have not run it"
+    validations:
+      required: true

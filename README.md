@@ -23,7 +23,7 @@ that does not exist is the failure this repository is written against.*
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat)
 ![Node 22](https://img.shields.io/badge/Node-22-339933?style=flat)
-![tests](https://img.shields.io/badge/vitest-279%20passing-3F9E63?style=flat)
+![tests](https://img.shields.io/badge/vitest-298%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 
 [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
@@ -58,9 +58,20 @@ Open the Echo Show link and the clinician link side by side, type a new instruct
 it: the device screen strikes the old line through, the receipt underneath the write reports the
 round trip it measured, and the assistant has what it needs to retract.
 
-The image above is an **illustration of the mechanism**, drawn from the committed seed record —
-not a screenshot. There is no demo video yet and no hosted URL; see
-[What is not here](#what-is-not-here).
+<img src="docs/img/echo-retraction.png" alt="Ray's Echo Show mid-retraction: the previous instruction struck through in amber, the new one beneath it, and a provenance line reading changed 1 second ago by Sarah Okafor, physio." width="820">
+
+That is a **photograph of the running product**, not a mock-up: `npm start`, the device page
+subscribed over MCP, and a real signed `POST /write` that the server answered
+`{"subscribers":1,"notified":true}`. Shot inside the window before the struck line fades.
+
+`GET /verify` is the one link that proves the chain without cloning anything — public,
+unauthenticated, and rendered for whoever asks:
+
+<img src="docs/img/verify-route.png" alt="GET /verify in a browser: five care:// chains, all INTACT, six versions replayed from SHA-256, and no care-internal:// chain listed." width="820">
+
+The hero at the top of this file is an **illustration** of the mechanism, drawn from the committed
+seed record. The two images in this section are not. There is no demo video yet and no hosted URL;
+see [What is not here](#what-is-not-here).
 
 ## 💡 The Problem & Solution
 
@@ -176,7 +187,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.39 ms
+  notifications/resources/updated  1.87 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -193,7 +204,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.39 ms` will differ on your machine and between two runs on this one;
+The `1.87 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -267,10 +278,10 @@ out of the same run that writes [`docs/proof/bench.txt`](docs/proof/bench.txt):
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.8ms      2.0ms      5.1ms
-notification → re-read            0.9ms      2.2ms      3.6ms
+signed write → notification       0.8ms      1.2ms      3.8ms
+notification → re-read            0.9ms      2.2ms      5.0ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.7ms      3.3ms      8.6ms
+END-TO-END (write → value)        1.7ms      3.3ms      8.5ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
@@ -310,15 +321,23 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**295 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**298 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 29 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and
 executed against a live server — because the transport a demo video would film was the one
 transport nothing ran.
 
-There is no CI workflow and no release: this repository has no remote yet. The gate that stands
-in for one is `./scripts/fresh_clone_check.sh`, which clones to a temp directory with empty
+The CI is committed and has **never run**. `.github/workflows/ci.yml` runs the suite, the
+type-check and the four scripts — `verify`, `e2e`, `probe`, `probe:resume` — on every push and
+every pull request, with no `continue-on-error` anywhere in it;
+`.github/workflows/fresh-clone.yml` runs the fresh-clone gate nightly. But this repository has no
+remote yet, so no runner has executed either of them, and that is why there is no CI badge in the
+header: a badge for a workflow that has never run is the same claim as a Live badge with nothing
+deployed. It goes in after the first green run, not before.
+
+The gate that has actually run — locally, not on a runner — is
+`./scripts/fresh_clone_check.sh`, which clones to a temp directory with empty
 state, installs from scratch, runs every command in [`DEMO.md`](DEMO.md) including the `curl`
 walkthrough against a real `npm start`, and exits non-zero if any of it drifts.
 
@@ -334,8 +353,15 @@ users, and nothing published to npm — `packages/live-resources` is extracted a
 source, not released. The AWS KMS provider is SigV4-signed and shaped but has **never been
 executed against a live key**. The MCP Apps `_meta` template binding has never been rendered by a
 host. No OAuth authorization server is shipped; Unsay is a protected resource only. The gating
-question — whether Alexa+ itself declares `capabilities.resources.subscribe` — has not been
-answered, which is exactly why the `whats_changed` fallback is built and exercised.
+question — whether Alexa+ itself declares `capabilities.resources.subscribe`, and re-reads on
+`notifications/resources/updated` — has not been answered, which is exactly why the
+`whats_changed` fallback is built and exercised.
+
+That last one has a receipt rather than only a sentence: `docs/proof/initialize.json` is committed
+with `"status": "not-run"`. It carries the question, the reason it is unrun (the account hold in
+`FRICTION.md` F-004), the exact command that will answer it, the fallback that ships either way,
+and the four things this project therefore does not claim. It is the one file here whose value is
+that it says no.
 
 The full inventory is at the end of [`FRICTION.md`](FRICTION.md) under *What this build does NOT
 do*, and the generated [`ARCHITECTURE.md`](ARCHITECTURE.md) closes with the same list.

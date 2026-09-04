@@ -189,7 +189,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.39 ms
+  notifications/resources/updated  1.87 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -216,7 +216,7 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.39 ms` will differ on your machine and between two runs on this one;
+The `1.87 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
 <!-- e2e:end -->
 
@@ -315,10 +315,10 @@ store → notification → authorized re-read → the client holds the new value
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.8ms      2.0ms      5.1ms
-notification → re-read            0.9ms      2.2ms      3.6ms
+signed write → notification       0.8ms      1.2ms      3.8ms
+notification → re-read            0.9ms      2.2ms      5.0ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.7ms      3.3ms      8.6ms
+END-TO-END (write → value)        1.7ms      3.3ms      8.5ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes

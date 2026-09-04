@@ -137,9 +137,13 @@ const out = [
   `retraction lands mid-sentence in ${midSentence}/${N} runs (${((midSentence / N) * 100).toFixed(0)}%)`,
   `a host was subscribed for every run: ${subscribedEvery ? 'yes' : 'NO — the timings mean nothing'}`,
   '',
-  `NOTE: loopback transport. The deployed path adds API Gateway → DynamoDB Streams`,
-  `→ Lambda; those segments are measured separately once deployed and this file is`,
-  `regenerated. Do not quote this number as the production figure.`,
+  `NOTE: loopback transport, and the change bus is in-process — the notifier in`,
+  `packages/live-resources, not a queue and not a stream. The build plan's Week-1`,
+  `gate was: if write → the client holds the new value exceeds 500 ms at p95, the`,
+  `mid-sentence claim is false; move the change bus in-process. It is ${pct(endToEnd, 95).toFixed(1)} ms`,
+  `here, so it moved, and no API Gateway, DynamoDB Stream or Lambda was ever built.`,
+  `Nothing is deployed: no network hop between clinician and host is inside these`,
+  `figures. Do not quote this number as the production figure.`,
 ].join('\n')
 
 console.log(out)

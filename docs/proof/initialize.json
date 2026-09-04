@@ -1,0 +1,57 @@
+{
+  "probe": "alexa_plus_initialize_capabilities",
+  "status": "not-run",
+  "recordedOn": "2026-09-04",
+  "why": "The build plan made this a day-2 item whose done-when was \"answer recorded either way\". It has not been run, so this file is the other way: a receipt for a question that is still open, committed where the answer would have gone.",
+
+  "question": "Does the Alexa+ host, at initialize, declare capabilities.resources with { subscribe: true, listChanged: true } — and, having subscribed, does it re-read the resource when it receives notifications/resources/updated mid-utterance?",
+
+  "whyItGates": "It decides which of the two paths in skill/SKILL.md a real host takes. With subscribe, the correction is pushed and the retraction interrupts the sentence. Without it, nothing is pushed and the retraction can only happen when the host next calls a tool — which is what whats_changed exists for. Unsay's server declares both capabilities and the reference client negotiates them (docs/proof/probe_subscribe.json); what is unknown is what Alexa+ declares back.",
+
+  "blockedBy": {
+    "friction": "F-004",
+    "summary": "The Amazon developer account is under a retail payment-verification hold, so no Alexa+ developer console is reachable from here. See FRICTION.md F-004 for the hold and why the accepted document types are structurally impossible to produce for an Indonesian debit card.",
+    "firstHit": "2026-09-01"
+  },
+
+  "commandThatWillAnswerIt": [
+    "npm start                                  # prints the /mcp URL and a bearer token",
+    "# 1. put that /mcp URL behind TLS on a public hostname — nothing in this repo does that for you",
+    "# 2. register it as an MCP server in the Alexa+ developer console, on an Amazon developer",
+    "#    account that is not under the hold in F-004",
+    "# 3. the answer IS the host's own initialize request: copy params.capabilities verbatim",
+    "#    into this file, set status to \"answered\", and record the date",
+    "# 4. then ask Ray's question and publish a correction mid-answer (npm run bench does the",
+    "#    write; scripts/probe_subscribe.ts is the same exchange against the reference client)"
+  ],
+
+  "whatWouldHaveToChangeHere": "src/http.ts does not tee the incoming initialize request to disk — the frame is consumed by the SDK transport. Capturing it needs either the host console's own request view or one line of logging at the POST /mcp entry point. No such flag exists today and this file does not pretend one does.",
+
+  "whatIsAlreadyKnown": {
+    "serverDeclares": { "subscribe": true, "listChanged": true },
+    "referenceClientNegotiates": true,
+    "receipt": "docs/proof/probe_subscribe.json",
+    "note": "Both halves of the handshake are proven against the reference client over Streamable HTTP. Only the Alexa+ half is unknown."
+  },
+
+  "fallbackThatShipsRegardless": {
+    "tool": "whats_changed",
+    "why": "Built and exercised precisely because this answer is unknown — not because the fallback is known to be needed, but because it cannot yet be known that it is not.",
+    "carries": "previousValue, so a retraction is possible on the fallback path too, not merely a fresh answer",
+    "exercisedBy": "npm run e2e — the run prints \"fallback whats_changed  1 revision(s)\" and writes docs/proof/live_run.jsonl",
+    "assertedBy": "test/server.test.ts"
+  },
+
+  "notClaimedAsAResult": [
+    "That Alexa+ subscribes to MCP resources.",
+    "That a retraction has ever interrupted a real Alexa+ utterance.",
+    "That skill/SKILL.md has been loaded by any host — it is a file with the correct front matter and contract that nobody has watched Alexa+ read.",
+    "That the measured mid-sentence latency (docs/proof/bench.txt) describes anything other than a loopback path in one process."
+  ],
+
+  "disclosedAlsoIn": [
+    "README.md — \"What is not here\"",
+    "FRICTION.md — \"What this build does NOT do\" › The Alexa+ surfaces",
+    "docs/SPEC.md §the silent-failure argument for scripts/probe_subscribe.ts"
+  ]
+}

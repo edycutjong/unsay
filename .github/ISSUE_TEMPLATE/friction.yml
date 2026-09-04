@@ -1,0 +1,53 @@
+name: Friction with the MCP spec, the SDK, or a host
+description: A tool cost you time while building on this. It belongs in FRICTION.md.
+labels: [friction]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `FRICTION.md` is the record of what the MCP specification, the reference TypeScript
+        SDK and Amazon's consoles cost this build, written the day each one was hit. Entries
+        follow one shape: task attempted · steps taken · expected vs actual · severity ·
+        workaround · actionable suggestion. This form is that shape.
+
+        Read the existing entries first: yours may already be F-002.
+  - type: input
+    id: tool
+    attributes:
+      label: The tool and the version
+      placeholder: "@modelcontextprotocol/sdk 1.30.0 · Streamable HTTP resumability"
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task attempted, and the steps you took
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected versus actual
+      description: What the documentation or the type signature led you to expect, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: cost
+    attributes:
+      label: What it cost
+      description: Hours, and whether it blocked or merely slowed you.
+      placeholder: 4 h, and it was a live leak
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround, if you found one
+      description: Name the file it lives in, so a reader can see the price of the workaround as well as the bug.
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: The actionable suggestion
+      description: What should change in the spec, the SDK or the console. This is the half that makes an entry worth filing upstream.
+    validations:
+      required: true

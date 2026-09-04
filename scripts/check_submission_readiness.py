@@ -76,9 +76,16 @@ for f in ["README.md", "DEMO.md", "ARCHITECTURE.md"]:
 
 # ── claims match reality ───────────────────────────────────────────────────────
 print("\nclaims match reality")
+# The count lives in the README twice, in two shapes: the prose ("**295 tests**")
+# and the shields.io badge, where it is a fragment of a URL. Only the prose was ever
+# checked here, so the badge sat at 279 for the length of a rewrite while the
+# sentence forty lines down said 295 — a gate cannot catch a form it does not read.
+# Both are now compared against the same vitest run.
 # Accept **27 tests**, **27** tests, or "27 tests, all passing".
 m = re.search(r"\*{0,2}(\d+)\s*tests?\*{0,2}", readme)
 declared = int(m.group(1)) if m else None
+b = re.search(r"shields\.io/badge/vitest-(\d+)(?:%20|-)passing", readme)
+badged = int(b.group(1)) if b else None
 try:
     out = subprocess.run(["npx", "vitest", "run", "--reporter=json"], cwd=ROOT,
                          capture_output=True, text=True, timeout=300).stdout
@@ -87,8 +94,11 @@ except Exception as e:                                   # noqa: BLE001
     actual = None
     warns.append(f"could not run vitest ({e})")
 check("README states an exact test count", declared is not None, f"declared {declared}")
+check("README carries a vitest badge with a count", badged is not None, f"badge {badged}")
 check("declared test count matches the suite", declared == actual,
       f"README {declared} vs actual {actual}")
+check("the test badge matches the suite", badged == actual,
+      f"badge {badged} vs actual {actual}")
 
 bench = read("docs/proof/bench.txt") or ""
 check("bench receipt records the speech-window verdict",

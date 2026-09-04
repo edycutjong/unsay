@@ -15,7 +15,7 @@
  *
  * A document is not a lower standard of truth than a function.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -297,7 +297,19 @@ describe('the drawn artwork says what the code says', () => {
 
   it('labels the hero as an illustration rather than a recording', () => {
     expect(read('docs/readme-hero.svg')).toContain('Illustration of the mechanism')
-    expect(README).toContain('illustration of the mechanism')
+    // Tolerant of emphasis marks, strict about the two words that carry the claim.
+    expect(README).toMatch(/\*{0,2}illustration\*{0,2} of the mechanism/i)
+  })
+
+  it('does not call a real screenshot an illustration, or the reverse', () => {
+    // Both images in "See it in Action" are captures of the running product, and the
+    // README says so. If either file goes away, or the sentence that vouches for them
+    // does, this must go red rather than leave a mock-up passing as a photograph.
+    for (const shot of ['docs/img/echo-retraction.png', 'docs/img/verify-route.png']) {
+      expect(existsSync(join(REPO, shot)), `${shot} is referenced by README`).toBe(true)
+      expect(README).toContain(shot)
+    }
+    expect(README).toContain('photograph of the running product')
   })
 })
 
