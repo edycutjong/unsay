@@ -15,6 +15,8 @@
  *   GET  /verify                                      public  — replay the hash chain
  *   GET  /health                                      public
  *   GET  / · /index.html · /clinician.html · /echo.html   public — the three surfaces
+ *   GET  /doc/readme · /doc/demo · /doc/architecture · /doc/spec · /doc/friction
+ *                                                     public — the prose, rendered
  *   GET  /README.md · /DEMO.md · /FRICTION.md · /docs/proof/*  public — what the pages cite
  *   OPTIONS *                                         public  — CORS preflight
  *
@@ -37,6 +39,7 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 
 import { AuditLog } from './audit.ts'
 import type { AuditReason, AuditVia } from './audit.ts'
+import { DOC_PAGES, renderDocPage } from './docpage.ts'
 import { type Envelope, announceOnce, envelopeFromEnv, startupLine } from './envelope.ts'
 import { buildServer } from './server.ts'
 import { LiveResourceStore, parseUri } from './store.ts'
@@ -196,6 +199,67 @@ export function signWriteBody(secret: string, timestamp: string, rawBody: Buffer
 // ── resumability ────────────────────────────────────────────────────────────
 
 /**
+ * Every URI a stored frame would NAME to whoever it is replayed to.
+ *
+ * Four shapes carry one, and all four are partition-relevant:
+ *   - `notifications/resources/updated` → `params.uri`
+ *   - the revision log channel          → `params.data.uri` (src/server.ts logRevision)
+ *   - a `resources/read` result         → `result.contents[].uri`
+ *   - a `resources/list` result         → `result.resources[].uri`
+ *
+ * A frame naming none — an initialize result, a tool result, a ping — is not a
+ * statement about the care partition and is replayed unchanged.
+ */
+export function urisNamedBy(message: JSONRPCMessage): string[] {
+  const uris: string[] = []
+  const push = (v: unknown) => { if (typeof v === 'string') uris.push(v) }
+  const m = message as {
+    params?: { uri?: unknown; data?: { uri?: unknown } }
+    result?: { contents?: { uri?: unknown }[]; resources?: { uri?: unknown }[] }
+  }
+  push(m.params?.uri)
+  push(m.params?.data?.uri)
+  for (const c of m.result?.contents ?? []) push(c.uri)
+  for (const r of m.result?.resources ?? []) push(r.uri)
+  return uris
+}
+
+/**
+ * May this principal be handed this stored frame again?
+ *
+ * The live send path re-authorizes at dispatch (`canNotify` in src/server.ts, and
+ * `logRevision()` on the second channel). Replay did not, and that was a real hole:
+ * a session whose principal had narrowed to `care.read.user` could resume with
+ * `Last-Event-ID` and be handed back `care-internal://ray/risk` — the URI, the
+ * version, the author, the timestamp and both hash-chain links — which is exactly
+ * the existence the partition refuses to confirm on a read (SPEC I-2, I-9).
+ *
+ * Fails closed on a URI this partition did not issue, for the same reason
+ * `canNotify` does: an unparseable URI is one we cannot authorize, not one we may
+ * assume is harmless.
+ */
+export function replayAllowed(message: JSONRPCMessage, principal: Principal | undefined): boolean {
+  const uris = urisNamedBy(message)
+  if (!uris.length) return true
+  if (!principal) return false
+  return uris.every((uri) => {
+    const parsed = parseUri(uri)
+    return parsed !== null && principal.scopes.includes(SCOPE[parsed.audience])
+  })
+}
+
+export interface MemoryEventStoreOptions {
+  capacity?: number
+  /**
+   * Re-authorization at REPLAY time. Returning false drops the stored frame
+   * silently, exactly as `canNotify` drops a live one. Defaults to "always
+   * allowed", which is only correct for a store whose principals never narrow —
+   * `createHttpServer` supplies the real guard.
+   */
+  canReplay?: (message: JSONRPCMessage) => boolean
+}
+
+/**
  * In-memory EventStore. Resumability is what lets a correction survive the
  * network dropping under an Echo Show mid-answer: the notification is stored
  * whether or not a stream is attached, and replayed on Last-Event-ID.
@@ -203,10 +267,16 @@ export function signWriteBody(secret: string, timestamp: string, rawBody: Buffer
 export class MemoryEventStore implements EventStore {
   #events: { id: EventId; streamId: StreamId; message: JSONRPCMessage }[] = []
   #seq = 0
+  #canReplay: (message: JSONRPCMessage) => boolean
   readonly capacity: number
+  /** Frames withheld from a resume because the resuming principal lost the scope. */
+  replaysWithheld = 0
 
-  constructor(capacity = 2048) {
-    this.capacity = capacity
+  constructor(opts: MemoryEventStoreOptions | number = {}) {
+    // A bare capacity was the old signature; keep it working rather than break a caller.
+    const o = typeof opts === 'number' ? { capacity: opts } : opts
+    this.capacity = o.capacity ?? 2048
+    this.#canReplay = o.canReplay ?? (() => true)
   }
 
   async storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId> {
@@ -232,6 +302,12 @@ export class MemoryEventStore implements EventStore {
       // Priming events are stored as `{}` to anchor a resumption point; they are
       // not protocol messages and must not be handed back to a client.
       if (!('jsonrpc' in e.message)) continue
+      // A frame was authorized when it was STORED. The principal behind the
+      // session can narrow before it resumes, so it is authorized again here.
+      if (!this.#canReplay(e.message)) {
+        this.replaysWithheld++
+        continue
+      }
       await send(e.id, e.message)
     }
     return streamId
@@ -336,7 +412,12 @@ export async function createHttpServer(
   const atRest = startupLine(store.envelope)
   const audit = opts.audit ?? new AuditLog({ sink: process.env.UNSAY_AUDIT_LOG })
   const secrets = { token: opts.tokenSecret ?? tokenSecret(), write: opts.writeSecret ?? writeSecret() }
-  const events = new MemoryEventStore()
+  // The resuming principal is the one the GET handler put in `currentPrincipal`
+  // (see handleMcp), so a narrowed token cannot pull an internal URI back out of
+  // the replay buffer that a wider one filled. SPEC I-9.
+  const events = new MemoryEventStore({
+    canReplay: (message) => replayAllowed(message, currentPrincipal.getStore()),
+  })
   const serveWeb = opts.serveWeb !== false
   const sessions = new Map<string, Session>()
   const stats = { sseOpens: 0, sseResumes: 0, lastResumeAt: 0, writesAccepted: 0, writesRejected: 0 }
@@ -391,6 +472,8 @@ export async function createHttpServer(
     if (serveWeb && (req.method === 'GET' || req.method === 'HEAD')) {
       const page = STATIC_PAGES[path === '/' ? '/index.html' : path]
       if (page) return sendPage(res, page, req.method === 'HEAD')
+      const doc = DOC_PAGES[path]
+      if (doc) return sendDoc(res, path, doc.file, doc.title, req.method === 'HEAD')
       const repoFile = REPO_FILES[path]
       if (repoFile) return sendFile(res, repoFile, REPO_FILE_TYPE(repoFile), req.method === 'HEAD')
     }
@@ -434,6 +517,70 @@ export async function createHttpServer(
     res.setHeader('access-control-expose-headers', 'mcp-session-id, www-authenticate')
     res.setHeader('access-control-max-age', '600')
     res.setHeader('vary', 'origin')
+  }
+
+  // ── the pages, dressed for the origin they are being served from ──────────
+
+  /**
+   * Per-server, not module-level: two servers in one process bind different
+   * origins and mint different tokens, and a shared cache would hand one's
+   * credential to the other's visitor.
+   */
+  const dressedPages = new Map<string, Buffer>()
+
+  /**
+   * A `care.read.user` token for the landing page's two jump links, minted only
+   * while this process is serving the BUILT-IN demo seed.
+   *
+   * The links used to be bare `href="echo.html"`, so a judge who opened the page
+   * `npm start` prints first and clicked through landed on a red "Not connected"
+   * banner over a bearer-token entry form, with the product below the fold — while
+   * the tokens that make it work existed, minted at startup, and were printed only
+   * into the terminal. The mechanism worked and the judged path to it did not
+   * (LESSONS R13). A deployment that mounts its own store gets the bare links back.
+   */
+  const demoSeed = opts.store === undefined
+  const demoLinkToken = demoSeed
+    ? mintToken({ sub: 'echo-show', scopes: [SCOPE.user], audience: resourceUrl, secret: secrets.token })
+    : null
+  // The write key is a secret. It is put in a link only when it is the dev key,
+  // which is printed in this file and in DEMO.md and protects nothing.
+  const demoWriteKey = secrets.write === DEV_WRITE_SECRET ? DEV_WRITE_SECRET : null
+
+  /**
+   * Rewrites a page for THIS origin: `og:image`/`og:url` made absolute (a relative
+   * og:image does not resolve in most scrapers), and the landing page's links into
+   * the two live screens given the demo token.
+   */
+  function dressPage(file: string, html: string): string {
+    let out = html.replace(
+      /(<meta (?:property|name)="(?:og:(?:image|url)|twitter:image)" content=")(\/[^"]*)"/g,
+      (_m, head: string, path: string) => `${head}${baseUrl}${path}"`,
+    )
+    if (file === 'index.html' && demoLinkToken) {
+      const q = new URLSearchParams({ token: demoLinkToken })
+      out = out.replaceAll('href="echo.html"', `href="echo.html?${q}"`)
+      const cq = new URLSearchParams(
+        demoWriteKey ? { token: demoLinkToken, key: demoWriteKey } : { token: demoLinkToken },
+      )
+      out = out.replaceAll('href="clinician.html"', `href="clinician.html?${cq}"`)
+    }
+    return out
+  }
+
+  function sendPage(res: ServerResponse, file: string, headOnly: boolean) {
+    let body = dressedPages.get(file)
+    if (!body) {
+      let raw: Buffer
+      try {
+        raw = readFileSync(new URL(`../web/${file}`, import.meta.url))
+      } catch {
+        return json(res, 404, { error: 'not_found' })
+      }
+      body = Buffer.from(dressPage(file, raw.toString('utf8')), 'utf8')
+      dressedPages.set(file, body)
+    }
+    sendBuffer(res, body, 'text/html; charset=utf-8', headOnly)
   }
 
   // ── MCP ───────────────────────────────────────────────────────────────────
@@ -838,6 +985,11 @@ const REPO_FILES: Record<string, string> = {
   '/skill/SKILL.md': 'skill/SKILL.md',
   '/icon.svg': 'docs/icon.svg',
   '/og.svg': 'docs/og.svg',
+  // The raster card. No scraper renders an SVG og:image, so the SVG is the source
+  // and this is what the meta tag names. web/web.test.ts reads its IHDR and fails
+  // if it is not exactly 1200×630.
+  '/og.png': 'docs/og.png',
+  '/docs/readme-hero.svg': 'docs/readme-hero.svg',
   '/packages/live-resources/src/store.ts': 'packages/live-resources/src/store.ts',
   '/src/server.ts': 'src/server.ts',
   '/src/http.ts': 'src/http.ts',
@@ -845,14 +997,29 @@ const REPO_FILES: Record<string, string> = {
 
 /**
  * Served as text, deliberately, including the `.ts` files: a judge following a
- * link from the page wants to READ the enforcement point, not download it.
+ * link from the page wants to READ the enforcement point, not download it. The
+ * five `.md` documents are the exception a person actually reads end to end, so
+ * they are also rendered at `/doc/<name>` (src/docpage.ts) and that is where the
+ * pages link; these raw paths stay for `curl` and for a diff.
  */
 const REPO_FILE_TYPE = (file: string) =>
   file.endsWith('.json') ? 'application/json; charset=utf-8'
     : file.endsWith('.svg') ? 'image/svg+xml; charset=utf-8'
+    : file.endsWith('.png') ? 'image/png'
     : 'text/plain; charset=utf-8'
 
 const pageCache = new Map<string, Buffer>()
+
+function sendBuffer(res: ServerResponse, body: Buffer, contentType: string, headOnly: boolean) {
+  res.writeHead(200, {
+    'content-type': contentType,
+    'content-length': body.length,
+    // The pages are the demo surface and change with every deploy; a cached copy
+    // pointing at a stale bench number is worse than a re-fetch of 30 kB.
+    'cache-control': 'no-cache',
+  })
+  headOnly ? res.end() : res.end(body)
+}
 
 function sendFile(res: ServerResponse, rel: string, contentType: string, headOnly: boolean) {
   let body = pageCache.get(rel)
@@ -864,18 +1031,28 @@ function sendFile(res: ServerResponse, rel: string, contentType: string, headOnl
     }
     pageCache.set(rel, body)
   }
-  res.writeHead(200, {
-    'content-type': contentType,
-    'content-length': body.length,
-    // The pages are the demo surface and change with every deploy; a cached copy
-    // pointing at a stale bench number is worse than a re-fetch of 30 kB.
-    'cache-control': 'no-cache',
-  })
-  headOnly ? res.end() : res.end(body)
+  sendBuffer(res, body, contentType, headOnly)
 }
 
-function sendPage(res: ServerResponse, file: string, headOnly: boolean) {
-  sendFile(res, `web/${file}`, 'text/html; charset=utf-8', headOnly)
+/**
+ * One of the five prose documents, rendered rather than handed over as source.
+ * See src/docpage.ts for why: `text/plain` markdown was the judge experience
+ * behind every footer link and two of the Proof cards.
+ */
+function sendDoc(res: ServerResponse, path: string, file: string, title: string, headOnly: boolean) {
+  const key = `doc:${path}`
+  let body = pageCache.get(key)
+  if (!body) {
+    let md: string
+    try {
+      md = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
+    } catch {
+      return json(res, 404, { error: 'not_found' })
+    }
+    body = Buffer.from(renderDocPage(md, { title, path, rawPath: `/${file}` }), 'utf8')
+    pageCache.set(key, body)
+  }
+  sendBuffer(res, body, 'text/html; charset=utf-8', headOnly)
 }
 
 // ── small helpers ───────────────────────────────────────────────────────────

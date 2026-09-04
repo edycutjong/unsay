@@ -67,6 +67,15 @@ const allowlist = (name: string) => {
 }
 const staticPages = allowlist('STATIC_PAGES')
 const repoFiles = allowlist('REPO_FILES')
+/**
+ * The rendered documents live in their own table in src/docpage.ts, and the router
+ * dispatches on it rather than on `path === '/doc/x'` — so without this they would
+ * be five real, judge-facing routes the generated inventory did not mention, which
+ * is the same R6 shape as documenting a route that does not exist.
+ */
+const docSource = bodies.get('src/docpage.ts') ?? ''
+const docRoutes = [...docSource.matchAll(/'(\/doc\/\w+)': \{ file: '([^']+)'/g)]
+  .map((m) => ({ route: m[1]!, file: m[2]! }))
 const routeMethods = (path: string) => {
   if (path === '/mcp') return 'POST · GET · DELETE'
   if (path === '/write') return 'POST'
@@ -202,8 +211,14 @@ for (const r of routes.filter((r) => r !== '/').sort()) {
 for (const page of staticPages) {
   A(`| \`${page}\`${page === '/index.html' ? ' (and `/`)' : ''} | GET · HEAD | public — served from \`web/\` |`)
 }
+for (const doc of docRoutes) {
+  A(`| \`${doc.route}\` | GET · HEAD | public — \`${doc.file}\` rendered by \`src/docpage.ts\` |`)
+}
 A()
-A(`**${routes.filter((r) => r !== '/').length} routes + ${staticPages.length} static pages**, all in \`src/http.ts\`.`)
+A(
+  `**${routes.filter((r) => r !== '/').length} routes + ${staticPages.length} static pages + ` +
+    `${docRoutes.length} rendered documents**, all in \`src/http.ts\`.`,
+)
 A()
 A('Plus a second read-only allowlist — the documents and receipts the landing page')
 A('cites, so every link on it resolves against the server a judge is already running:')
@@ -287,5 +302,5 @@ A('- No blockchain, token, or payment surface.')
 writeFileSync(join(ROOT, 'ARCHITECTURE.md'), lines.join('\n') + '\n')
 console.log(
   `ARCHITECTURE.md generated — ${new Set(handlers).size} handlers, ${new Set(notifications).size} notifications, ` +
-    `${routes.length - 1} HTTP routes, ${staticPages.length} pages, ${deps.length} deps`,
+    `${routes.length - 1} HTTP routes, ${staticPages.length} pages, ${docRoutes.length} documents, ${deps.length} deps`,
 )

@@ -12,11 +12,17 @@
 <meta property="og:site_name" content="Unsay">
 <meta property="og:title" content="Unsay — clinician write screen">
 <meta property="og:description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
-<meta property="og:image" content="/og.svg">
+<meta property="og:url" content="/clinician.html">
+<meta property="og:image" content="/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Unsay — clinician write screen">
 <meta name="twitter:description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
-<meta name="twitter:image" content="/og.svg">
+<meta name="twitter:image" content="/og.png">
+<meta name="twitter:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 :root{
@@ -65,14 +71,6 @@ a:hover{border-bottom-color:var(--accent)}
 .status.down .led{background:var(--red)}
 .status.busy .led{background:var(--amber); animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
-
-/* The only infinite animation on this page, and the only one of the three pages
-   with no reduced-motion path until now. */
-@media (prefers-reduced-motion: reduce){
-  .status.busy .led{animation:none; opacity:1}
-  summary::after{transition:none}
-  input,textarea,button{transition:none}
-}
 
 details.setup{margin:18px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:12px}
 details.setup[open]{border-color:var(--muted)}
@@ -172,6 +170,22 @@ textarea{min-height:86px; resize:vertical; line-height:1.5}
 .foot{margin:46px 0 0; padding-top:22px; border-top:1px solid var(--line-soft); color:var(--dim); font-size:13.5px}
 .foot h3{font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; font-weight:500}
 .foot p{margin:0 0 12px; line-height:1.65}
+/* ── reduced motion ──────────────────────────────────────────────────────────
+   LAST in the sheet, and specific enough to win, on purpose.
+
+   This block used to sit two hundred lines up, above every rule it cancels: the
+   caret, the inputs and every button kept their transitions because a later rule
+   of equal specificity beats an earlier one, and `input,textarea,button` (0,0,1)
+   loses outright to `input[type=text]` (0,1,1). Three of its four declarations
+   did nothing, measured in a browser with the preference set — CSS that declares
+   a behaviour it does not produce is R6 living in a stylesheet. */
+@media (prefers-reduced-motion: reduce){
+  .status.busy .led{animation:none; opacity:1}
+  summary::after{transition:none}
+  input[type=text],input[type=password],textarea{transition:none}
+  button{transition:none}
+  button:active{transform:none}
+}
 </style>
 </head>
 <body>
@@ -534,6 +548,7 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
     const ms = new Date(nowIso).getTime() - new Date(fromIso).getTime()
     if (!isFinite(ms)) return 'an unknown time'
     const s = Math.max(0, Math.round(ms / 1000))
+    if (s < 5) return 'moments'
     if (s < 60) return s === 1 ? '1 second' : s + ' seconds'
     const m = Math.round(s / 60); if (m < 60) return m === 1 ? '1 minute' : m + ' minutes'
     const h = Math.round(m / 60); if (h < 36) return h === 1 ? '1 hour' : h + ' hours'
@@ -596,8 +611,14 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
 
       const meta = el('div', 'meta')
       meta.appendChild(el('span', 'd ' + (f.stale ? 'red' : 'green')))
+      // The suffix belongs INSIDE the branch. Appended outside it, the stale line
+      // read "not updated for 9 days ago" — a duration preposition and a past-tense
+      // adverb on the same clause, in red, on the anticoagulant record. echo.html
+      // has always got this right; this is the same shape.
       meta.appendChild(el('span', f.stale ? 'stale-txt' : null,
-        (f.stale ? 'not updated for ' : 'changed ') + age(f.lastModified, state.now) + ' ago'))
+        f.stale
+          ? 'not updated for ' + age(f.lastModified, state.now)
+          : 'changed ' + age(f.lastModified, state.now) + ' ago'))
       meta.appendChild(el('span', 'sep', '·'))
       meta.appendChild(el('span', null, f.author))
       if (f.version != null) {

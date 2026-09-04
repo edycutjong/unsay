@@ -314,6 +314,12 @@ describe('every pointer the pages give a judge lands on something', () => {
     const http = readFileSync(join(REPO, 'src/http.ts'), 'utf8')
     const served = new Set([...http.matchAll(/'(\/[\w./-]+)': '[\w./-]+',/g)].map((m) => m[1]!))
     served.add('/verify')
+    // The five prose documents are rendered at /doc/<name> rather than served as
+    // markdown source; the routes come from the same table the server routes on.
+    const docs = readFileSync(join(REPO, 'src/docpage.ts'), 'utf8')
+    const docRoutes = [...docs.matchAll(/'(\/doc\/\w+)': \{ file:/g)].map((m) => m[1]!)
+    expect(docRoutes.length, 'DOC_PAGES no longer parses').toBe(5)
+    for (const r of docRoutes) served.add(r)
     const rooted = [...all['index.html']!.matchAll(/(?:href|data-source|data-probe)="(\/[^"#]*)"/g)]
       .map((m) => m[1]!)
     expect(rooted.length).toBeGreaterThan(6)
@@ -492,4 +498,224 @@ describe("the device screen's own MCP client, executed", () => {
       await srv.close()
     }
   }, 20_000)
+})
+
+describe('the proof card describes the payload the endpoint returns', () => {
+  /**
+   * The card headed "The judge's instrument" told a judge that `GET /verify`
+   * returns the negotiated `initialize` block and live
+   * `notifications/resources/updated` frames. It returns neither and never has —
+   * the negotiated block is in `docs/proof/probe_subscribe.json` and the frames go
+   * down `/mcp`. Every other count on that page is recomputed from its artifact;
+   * this prose was gated by nothing, which is R6 in its exact canonical form on the
+   * page a judge is most likely to open first, one `curl` away from being caught.
+   */
+  it('names only keys a live GET /verify actually carries', async () => {
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const payload = (await (await fetch(`${srv.baseUrl}/verify`)).json()) as Record<string, unknown>
+      const card = /<a class="card" id="verifyCard"[\s\S]*?<\/a>/.exec(all['index.html']!)?.[0]
+      expect(card, 'the landing page no longer has a #verifyCard').toBeTypeOf('string')
+      const claimed = [...card!.matchAll(/<code>([\w.]+)<\/code>/g)].map((m) => m[1]!)
+      expect(claimed.length, 'the card names no field at all').toBeGreaterThan(2)
+      expect(claimed.filter((k) => !(k in payload))).toEqual([])
+    } finally {
+      await srv.close()
+    }
+  })
+})
+
+describe('the hero frame names the version the chain is at', () => {
+  it('labels the correction v3, the revision whose retraction it prints', async () => {
+    /**
+     * The frame said `→ v2` while the retraction on the same line — machine-checked
+     * against renderRetraction() by the case above — is rendered from v2→v3. A
+     * judge who runs `npm run e2e` sees `v3` and then sees `v2` on the page, which
+     * reads as the illustration having been drawn rather than derived.
+     */
+    const { DEMO_NOW, RAY, STAGED_REVISION, seedDemo } = await import('../src/seed.ts')
+    const store = seedDemo()
+    store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    const latest = store.versions(RAY, 'weight_bearing').at(-1)!
+    const shown = /weight_bearing → v(\d+)/.exec(all['index.html']!)?.[1]
+    expect(shown, 'the hero no longer labels the corrected version').toBeTypeOf('string')
+    expect(Number(shown)).toBe(latest.version)
+  })
+})
+
+describe('reduced motion is the last word in every sheet', () => {
+  /**
+   * clinician.html declared `transition:none` for the inputs, every button and the
+   * disclosure caret from an at-rule two hundred lines ABOVE the rules it cancels.
+   * Measured in a browser with the preference set, three of its four declarations
+   * did nothing: a later rule of equal specificity wins, and `input,textarea,button`
+   * (0,0,1) loses outright to `input[type=text]` (0,1,1). CSS that declares a
+   * behaviour it does not produce is the R6 shape living in a stylesheet.
+   */
+  const sheet = (html: string) => /<style>([\s\S]*?)<\/style>/.exec(html)![1]!
+
+  for (const page of PAGES) {
+    it(`${page} closes its stylesheet with the reduced-motion at-rule`, () => {
+      const css = sheet(all[page]!)
+      const media = [...css.matchAll(/@media\s*\(([^)]*)\)/g)].map((m) => m[1]!.trim())
+      expect(media.length, `${page} has no @media at all`).toBeGreaterThan(0)
+      expect(media.at(-1), `${page} cancels motion before the rules it cancels`).toBe(
+        'prefers-reduced-motion: reduce',
+      )
+    })
+  }
+
+  it('cancels the input transition at a specificity that can win', () => {
+    // 0,1,1 to beat `input[type=text]`, not the 0,0,1 of a bare `input`.
+    expect(sheet(all['clinician.html']!)).toContain(
+      'input[type=text],input[type=password],textarea{transition:none}',
+    )
+  })
+})
+
+describe('the social card is a raster a scraper can render', () => {
+  /**
+   * `og:image` pointed at `/og.svg`. No major platform renders an SVG og:image and
+   * most do not resolve a relative one, so the preview was blank everywhere the
+   * repo link was pasted — and with no raster in the tree there was nothing to
+   * upload for the Devpost gallery card either. R13: a great repo behind a weak
+   * platform surface.
+   */
+  const png = readFileSync(join(REPO, 'docs/og.png'))
+
+  it('is a PNG of exactly 1200×630, the size every scraper crops to', () => {
+    expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
+    expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR')
+    expect(png.readUInt32BE(16)).toBe(1200)
+    expect(png.readUInt32BE(20)).toBe(630)
+  })
+
+  it('is what every page names, with the dimensions and the alt text beside it', () => {
+    for (const page of PAGES) {
+      const html = all[page]!
+      expect(html, page).toContain('<meta property="og:image" content="/og.png">')
+      expect(html, page).toContain('<meta name="twitter:image" content="/og.png">')
+      expect(html, page).toContain('<meta property="og:image:width" content="1200">')
+      expect(html, page).toContain('<meta property="og:image:height" content="630">')
+      expect(html, page).toMatch(/<meta property="og:image:alt" content="[^"]{20,}">/)
+      expect(html, page).toContain(`<meta property="og:url" content="/${page}">`)
+      expect(html, page).not.toContain('content="/og.svg"')
+    }
+  })
+
+  it('keeps both descriptions inside the length a preview will show', () => {
+    for (const page of PAGES) {
+      const html = all[page]!
+      const og = /<meta property="og:description" content="([^"]*)"/.exec(html)![1]!
+      const meta = /<meta name="description" content="([^"]*)"/.exec(html)![1]!
+      expect(og.length, `${page} og:description`).toBeLessThanOrEqual(125)
+      expect(meta.length, `${page} meta description`).toBeLessThanOrEqual(155)
+    }
+  })
+})
+
+describe('the clinician screen says how long ago in English', () => {
+  /**
+   * The page rendered "not updated for 9 days ago" — a duration preposition and a
+   * past-tense adverb on one clause, in red, on the anticoagulant record, on the
+   * screen a clinician is meant to trust. The `' ago'` suffix was appended outside
+   * the branch. This executes the page's own expression rather than a copy of it.
+   */
+  const html = all['clinician.html']!
+  const ageSrc = /function age\(fromIso, nowIso\) \{[\s\S]*?\n  \}/.exec(html)![0]!
+  const expr = /el\('span', f\.stale \? 'stale-txt' : null,\n([\s\S]*?)\)\)\n/.exec(html)![1]!
+  const line = new Function('f', 'state', `${ageSrc}\nreturn (${expr})`) as (
+    f: { stale: boolean; lastModified: string },
+    state: { now: string },
+  ) => string
+
+  const NOW = '2026-10-13T09:14:00.000Z'
+  const NINE_DAYS = '2026-10-04T09:14:00.000Z'
+
+  it('reads "not updated for 9 days", not "for 9 days ago"', () => {
+    const stale = line({ stale: true, lastModified: NINE_DAYS }, { now: NOW })
+    expect(stale).toBe('not updated for 9 days')
+    expect(stale, 'a duration and a past-tense adverb on the same clause').not.toMatch(/for .* ago/)
+  })
+
+  it('still says "changed N ago" for a current record', () => {
+    expect(line({ stale: false, lastModified: NINE_DAYS }, { now: NOW })).toBe('changed 9 days ago')
+  })
+
+  it('says "moments" rather than "0 seconds" right after a publish', () => {
+    expect(line({ stale: false, lastModified: NOW }, { now: NOW })).toBe('changed moments ago')
+  })
+})
+
+describe('the served pages are what a judge actually gets', () => {
+  it('hands the landing page links that already carry a demo token', async () => {
+    /**
+     * All three links into the two live screens were bare `href="echo.html"`, so
+     * clicking through from the page `npm start` prints first landed on a red "Not
+     * connected" banner over a token entry form, with the product below the fold —
+     * while the server held the tokens the whole time and printed them only into
+     * the terminal. The mechanism worked; the judged path to it did not (R13).
+     */
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const body = await (await fetch(`${srv.baseUrl}/index.html`)).text()
+      expect(body).toContain('href="echo.html?token=')
+      expect(body).toContain('href="clinician.html?token=')
+      // The raw hrefs stay in the file, so the link allowlist above still holds.
+      expect(all['index.html']).toContain('href="echo.html"')
+      // og:image cannot be relative and reach a scraper; the server absolutizes it.
+      expect(body).toContain(`content="${srv.baseUrl}/og.png"`)
+      expect(body).toContain(`content="${srv.baseUrl}/index.html"`)
+    } finally {
+      await srv.close()
+    }
+  })
+
+  it('renders the five documents as HTML instead of handing over markdown source', async () => {
+    /**
+     * Every prose document the page links to was served `text/plain`, so a judge
+     * following the footer or a Proof card got raw markdown in the browser's
+     * default serif, edge to edge. The old allowlist test asserted each path
+     * "returns 200 with the expected content" — true, green, and unreadable
+     * (LESSONS R11).
+     */
+    const { createHttpServer } = await import('../src/http.ts')
+    const { DOC_PAGES } = await import('../src/docpage.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      for (const [path, doc] of Object.entries(DOC_PAGES)) {
+        const res = await fetch(`${srv.baseUrl}${path}`)
+        expect(res.status, path).toBe(200)
+        expect(res.headers.get('content-type'), path).toContain('text/html')
+        const body = await res.text()
+        expect(body, path).toMatch(/<h1 id="[^"]*">/)
+        expect(body, path).not.toContain('\n## ')
+        // The raw source stays reachable for curl and for a diff.
+        expect(body, path).toContain(`href="/${doc.file}"`)
+        const raw = await fetch(`${srv.baseUrl}/${doc.file}`)
+        expect(raw.headers.get('content-type'), doc.file).toContain('text/plain')
+      }
+    } finally {
+      await srv.close()
+    }
+  })
+
+  it('renders a table, a code fence and a resolved link, and escapes the rest', async () => {
+    const { renderMarkdown } = await import('../src/docpage.ts')
+    const out = renderMarkdown(
+      '# Title\n\n| a | b |\n|---|---|\n| 1 | `2` |\n\n```bash\nnpm run verify\n```\n\n' +
+        'See [the spec](docs/SPEC.md) and [nothing](src/nowhere.ts). <script>alert(1)</script>\n',
+    )
+    expect(out).toContain('<h1 id="title">Title</h1>')
+    expect(out).toContain('<th>a</th>')
+    expect(out).toContain('<code>2</code>')
+    expect(out).toContain('<pre data-lang="bash"><code>npm run verify</code></pre>')
+    expect(out).toContain('<a href="/doc/spec">the spec</a>')
+    // A link this server answers nowhere is text, not a 404 waiting to happen.
+    expect(out).toContain('<span class="unlinked">nothing</span>')
+    expect(out).not.toContain('<script>')
+    expect(out).toContain('&lt;script&gt;')
+  })
 })

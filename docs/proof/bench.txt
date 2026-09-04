@@ -1,13 +1,13 @@
-unsay bench · 200 revisions · 2026-09-04T11:28:32.162Z
+unsay bench · 200 revisions · 2026-09-04T12:21:25.860Z
 transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk 1.30.0
 path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read
 at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)
 
 segment                             p50        p95        max
-signed write → notification       0.7ms      1.6ms      3.2ms
-notification → re-read            0.7ms      1.8ms      3.8ms
+signed write → notification       0.7ms      1.3ms      4.8ms
+notification → re-read            0.8ms      1.7ms      3.2ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.3ms      2.7ms      6.6ms
+END-TO-END (write → value)        1.5ms      3.0ms      8.0ms
 
 speech window: a 12-word utterance ≈ 3400 ms (an assumed speech rate, not a
 measurement of Alexa+ TTS)

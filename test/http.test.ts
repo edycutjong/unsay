@@ -19,7 +19,9 @@ import { Envelope, LocalKeyProvider } from '../src/envelope.ts'
 import {
   createHttpServer,
   mintToken,
+  replayAllowed,
   signWriteBody,
+  urisNamedBy,
   verifyToken,
   WRITE_SKEW_MS,
 } from '../src/http.ts'
@@ -833,5 +835,212 @@ describe('/write attributes to the principal it verified', () => {
     }
     const uris = own.store.list({ sub: 't', scopes: [SCOPE.user] }).map((x) => x.uri)
     expect(uris.some((u) => u.includes('evil') || u.includes('v99'))).toBe(false)
+  })
+})
+
+// ── the resume path, re-authorized ──────────────────────────────────────────
+
+describe('a resumed SSE stream is re-authorized, not replayed blind', () => {
+  /**
+   * The hole this closes was reproducible against a running server. A session
+   * opened with `care.read.assistant`, subscribed to `care-internal://ray/risk`,
+   * then resumed with `Last-Event-ID` under a NARROWED token of the same subject,
+   * and was handed back the internal URI, its version, its author, its timestamp
+   * and both hash-chain links — through `notifications/resources/updated` and the
+   * revision log channel alike. Both live channels re-authorize at send time
+   * (`canNotify`, `logRevision`); replay did not, so the whole guard could be
+   * walked around by dropping a stream and reconnecting. SPEC I-2, I-9.
+   */
+  const frames = async (res: Response, ms: number) => {
+    const reader = res.body!.getReader()
+    const dec = new TextDecoder()
+    let text = ''
+    const deadline = Date.now() + ms
+    try {
+      while (Date.now() < deadline) {
+        const race = await Promise.race([
+          reader.read(),
+          sleep(deadline - Date.now()).then(() => 'timeout' as const),
+        ])
+        if (race === 'timeout') break
+        if (race.done) break
+        text += dec.decode(race.value, { stream: true })
+      }
+    } finally {
+      await reader.cancel().catch(() => {})
+    }
+    return text
+  }
+
+  it('withholds an internal URI from a resume whose principal has narrowed', async () => {
+    const own = await createHttpServer({
+      store: seedDemo(new LiveResourceStore()),
+      tokenSecret: TOKEN_SECRET,
+      writeSecret: WRITE_SECRET,
+      announce: false,
+    })
+    const bearer = (scopes: string[]) =>
+      `Bearer ${mintToken({ sub: 'downgrade-probe', scopes, audience: own.resourceUrl, secret: TOKEN_SECRET })}`
+    const wide = bearer([SCOPE.user, SCOPE.assistant])
+    const narrow = bearer([SCOPE.user])
+
+    try {
+      const init = await fetch(`${own.baseUrl}/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: MCP_ACCEPT, Authorization: wide },
+        body: JSON.stringify(INITIALIZE),
+      })
+      const sid = init.headers.get('mcp-session-id')!
+      expect(sid).toBeTruthy()
+      await init.text()
+
+      const post = (body: unknown, auth: string) =>
+        fetch(`${own.baseUrl}/mcp`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            accept: MCP_ACCEPT,
+            'mcp-session-id': sid,
+            Authorization: auth,
+          },
+          body: JSON.stringify(body),
+        })
+
+      await (await post({ jsonrpc: '2.0', method: 'notifications/initialized' }, wide)).text()
+      await (
+        await post(
+          { jsonrpc: '2.0', id: 2, method: 'resources/subscribe', params: { uri: RISK } },
+          wide,
+        )
+      ).text()
+
+      // The wide session attaches its standalone stream and takes the live revision.
+      const live = await fetch(`${own.baseUrl}/mcp`, {
+        method: 'GET',
+        headers: { accept: 'text/event-stream', 'mcp-session-id': sid, Authorization: wide },
+      })
+      expect(live.ok).toBe(true)
+      const liveFrames = frames(live, 900)
+      await sleep(120)
+
+      const raw = Buffer.from(
+        JSON.stringify({
+          patient: RAY,
+          domain: 'risk',
+          audience: 'assistant',
+          value: 'Fall risk: HIGH. Reviewed today.',
+          authorId: 'mensah',
+          authorLabel: 'Dr Mensah, GP',
+        }),
+        'utf8',
+      )
+      const ts = new Date().toISOString()
+      const wrote = await fetch(`${own.baseUrl}/write`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-unsay-timestamp': ts,
+          'x-unsay-signature': signWriteBody(WRITE_SECRET, ts, raw),
+        },
+        body: raw,
+      })
+      expect(wrote.status).toBe(200)
+
+      const delivered = await liveFrames
+      expect(delivered, 'the wide session never saw the live revision').toContain('care-internal://')
+      const ids = [...delivered.matchAll(/^id: (.+)$/gm)].map((m) => m[1]!)
+      // Resume from BEFORE the internal frames, so there is something to withhold.
+      const resumeFrom = ids[0]!
+      expect(resumeFrom).toBeTruthy()
+
+      // The transport allows one connection per stream id, so the dropped stream
+      // has to be released server-side before a resume can attach — exactly what a
+      // proxy timeout does, and what scripts/probe_resume.ts does deliberately.
+      own.dropStreams()
+      await sleep(40)
+
+      // The same session, the same `sub`, a token that no longer carries
+      // care.read.assistant. Every stored frame naming an internal URI is dropped.
+      const narrowed = await fetch(`${own.baseUrl}/mcp`, {
+        method: 'GET',
+        headers: {
+          accept: 'text/event-stream',
+          'mcp-session-id': sid,
+          'last-event-id': resumeFrom,
+          Authorization: narrow,
+        },
+      })
+      expect(narrowed.ok).toBe(true)
+      const leaked = await frames(narrowed, 500)
+      expect(leaked, 'a narrowed resume was handed an internal URI').not.toContain('care-internal://')
+      expect(leaked, 'a narrowed resume was handed an internal chain link').not.toContain('versionHash')
+      expect(own.events.replaysWithheld).toBeGreaterThan(0)
+
+      // Control: the guard drops frames because of the SCOPE, not because replay
+      // is broken. The same cursor under the original token still delivers them.
+      own.dropStreams()
+      await sleep(40)
+      const again = await fetch(`${own.baseUrl}/mcp`, {
+        method: 'GET',
+        headers: {
+          accept: 'text/event-stream',
+          'mcp-session-id': sid,
+          'last-event-id': resumeFrom,
+          Authorization: wide,
+        },
+      })
+      const replayed = await frames(again, 500)
+      expect(replayed, 'the wide resume replayed nothing — the test proves nothing').toContain(
+        'care-internal://',
+      )
+    } finally {
+      await own.close()
+    }
+  }, 20_000)
+
+  it('replays a frame that names no partitioned URI unchanged', () => {
+    const ping = { jsonrpc: '2.0', id: 9, result: {} } as unknown as Parameters<typeof replayAllowed>[0]
+    expect(urisNamedBy(ping)).toEqual([])
+    expect(replayAllowed(ping, undefined)).toBe(true)
+  })
+
+  it('reads the URI out of every frame shape that carries one', () => {
+    const updated = {
+      jsonrpc: '2.0',
+      method: 'notifications/resources/updated',
+      params: { uri: RISK },
+    } as unknown as Parameters<typeof replayAllowed>[0]
+    const logged = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'notice', logger: 'unsay.revision', data: { uri: RISK, version: 2 } },
+    } as unknown as Parameters<typeof replayAllowed>[0]
+    const readResult = {
+      jsonrpc: '2.0',
+      id: 4,
+      result: { contents: [{ uri: RISK, text: 'Fall risk: HIGH' }] },
+    } as unknown as Parameters<typeof replayAllowed>[0]
+    const listResult = {
+      jsonrpc: '2.0',
+      id: 5,
+      result: { resources: [{ uri: WB }, { uri: RISK }] },
+    } as unknown as Parameters<typeof replayAllowed>[0]
+
+    for (const frame of [updated, logged, readResult, listResult]) {
+      expect(urisNamedBy(frame)).toContain(RISK)
+      expect(replayAllowed(frame, { sub: 'x', scopes: [SCOPE.user] })).toBe(false)
+      expect(replayAllowed(frame, { sub: 'x', scopes: [SCOPE.user, SCOPE.assistant] })).toBe(true)
+    }
+  })
+
+  it('fails closed on a URI this partition did not issue', () => {
+    const alien = {
+      jsonrpc: '2.0',
+      method: 'notifications/resources/updated',
+      params: { uri: 'ui://unsay/echo' },
+    } as unknown as Parameters<typeof replayAllowed>[0]
+    // Same rule canNotify() and logRevision() apply: a URI we cannot parse is one
+    // we cannot authorize, not one we may assume is harmless.
+    expect(replayAllowed(alien, { sub: 'x', scopes: [SCOPE.user, SCOPE.assistant] })).toBe(false)
   })
 })

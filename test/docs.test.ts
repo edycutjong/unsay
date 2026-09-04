@@ -175,6 +175,9 @@ describe('the counts in the documents are the counts', () => {
     const words: Record<number, string> = { 12: 'twelve', 13: 'thirteen', 14: 'fourteen' }
     expect(README, 'README miscounts FRICTION.md').toContain(`${words[entries]} entries`)
     expect(FRICTION.toLowerCase()).toContain(`${words[entries]} entries.`)
+    // The CTA badge carries the same number in a URL, where it is just as capable
+    // of going stale and just as visible in the first screen.
+    expect(README, 'the CTA badge miscounts FRICTION.md').toContain(`-${entries}%20entries-`)
   })
 
   it('agrees with the verify receipt about how many assertions it makes', () => {
@@ -266,5 +269,173 @@ describe('the judge-facing pointers land on something', () => {
     expect(README).toContain('skill/SKILL.md')
     expect(README).toContain('ui://unsay/echo')
     expect(read('skill/SKILL.md')).toContain('name: unsay-care-plan')
+  })
+})
+
+describe('DEMO.md quotes output the scripts can actually produce', () => {
+  /** The `**Expected:**` block under one section heading — not the command above it. */
+  const expected = (heading: string) => {
+    const from = DEMO.indexOf(`## ${heading}`)
+    expect(from, `DEMO.md has no section "${heading}"`).toBeGreaterThan(-1)
+    const m = /\*\*Expected:\*\*\n+```\n([\s\S]*?)\n```/.exec(DEMO.slice(from))
+    expect(m, `DEMO.md has no Expected block under "${heading}"`).not.toBeNull()
+    return m![1]!
+  }
+
+  describe('§1 · the probe block', () => {
+    /**
+     * This block used to read `write → notification : <1 ms` — a string
+     * `scripts/probe_subscribe.ts` cannot emit — and silently dropped five lines it
+     * does emit, while every other Expected block in the file was verbatim. An
+     * abridged, hand-rounded block in the same visual form as the captured ones
+     * invites a judge to conclude none of them are captures.
+     */
+    const probeSrc = read('scripts/probe_subscribe.ts')
+    const block = expected('1 · The correction mechanism is real')
+
+    it('quotes no line the script has no format string for', () => {
+      for (const line of block.split('\n').map((l) => l.trim()).filter(Boolean)) {
+        const label = (line.includes(':') ? line.slice(0, line.indexOf(':')) : line).trim()
+        expect(probeSrc, `DEMO quotes "${label}", which probe_subscribe.ts never prints`)
+          .toContain(label)
+      }
+    })
+
+    it('omits no line the script does print', () => {
+      const printed = [...probeSrc.matchAll(/log\((['`])([^'`$]*)/g)]
+        .map((m) => m[2]!.replace(/^\\n/, '').replace(/\\n$/, '').trim())
+        .filter((s) => s.length > 3)
+      expect(printed.length).toBeGreaterThan(8)
+      expect(printed.filter((p) => !block.includes(p))).toEqual([])
+    })
+
+    it('quotes the latency in the shape the script formats it, and says it moves', () => {
+      // `toFixed(2)`, not a hand-rounded "<1 ms" that no run can produce.
+      const m = /write → notification\s+: (\d+\.\d{2}) ms/.exec(block)
+      expect(m, 'the probe block no longer quotes a two-decimal figure').not.toBeNull()
+      expect(DEMO).toContain(`\`${m![1]} ms\` will differ`)
+    })
+  })
+
+  describe('§3 · the encrypted run', () => {
+    /**
+     * The encrypted block quoted `5 chains · 7 versions` for a run that prints 8,
+     * six lines below a plaintext block that says 8 — two blocks in one section
+     * contradicting each other, in the section that carries the AES-256-GCM claim.
+     * Encryption seals the value; it adds and removes no revision, so the two lines
+     * must agree everywhere except the sealed count.
+     */
+    const lines = [...DEMO.matchAll(/GET \/verify \(no token\)\s+(\d+) chains · (\d+) versions · intact (\w+) · (\d+)\/(\d+) sealed at rest/g)]
+
+    it('quotes the same chain and version counts as the plaintext run', () => {
+      expect(lines.length, 'DEMO no longer shows both /verify lines').toBe(2)
+      const [plain, sealed] = lines as [RegExpMatchArray, RegExpMatchArray]
+      expect(sealed[1], 'chain counts disagree').toBe(plain[1])
+      expect(sealed[2], 'version counts disagree').toBe(plain[2])
+      expect(sealed[3]).toBe(plain[3])
+      expect(plain[4]).toBe('0')
+      expect(sealed[4]).toBe(sealed[5])
+      expect(sealed[5]).toBe(plain[5])
+    })
+
+    it('counts the speakable chains the seed actually holds', async () => {
+      const { seedDemo } = await import('../src/seed.ts')
+      const speakable = seedDemo()
+        .list({ sub: 'anon', scopes: ['care.read.user'] })
+        .filter((r) => r.uri.startsWith('care://'))
+      expect(Number(lines[0]![1])).toBe(speakable.length)
+    })
+
+    it('says three lines differ, because three do', () => {
+      // The envelope prints its banner once on startup and once inside the run.
+      expect(DEMO).toContain('Identical output except three lines')
+    })
+  })
+
+  describe('§6 · the curl walkthrough', () => {
+    it('quotes every label GET /verify prints, including the one it dropped', () => {
+      /**
+       * The quoted `/verify` output omitted `checked  :`, which the server prints
+       * between `resource :` and the at-rest line. Small, and inside the one part
+       * of DEMO.md nothing used to run — so it stayed wrong until a judge pasted it.
+       */
+      const http = read('src/http.ts')
+      const labels = [...http.matchAll(/`([a-z]+ *: )\$\{/g)].map((m) => m[1]!)
+      expect(labels.length, 'handleVerify no longer builds its lines from templates')
+        .toBeGreaterThan(1)
+      const block = /```\nunsay · version chain verification\n([\s\S]*?)\n```/.exec(DEMO)
+      expect(block, 'DEMO.md no longer quotes the /verify text output').not.toBeNull()
+      for (const label of labels) expect(block![0], label).toContain(label)
+    })
+  })
+})
+
+describe('the fresh-clone gate runs what DEMO.md says it runs', () => {
+  /**
+   * DEMO.md claimed the script "runs every command on this page verbatim". It ran
+   * nine npm scripts, one with different arguments, and skipped eleven commands
+   * including `npm start` and the whole curl walkthrough. Overstating the scope of
+   * the anti-R11 gate is the same failure the gate exists to prevent, and the shell
+   * script is forty lines a judge can read in ten seconds.
+   */
+  const gate = read('scripts/fresh_clone_check.sh')
+  const commands = [
+    ...new Set(
+      [...DEMO.matchAll(/```(?:bash|sh)\n([\s\S]*?)```/g)]
+        .flatMap((m) => [...m[1]!.matchAll(/\bnpm (?:run --silent |run )?([\w:]+)/g)])
+        .map((m) => m[1]!),
+    ),
+  ]
+
+  it('finds a substantial number of npm commands to check', () => {
+    expect(commands.length).toBeGreaterThan(8)
+  })
+
+  it('runs every npm command the page names', () => {
+    expect(commands.filter((c) => !gate.includes(c))).toEqual([])
+  })
+
+  it('drives the curl walkthrough against a real npm start', () => {
+    for (const asserted of [
+      'npm start',
+      '401 Unauthorized',
+      '{"error":"unauthorized"}',
+      'ALL 5 CHAIN(S) INTACT',
+      'x-unsay-signature',
+    ]) {
+      expect(gate, asserted).toContain(asserted)
+    }
+  })
+
+  it('names in DEMO.md the one command it does not run', () => {
+    expect(DEMO).toContain('The one line on this page it does not run is')
+    expect(DEMO).toContain('check_submission_readiness.py')
+  })
+})
+
+describe('SPEC names its whole suite, and README carries no ungated day count', () => {
+  it('lists all eight files, not the four it used to', () => {
+    /**
+     * SPEC named four files holding 154 of the tests, in the very paragraph
+     * explaining why it does not repeat the count — the paragraph about not letting
+     * a number go stale, gone stale. It also left out the two suites the submission
+     * most wants credit for: the extracted package and the executed browser client.
+     */
+    const suite = ['test/store.test.ts', 'test/server.test.ts', 'test/http.test.ts',
+      'test/envelope.test.ts', 'test/retraction.test.ts', 'test/docs.test.ts',
+      'web/web.test.ts', 'packages/live-resources/test/live-resources.test.ts']
+    const inventory = /The suite is ([\s\S]*?)\.\s/.exec(SPEC)
+    expect(inventory, 'SPEC no longer states its suite').not.toBeNull()
+    for (const file of suite) expect(inventory![1], file).toContain(file)
+  })
+
+  it('has no hand-typed "day N" status marker to go stale', () => {
+    /**
+     * `## Status — day 7` sat above a commit whose subject said day 8, in a repo
+     * whose whole pitch is that nothing here is stale. It was the one number on the
+     * page no gate recomputed. The fix is not a better number; it is not having one.
+     */
+    expect(README).not.toMatch(/^##.*\bday \d+/m)
+    expect(README).toContain('deadline 2026-10-23')
   })
 })

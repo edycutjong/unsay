@@ -60,6 +60,14 @@ preference, so it cannot depend on the client behaving.
 Check 2 exists because check 1 trusts the URI the caller supplied: a caller asking for an
 internal record under a `care://` URI passes check 1 and fails check 2.
 
+Check 1 earns its place in the mirror case, and it is not decorative. Chains are keyed by
+subject and topic, *not* by audience, so `care://ray/risk` resolves to the same record as
+`care-internal://ray/risk`. A principal holding `care.read.assistant` and **not**
+`care.read.user` passes check 2 — it may read that record — and check 1 is the only thing that
+stops the internal value being served under a scheme a host is entitled to speak. Removing it
+used to leave the whole suite, `npm run verify` and `npm run e2e` green; the test named below
+is the one that fails now.
+
 Everything funnels through `read()`. `staleness()` calls it. `src/server.ts` calls it for
 `resources/read` and again in the `resources/subscribe` handler before recording a subscription.
 Blobs ride the same path by construction: `src/blobs.ts` is a byte registry keyed by URI that
@@ -72,8 +80,10 @@ to `{ scopes: [SCOPE.user] }`, so the open port lists speakable chains only.
 principal"*, *"will not let a care:// uri reach an assistant-only record"*, and *"serves
 assistant-only records to a principal holding the scope"* (the partition must be a partition, not
 a wall). `test/envelope.test.ts` — *"still hides assistant-only records from a user-scoped
-principal"*, i.e. encryption did not quietly change the answer. `scripts/verify.ts` §1 exits
-non-zero if either internal domain is readable with `care.read.user`.
+principal"*, i.e. encryption did not quietly change the answer, and — pinning check 1
+independently of check 2 — *"refuses a care:// uri for an internal record even to a principal
+that could read it internally"*. `scripts/verify.ts` §1 exits non-zero if either internal domain
+is readable with `care.read.user`.
 
 ---
 
@@ -93,17 +103,31 @@ scope before building the array,
 so an unauthorized URI is never enumerated — which also means it can never appear in a
 pagination page or a cursor.
 
-The same rule is applied to **both** notification channels, which is the easy place to forget it.
-`src/server.ts › logRevision()` re-parses the URI and returns early unless the principal holds the
-scope for that audience, before anything reaches `notifications/message`. The `updated` channel
-does the same at SEND time through the notifier's `canNotify` guard
-(`packages/live-resources/src/notifier.ts`), so a subscription authorized under a wider scope stops
-delivering the moment the session's principal narrows. Announcing *"care-internal://ray/risk
-changed"* on either channel would confirm exactly what `read()` refuses to confirm on a third.
+The same rule is applied to **both** notification channels and to the **replay** of either,
+which is the easy place to forget it. `src/server.ts › logRevision()` re-parses the URI and
+returns early unless the principal holds the scope for that audience, before anything reaches
+`notifications/message`. The `updated` channel does the same at SEND time through the notifier's
+`canNotify` guard (`packages/live-resources/src/notifier.ts`), so a subscription authorized under
+a wider scope stops delivering the moment the session's principal narrows.
+
+Guarding the live path alone was not enough, and for a while that is all this build did. A frame
+is *stored* when it is sent, and `Last-Event-ID` hands it back later: a session that resumed under
+a narrowed token of the same subject was replayed `care-internal://ray/risk`, its version, its
+author, its timestamp and both hash-chain links, straight past both guards. `src/http.ts ›
+MemoryEventStore.replayEventsAfter()` now re-authorizes every stored frame against the resuming
+principal — `replayAllowed()` reads the URI out of `params.uri`, `params.data.uri`,
+`result.contents[].uri` and `result.resources[].uri`, and fails closed on a URI this partition did
+not issue. Announcing *"care-internal://ray/risk changed"* on either channel, live or replayed,
+would confirm exactly what `read()` refuses to confirm on a third.
 
 **Asserted by.** `test/store.test.ts` — *"reports NotFound rather than Forbidden, so existence is
 not confirmed"* substitutes the domain name out of both messages and requires them to be equal;
-*"omits assistant-only URIs from list() for a user-scoped principal"*. `scripts/verify.ts` §2.
+*"omits assistant-only URIs from list() for a user-scoped principal"*. `test/http.test.ts` —
+*"withholds an internal URI from a resume whose principal has narrowed"* drives the whole leak over
+real sockets (subscribe wide, drop the stream, resume narrow) and asserts the wide resume still
+replays, so the guard is shown to drop frames on scope rather than because replay is broken;
+*"reads the URI out of every frame shape that carries one"* and *"fails closed on a URI this
+partition did not issue"* pin the predicate itself. `scripts/verify.ts` §2.
 
 **Residual.** Timing. `read()` does more work for a record that exists than for one that does
 not, and nothing here constant-times that path. For an in-process `Map` the difference is
@@ -317,13 +341,17 @@ string; `packages/live-resources/src/notifier.ts › ResourceNotifier` forwards 
 `sendResourceUpdated({ uri })` and only for URIs present in the `subscriptions` set, which
 `src/server.ts`'s `resources/subscribe` handler can only add to after `store.read()` succeeds —
 **and** only when the `canNotify` guard, wired in `src/server.ts`, still finds the current principal
-holds the scope for that URI's audience.
+holds the scope for that URI's audience. The same question is asked a third time on the way back
+out of the replay buffer: `src/http.ts › MemoryEventStore.replayEventsAfter()` runs every stored
+frame through `replayAllowed()` before handing it to a resumed stream.
 
 **Asserted by.** `test/server.test.ts` — *"refuses a subscription to a resource the principal
 cannot read"* (the authorization gate on the way in), *"delivers resources/updated to a subscriber
 when the physio writes"*, *"stops delivering after unsubscribe"*, and *"does not log an internal
 revision to a user-scoped host"* — the last one covering the second channel, where a URI would
-otherwise escape the partition without any content escaping with it.
+otherwise escape the partition without any content escaping with it. `test/http.test.ts` —
+*"withholds an internal URI from a resume whose principal has narrowed"* covers the third path,
+the one a dropped stream reopens.
 
 **Residual, rewritten because it closed.** This used to read: *"the fact that something changed is
 not re-authorized at send time … the code does not close it and we do not pretend otherwise."* That
@@ -333,11 +361,17 @@ very existence `read()` refuses to confirm. It is closed: the notifier takes a `
 `src/server.ts` supplies one that re-checks the current principal's scope against the URI's audience
 at SEND time, mirroring what `logRevision()` already did on the second channel.
 
-What remains is narrower and is not closed. The guard reads the principal at the moment the
-notification is dispatched; a scope that narrows *between* dispatch and delivery is not re-checked,
-because there is nothing to re-check it against once the frame is on the wire. And a URI already
-replayed out of `MemoryEventStore` on a `Last-Event-ID` resume was authorized when it was stored,
-not when it is replayed.
+The half of that residual that named `MemoryEventStore` has since closed too, and it was not
+theoretical — it was reproducible against a running server, and it defeated `canNotify` entirely
+for anyone willing to drop a stream and reconnect. `replayEventsAfter()` takes a `canReplay`
+predicate; `createHttpServer` supplies one that re-authorizes each stored frame against the
+principal the resuming request carries, read from the same `AsyncLocalStorage` the GET handler
+already populates. Withheld frames are counted (`events.replaysWithheld`) rather than dropped
+silently into nothing.
+
+What remains is narrower. The guard reads the principal at the moment the notification is
+dispatched, or at the moment the resume asks; a scope that narrows *between* dispatch and delivery
+is not re-checked, because there is nothing to re-check it against once the frame is on the wire.
 
 ---
 
@@ -568,7 +602,7 @@ time with `UNSAY_KEY_PROVIDER=local`.
 | Gap | What is missing |
 |---|---|
 | I-2 **timing** | Not measured, and no attempt is made to constant-time the path. `-32002` is constant in shape, not in duration. |
-| I-9 **residual** | Closed and asserted — `test/server.test.ts` *"does not deliver an internal updated to a downgraded session"* and the package's *"re-checks authorization at SEND time, not only at subscribe time"*. What is still unasserted is the narrower window inside a single dispatch, and a URI replayed out of `MemoryEventStore` after a resume, which was authorized when it was stored. |
+| I-9 **residual** | Closed and asserted on all three paths — `test/server.test.ts` *"does not deliver an internal updated to a downgraded session"*, the package's *"re-checks authorization at SEND time, not only at subscribe time"*, and `test/http.test.ts` *"withholds an internal URI from a resume whose principal has narrowed"* for the `Last-Event-ID` replay that used to walk around both. What is still unasserted is the narrower window inside a single dispatch: a scope that narrows between dispatch and delivery. |
 | **Resumability** | `Last-Event-ID` replay is exercised by `scripts/probe_resume.ts` with a committed receipt (`docs/proof/resume.json`: stream dropped, three revisions written into the dark, all three replayed in order on reconnect) — a script, not a test, so it is still outside `npm test`. It is now run by `scripts/fresh_clone_check.sh` and by `scripts/check_submission_readiness.py`, which also asserts the committed receipt's verdict. |
 | **Resumability, the gap under it** | A client that has received no event on the standalone SSE stream holds no `Last-Event-ID` and cannot resume at all — the SDK writes no priming event on that stream (FRICTION F-010). A correction published before the first event on a fresh stream is stored and not replayable. Unfixable from this side; disclosed rather than closed. |
 | **Key rotation** | `Envelope.openAsync()` unwraps whatever key the stored bytes name, and `test/envelope.test.ts` covers it at the provider level. No test rotates a live store's key and reads old records back through it. |
@@ -576,8 +610,9 @@ time with `UNSAY_KEY_PROVIDER=local`.
 | **MCP Apps binding** | The `ui://unsay/echo` resource is served, listed and read over the wire by `npm run e2e`. The `_meta` template binding that tells a host to render a tool result INTO it has never been honoured by a host, because no host we can reach implements the extension. F-013. |
 | **The browser host** | `web/web.test.ts` now slices echo.html's own MCP client out of the page and runs it against a live server — initialize, pagination, subscribe, the SSE framer, the correction. What is still unverified is **rendering**: layout, animation timing and the 1280×800 device fit are checked by eye, not by a headless browser. |
 
-The suite is `test/store.test.ts`, `test/envelope.test.ts`, `test/server.test.ts` and
-`test/http.test.ts`. `npm test` prints the exact count and the README headlines it; this document
+The suite is `test/store.test.ts`, `test/envelope.test.ts`, `test/server.test.ts`,
+`test/http.test.ts`, `test/retraction.test.ts`, `test/docs.test.ts`, `web/web.test.ts` and
+`packages/live-resources/test/live-resources.test.ts`. `npm test` prints the exact count and the README headlines it; this document
 deliberately does not repeat the number, because a count copied into a second place is a count
 that goes stale. What matters here is which assertion backs which invariant, and that is named
 next to each one above.
@@ -790,7 +825,8 @@ position is T-2.
 ### The stream drops mid-answer
 
 `src/http.ts › MemoryEventStore` stores each notification whether or not a stream is attached and
-replays it on `Last-Event-ID`, so a correction survives the network dropping under an Echo Show
+replays it — to a principal that still holds the scope for the URI it names, checked again at
+replay time — on `Last-Event-ID`, so a correction survives the network dropping under an Echo Show
 mid-sentence. `scripts/probe_resume.ts` proves it end to end and commits the receipt: a revision is delivered
 live, the stream is dropped, **three** further revisions are written while it is down, the client
 reconnects with `Last-Event-ID`, and all three are replayed in order
@@ -801,9 +837,14 @@ at 2048 events: a long enough outage, or a process restart, loses the replay.
 
 ### A scope is revoked between subscribe and revision
 
-The URI still fires (I-9, residual). Content stays protected — the subsequent `resources/read`
-re-enters `read()` under current scopes and throws `-32002` — but the *existence of a change*
-leaked. Not exploitable in this build, where scopes are fixed per session. Not closed by the code.
+Closed, and this paragraph is rewritten rather than deleted because it was wrong twice over. It
+used to end *"not exploitable in this build, where scopes are fixed per session"*. Scopes are not
+fixed per session: `src/http.ts` re-reads the principal on every request and updates
+`session.principal`, which is the whole reason `canNotify` exists. And when the live path was
+guarded, the **replay** path was not — resuming with `Last-Event-ID` under a narrowed token of the
+same subject handed back the internal URI, its version, its author and its hash-chain links. Both
+are now re-authorized at send and at replay (I-2, I-9), content was protected throughout by
+`read()`, and the residual is the dispatch-to-delivery window, which nothing can re-check.
 
 ### The process restarts
 

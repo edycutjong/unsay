@@ -11,12 +11,18 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Unsay">
 <meta property="og:title" content="Unsay — Echo Show card">
-<meta property="og:description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
-<meta property="og:image" content="/og.svg">
+<meta property="og:description" content="1280×800 device card: the current instruction, the retracted line struck through, and who changed it.">
+<meta property="og:url" content="/echo.html">
+<meta property="og:image" content="/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Unsay — Echo Show card">
-<meta name="twitter:description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
-<meta name="twitter:image" content="/og.svg">
+<meta name="twitter:description" content="1280×800 device card: the current instruction, the retracted line struck through, and who changed it.">
+<meta name="twitter:image" content="/og.png">
+<meta name="twitter:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 :root{
@@ -134,12 +140,6 @@ input::placeholder{color:var(--dim)}
 .s-meta.stale{color:var(--s-red)}
 .s-advice{margin:18px 0 0; font-size:28px; color:var(--s-muted); max-width:34ch; line-height:1.35}
 
-@media (prefers-reduced-motion: reduce){
-  .s-fact.enter{animation:none}
-  .s-dot.amber{animation:none}
-  .s-old{transition:none}
-}
-
 /* ── presentation mode: nothing but the device ──────────────────────────── */
 body.present{background:#000; overflow:hidden}
 body.present .shell{display:none}
@@ -163,6 +163,17 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
    a person reads before they act on it. */
 .s-advice .src{display:block; font-size:20px; letter-spacing:.18em; text-transform:uppercase;
   color:var(--s-dim); margin-bottom:8px}
+/* ── reduced motion ──────────────────────────────────────────────────────────
+   LAST in the sheet, for the same reason it is last in clinician.html: an
+   at-rule placed above the rules it cancels loses the cascade to them. The
+   struck-through sweep and the fade were the two this used to miss. */
+@media (prefers-reduced-motion: reduce){
+  .s-fact.enter{animation:none}
+  .s-dot.amber{animation:none}
+  .s-old,.s-old .w,.s-old.gone{transition:none}
+  summary::after{transition:none}
+  button{transition:none}
+}
 </style>
 </head>
 <body>

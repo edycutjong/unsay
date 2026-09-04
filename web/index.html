@@ -4,19 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unsay — the assistant that can be corrected</title>
-<meta name="description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
+<meta name="description" content="An MCP server whose resources can be corrected mid-sentence: the assistant stops, retracts what it said, and names what changed and who changed it.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#F3F5F6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
+<!-- og:url and og:image are root-relative HERE and made absolute by the server
+     (src/http.ts dressPage), because a scraper does not resolve a relative one and
+     this repo has no deployed origin to hard-code yet. Set UNSAY_PUBLIC_URL on a
+     deploy and the served page carries the absolute URL. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Unsay">
 <meta property="og:title" content="Unsay — the assistant that can be corrected">
-<meta property="og:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
-<meta property="og:image" content="/og.svg">
+<meta property="og:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can retract what it just said and say why.">
+<meta property="og:url" content="/index.html">
+<meta property="og:image" content="/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Unsay — the assistant that can be corrected">
-<meta name="twitter:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
-<meta name="twitter:image" content="/og.svg">
+<meta name="twitter:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can retract what it just said and say why.">
+<meta name="twitter:image" content="/og.png">
+<meta name="twitter:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 /* Palette is the product's vocabulary, not decoration: amber = this changed,
@@ -152,6 +162,7 @@ h1{font-size:clamp(38px,6.2vw,68px); font-weight:660; max-width:16ch}
 .jump a:hover{border-color:var(--muted); background:var(--raise)}
 .jump a:active{transform:translateY(1px)}
 .jump a .arw{color:var(--dim)}
+.jump-note{margin:12px 0 0; font-size:13.5px; line-height:1.55; color:var(--dim); max-width:62ch}
 
 /* ── sections ───────────────────────────────────────────────────────────── */
 section{padding:84px 0 0}
@@ -233,6 +244,14 @@ a.card:active{transform:translateY(1px)}
 footer{margin-top:96px; border-top:1px solid var(--line-soft); padding:34px 0 64px; color:var(--dim); font-size:14px}
 footer p{margin:0 0 10px; max-width:74ch}
 footer a{color:var(--muted)}
+/* ── reduced motion ──────────────────────────────────────────────────────────
+   The hero is driven from script, which already honours the preference before it
+   animates a word. These are the CSS-only transitions it cannot reach. Last in
+   the sheet so it actually wins — see the same block in clinician.html. */
+@media (prefers-reduced-motion: reduce){
+  .jump a,.card,.frame,.w,a,button{transition:none !important; animation:none !important}
+  .jump a:active{transform:none}
+}
 </style>
 </head>
 <body>
@@ -290,6 +309,10 @@ footer a{color:var(--muted)}
       <a href="echo.html">The Echo Show screen <span class="arw" aria-hidden="true">→</span></a>
       <a href="clinician.html">The clinician write screen <span class="arw" aria-hidden="true">→</span></a>
     </div>
+    <p class="jump-note">Served from <code>npm start</code>, these two carry a
+      <code>care.read.user</code> token minted by the server when this page was requested — the
+      same one it prints in the terminal. Opened any other way they carry none, and each screen
+      asks for one.</p>
   </div>
 
   <section id="mechanism">
@@ -352,7 +375,7 @@ footer a{color:var(--muted)}
         record exists. It is never sent the content, so it cannot leak it.</p>
       <p>We do not rely on <code>annotations.audience</code>, because the 2025-11-25 spec places no
         obligation on a client to honour it. That gap is filed as
-        <a href="/FRICTION.md">FRICTION.md F-002</a>, with proposed spec language. The enforcement
+        <a href="/doc/friction#f-002-mcp-spec-2025-11-25-annotationsaudience-is-advisory-with-no-enforcement-story">FRICTION.md F-002</a>, with proposed spec language. The enforcement
         point is about fifteen lines: <a href="/packages/live-resources/src/store.ts"><code>packages/live-resources/src/store.ts</code></a>
         <code>read()</code>. The reads that must fail are asserted as failures by
         <code>npm run verify</code>.</p>
@@ -369,11 +392,11 @@ footer a{color:var(--muted)}
          produces docs/proof/bench.json, rounded up to one decimal so it can never be
          faster than the measurement. web/web.test.ts fails if one is edited by hand. -->
     <script type="application/json" id="bench" data-source="/docs/proof/bench.json">
-      {"endToEnd":{"p50":1.4,"p95":2.8},"writeToNotification":{"p50":0.7},"n":200,"midSentence":200}
+      {"endToEnd":{"p50":1.5,"p95":3.1},"writeToNotification":{"p50":0.7},"n":200,"midSentence":200}
     </script>
     <div class="stat">
-      <div><div class="v"><span data-bench="endToEnd.p50">1.4</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
-      <div><div class="v"><span data-bench="endToEnd.p95">2.8</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p50">1.5</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p95">3.1</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
       <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
     </div>
     <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
@@ -390,7 +413,7 @@ footer a{color:var(--muted)}
       <code>--dry-run</code> anywhere in the reproduce path. If a flag could switch off the thing
       being judged, the submission would be worthless.</p>
     <div class="proof" id="proofGrid">
-      <a class="card" href="/DEMO.md" data-probe="/DEMO.md">
+      <a class="card" href="/doc/demo" data-probe="/doc/demo">
         <span class="cmd">npm run verify</span>
         <h3>The safety property, asserted as failures</h3>
         <p><span data-count="verify">33</span> assertions — fifteen in process, eighteen against a
@@ -413,10 +436,10 @@ footer a{color:var(--muted)}
           window. The caveat is printed by the script, not added afterwards.</p>
         <span class="path">docs/proof/bench.txt · docs/proof/bench.json</span>
       </a>
-      <a class="card" href="/FRICTION.md" data-probe="/FRICTION.md">
+      <a class="card" href="/doc/friction" data-probe="/doc/friction">
         <span class="cmd">FRICTION.md</span>
         <h3>What fought back</h3>
-        <p><span data-count="friction">13</span> entries written the day each was hit, including
+        <p><span data-count="friction">14</span> entries written the day each was hit, including
           <span data-count="frictionSpec">7</span> proposed changes to the MCP specification and its
           extensions, found by building against them.</p>
         <span class="path">FRICTION.md — root level</span>
@@ -426,9 +449,10 @@ footer a{color:var(--muted)}
       <a class="card" id="verifyCard" href="/verify" data-probe="/verify" data-live-only="1">
         <span class="cmd">GET /verify</span>
         <h3>The judge’s instrument</h3>
-        <p>Public and unauthenticated. The <code>initialize</code> block the host actually
-          negotiated, live <code>notifications/resources/updated</code> frames, and the current
-          version hash per domain — recomputable from the audit log.</p>
+        <p>Public and unauthenticated. Every <code>chains</code> entry replayed from
+          SHA-256(prev ‖ value ‖ writtenAt ‖ authorId), the <code>versions</code> count, the
+          <code>atRest</code> receipt read back off the stored bytes, and <code>intact</code> —
+          without a token or an account.</p>
         <span class="path">/verify</span>
       </a>
       <a class="card" href="clinician.html">
@@ -446,8 +470,8 @@ footer a{color:var(--muted)}
     <p class="sec-h">Friction log</p>
     <h2><span data-count="frictionSpec">7</span> of these propose changes to the spec.</h2>
     <p class="lede">Written the day each was hit, not assembled the week of the deadline. Five of
-      <span data-count="friction">13</span> shown.
-      <a href="/FRICTION.md">Read all <span data-count="friction">13</span> →</a></p>
+      <span data-count="friction">14</span> shown.
+      <a href="/doc/friction">Read all <span data-count="friction">14</span> →</a></p>
     <div class="fric">
       <div class="fric-row">
         <span class="id">F-002</span>
@@ -495,9 +519,10 @@ footer a{color:var(--muted)}
     <p><b>Unsay relays what a clinician wrote. It does not generate clinical guidance and is not a
       medical device.</b> Ray Dunn, Sarah Okafor and the care plan on this page are a scenario;
       the seed record is committed at <code>src/seed.ts</code>.</p>
-    <p>MIT licensed · <a href="/LICENSE">LICENSE</a> · <a href="/README.md">README</a> ·
-      <a href="/DEMO.md">DEMO</a> · <a href="/ARCHITECTURE.md">ARCHITECTURE</a> ·
-      <a href="/FRICTION.md">FRICTION</a></p>
+    <p>MIT licensed · <a href="/LICENSE">LICENSE</a> · <a href="/doc/readme">README</a> ·
+      <a href="/doc/demo">DEMO</a> · <a href="/doc/architecture">ARCHITECTURE</a> ·
+      <a href="/doc/friction">FRICTION</a> ·
+      <a href="/doc/spec">SPEC</a></p>
   </div>
 </footer>
 
@@ -527,7 +552,7 @@ footer a{color:var(--muted)}
   const FRAMES = [
     { off: '+0.00', m: 'resources/subscribe', sub: 'care://ray/weight_bearing' },
     { off: '+0.00', m: 'resources/read', sub: 'care-internal://ray/risk · audience: assistant', cls: 'secret', subx: 'shapes the answer · never spoken' },
-    { off: '+0.00', m: 'notifications/resources/updated', sub: 'care://ray/weight_bearing → v2', cls: 'hot' },
+    { off: '+0.00', m: 'notifications/resources/updated', sub: 'care://ray/weight_bearing → v3', cls: 'hot' },
     { off: ms(BENCH.writeToNotification.p50), m: 'notification received by host', sub: 'p50, loopback' },
     { off: ms(BENCH.endToEnd.p50), m: 'resources/read', sub: 'new value at the client' },
   ]

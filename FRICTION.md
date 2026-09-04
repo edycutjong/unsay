@@ -536,16 +536,62 @@ cannot be probed is a rendering contract a server ships blind.
 
 ---
 
+## F-014 · MCP TypeScript SDK · `EventStore` replay has no authorization seam, so resumability can walk around a send-time guard
+
+**Date:** 2026-09-04 · **Severity:** High (4 h, and it was a live leak) · **Tool:** `@modelcontextprotocol/sdk` (TypeScript) — `EventStore`, Streamable HTTP resumability
+
+**Task attempted.** Keep Unsay's audience partition intact across a dropped SSE stream. A
+`care-internal://` URI must never be named to a principal that cannot read it — not by
+`notifications/resources/updated`, not by the revision log, and not by a resume.
+
+**Steps taken.** Guarded both live channels at send time: `canNotify` in the notifier and
+`logRevision()` in `src/server.ts` both re-read the session's current principal, because a session's
+scopes can narrow within its lifetime (the server re-reads the bearer token on every request).
+Then dropped the stream and reconnected with `Last-Event-ID` under a narrowed token of the *same*
+subject.
+
+**Expected vs actual.** Expected the resume to be subject to the same authorization as the send.
+Actual: the resumed stream returned the internal URI, its version, its author, its timestamp and
+both hash-chain links, verbatim. The reason is in the interface, not in our wiring. `EventStore` is
+
+```ts
+storeEvent(streamId, message): Promise<EventId>
+replayEventsAfter(lastEventId, { send }): Promise<StreamId>
+```
+
+`replayEventsAfter` is handed an event id and a sink. It is given no principal, no `AuthInfo`, no
+request — nothing about *who is asking now*. The transport calls it before the response is
+constructed and hands whatever comes back straight to the client. So a server that has correctly
+re-authorized every send has still not re-authorized anything a client can ask for again, and the
+one seam where that could be fixed does not receive the identity it would need. The asymmetry is
+easy to miss precisely because the send path looks guarded.
+
+**Workaround.** Read the principal out of the same `AsyncLocalStorage` the GET handler already
+populates, and filter inside our own store implementation: `MemoryEventStore` takes a `canReplay`
+predicate and `replayAllowed()` drops any stored frame naming a URI the resuming principal lacks
+the scope for, failing closed on a URI the partition did not issue. It works, but only because
+Unsay owns both the HTTP handler and the event store; a server using a third-party `EventStore`
+has no seam at all. Asserted end to end by `test/http.test.ts` *"withholds an internal URI from a
+resume whose principal has narrowed"*, which also asserts the wide resume still replays.
+
+**Actionable suggestion.** Pass the resuming request's `AuthInfo` (or the whole `RequestInfo` the
+transport already has) into `replayEventsAfter` as a third field alongside `send`, and say in the
+spec's resumability section that replay is a delivery and carries the same authorization
+obligations as the original send. Without it, "the server MUST NOT send a message to an
+unauthorized client" is a rule the transport's own resume path makes impossible to keep.
+
+---
+
 *Filed to the submission's product-feedback field, and F-002/F-003 additionally to the MCP
 specification repository. Send-by date for upstream filing: **2026-09-20** — a draft with no send
 date is a loss in progress.*
 
-*Thirteen entries. **Seven** ask for a change to the MCP specification or one of its extensions —
-F-002, F-003, F-005, F-007, F-008, F-012, F-013. **Five** ask for a change to the reference
-TypeScript SDK — F-001, F-006, F-009, F-010, F-011. F-005 asks both, and is counted in the seven.
-**One**, F-004, is Amazon account onboarding. 7 + 5 + 1 = 13. F-005 through F-013 were found by
-building against the spec and the reference SDK, not by reading about them; each names the file or
-the measurement it came from, and all carry the same send-by date.*
+*Fourteen entries. **Seven** ask for a change to the MCP specification or one of its extensions —
+F-002, F-003, F-005, F-007, F-008, F-012, F-013. **Six** ask for a change to the reference
+TypeScript SDK — F-001, F-006, F-009, F-010, F-011, F-014. F-005 asks both, and is counted in the
+seven. **One**, F-004, is Amazon account onboarding. 7 + 6 + 1 = 14. F-005 through F-014 were found
+by building against the spec and the reference SDK, not by reading about them; each names the file
+or the measurement it came from, and all carry the same send-by date.*
 
 ---
 

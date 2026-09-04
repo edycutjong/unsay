@@ -29,15 +29,28 @@ revises a resource, and measures how long the notification takes to arrive.
 **Expected:**
 
 ```
+unsay · day-1 probe · Streamable HTTP
+
   server capabilities.resources : {"subscribe":true,"listChanged":true}
   subscribe supported           : YES
+  read (before)                 : "Partial weight-bearing, about half your body w…"
+  subscribed                    : care://ray/weight_bearing
+
   notifications/resources/updated RECEIVED
-    write → notification        : <1 ms
+    uri                         : care://ray/weight_bearing
+    write → notification        : 0.88 ms
     re-read returns new value   : YES
+    author now                  : Sarah Okafor, physio
+
   VERDICT: correction lands mid-sentence (< 3400 ms): YES
+
+  receipt → docs/proof/probe_subscribe.json
 ```
 
-Exit code 0. Receipt: `docs/proof/probe_subscribe.json`.
+Exit code 0. The `0.88 ms` will differ on your machine; nothing else should. Receipt:
+`docs/proof/probe_subscribe.json`, which records the measured figure to three decimals.
+`test/docs.test.ts` checks every label in that block against the format strings
+`scripts/probe_subscribe.ts` actually prints.
 
 ---
 
@@ -174,7 +187,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.55 ms
+  notifications/resources/updated  1.46 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -202,7 +215,7 @@ unsay · end-to-end · the demo as code
 ```
 
 Exit code 0. Receipt: `docs/proof/live_run.jsonl` — 21 lines: 20 frames of the real protocol
-exchange and a summary line. The `1.55 ms` will differ on your machine; nothing else should.
+exchange and a summary line. The `1.46 ms` will differ on your machine; nothing else should.
 
 Three of those steps are new and are the ones worth reading. `read ui://unsay/echo` is the Echo
 Show card fetched **through MCP** as an MCP Apps resource rather than off a static HTTP route.
@@ -218,12 +231,18 @@ arrives.
 UNSAY_KEY_PROVIDER=local UNSAY_MASTER_KEY=$(npm run --silent keygen) npm run e2e
 ```
 
-Identical output except the two at-rest lines:
+Identical output except three lines — the banner the envelope prints on startup, the same
+line inside the run, and the `sealed at rest` count on `GET /verify`:
 
 ```
+at-rest: AES-256-GCM/local-hkdf/unsay/local/v1 · AAD=patient|domain|version|audience
   at-rest: AES-256-GCM/local-hkdf/unsay/local/v1 · AAD=patient|domain|version|audience
-  GET /verify (no token)    5 chains · 7 versions · intact true · 5/5 sealed at rest
+  GET /verify (no token)    5 chains · 8 versions · intact true · 5/5 sealed at rest
 ```
+
+The chain and version counts are the plaintext run's, unchanged: encryption seals the value,
+it does not add or remove a revision. `test/docs.test.ts` recomputes both counts from the seed
+store and fails if either block drifts from the other.
 
 The version hashes are unchanged, because the chain hashes the plaintext — an auditor holding
 the log and no key can still replay it.
@@ -290,10 +309,10 @@ store → notification → authorized re-read → the client holds the new value
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.7ms      1.6ms      3.2ms
-notification → re-read            0.7ms      1.8ms      3.8ms
+signed write → notification       0.7ms      1.3ms      4.8ms
+notification → re-read            0.8ms      1.7ms      3.2ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.3ms      2.7ms      6.6ms
+END-TO-END (write → value)        1.5ms      3.0ms      8.0ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
@@ -404,6 +423,7 @@ curl -s localhost:39500/verify -H 'accept: text/plain'
 ```
 unsay · version chain verification
 resource : http://127.0.0.1:39500/mcp
+checked  : …
 at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)
 
 INTACT  care://ray/weight_bearing              3 version(s)
@@ -429,7 +449,7 @@ npm test
 npm run typecheck
 ```
 
-**246 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
+**279 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
 the retraction wording, and the documents themselves), `web/**` (the three pages — including a run
 of `echo.html`'s own hand-rolled MCP client, sliced out of the page and executed against a live
 server), and `packages/live-resources/test/**` (the extracted package, imported through its public
@@ -443,8 +463,19 @@ Coverage is deliberately not headlined — two projects in this builder's histor
 ```
 
 clones the repo to a temp directory with **empty state**, installs from scratch, and runs every
-command on this page verbatim. Unit tests never test the sequence a human types, and never test
-the absence of state you forgot you had.
+command on this page: every `npm` script it names (`bench` at `--n 20` rather than `--n 200`, for time),
+the encrypted end-to-end run, a regeneration of `ARCHITECTURE.md` that must leave the file
+unchanged, and — against a real `npm start` on a free port — the whole `curl` walkthrough in §6,
+asserting the `401`, the metadata body, the signed `"version":3`, the uniform
+`{"error":"unauthorized"}` on the tampered body, `ALL 5 CHAIN(S) INTACT`, and that `/verify`
+names no `care-internal://` chain. The one line on this page it does not run is
+`python3 scripts/check_submission_readiness.py`, which re-runs the suite and the two scripts it
+has just run.
+
+The §6 block is why the script exists. Every `npm` script above stands up its own server in
+process; §6 is the only part of this page a human types by hand, and until it ran here it was the
+only part where drift was invisible. Unit tests never test the sequence a human types, and never
+test the absence of state you forgot you had.
 
 ```bash
 python3 scripts/check_submission_readiness.py

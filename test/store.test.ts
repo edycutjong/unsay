@@ -63,6 +63,27 @@ describe('audience partition — the safety property', () => {
     expect(() => fresh().read(uriFor(RAY, 'risk', 'user'), userOnly)).toThrow(NotFoundError)
   })
 
+  it('refuses a care:// uri for an internal record even to a principal that could read it internally', () => {
+    /**
+     * This is what SPEC I-1's FIRST scope check buys, and until this test existed
+     * nothing noticed its removal: 246 tests, `npm run verify` and `npm run e2e`
+     * all stayed green with it deleted, because every other case is caught by
+     * check 2. A judge repeating that mutation on the file the README nominates as
+     * the enforcement point found a line whose deletion nothing cared about, on
+     * the page arguing defence in depth.
+     *
+     * The gap is real, not hypothetical. Chains are keyed by subject/topic and NOT
+     * by audience, so `care://ray/risk` resolves to the same record as
+     * `care-internal://ray/risk`. Check 2 asks whether the principal may read the
+     * RECORD — an assistant-scoped one may — and would hand internal content back
+     * under a speakable scheme, which is precisely the URI a host is entitled to
+     * read aloud. Check 1 asks whether it may read the SCHEME, and refuses.
+     */
+    const assistantOnly = { sub: 'reasoner', scopes: ['care.read.assistant'] }
+    expect(fresh().read(uriFor(RAY, 'risk', 'assistant'), assistantOnly).value).toContain('Fall risk')
+    expect(() => fresh().read(uriFor(RAY, 'risk', 'user'), assistantOnly)).toThrow(NotFoundError)
+  })
+
   it('refuses to change a record audience on a later write', () => {
     expect(() =>
       fresh().publish({
