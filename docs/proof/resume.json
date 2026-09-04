@@ -1,0 +1,26 @@
+{
+  "probe": "last_event_id_resumability",
+  "ranAt": "2026-09-04T09:23:53.683Z",
+  "sdk": "@modelcontextprotocol/sdk@1.30.0",
+  "transport": "StreamableHTTP",
+  "uri": "care://ray/weight_bearing",
+  "revisions": {
+    "live": 3,
+    "missed": 4
+  },
+  "offlineWindowMs": 805,
+  "writeToReplayedAtClientMs": 806,
+  "sseOpens": 1,
+  "sseResumes": 1,
+  "storedEvents": 8,
+  "checks": {
+    "revision A delivered on the live stream": true,
+    "revision B written while the stream was down": true,
+    "client reconnected with Last-Event-ID": true,
+    "missed notifications/resources/updated replayed": true,
+    "replay arrived on the resumed stream, not the old one": true,
+    "chain advanced by exactly two versions": true
+  },
+  "error": null,
+  "verdict": "PASS"
+}

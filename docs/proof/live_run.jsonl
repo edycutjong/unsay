@@ -1,11 +1,18 @@
-{"t":"2026-09-01T21:33:42.596Z","event":"initialize","capabilities":{"completions":{},"resources":{"subscribe":true,"listChanged":true},"tools":{}}}
-{"t":"2026-09-01T21:33:42.600Z","event":"templates/list","count":2}
-{"t":"2026-09-01T21:33:42.603Z","event":"completion/complete","arg":"version","context":{"domain":"weight_bearing"},"values":["v1"]}
-{"t":"2026-09-01T21:33:42.608Z","event":"resources/read","uri":"care://ray/weight_bearing","audience":"user"}
-{"t":"2026-09-01T21:33:42.610Z","event":"resources/read","uri":"care-internal://ray/risk","audience":"assistant","spoken":false}
-{"t":"2026-09-01T21:33:42.612Z","event":"resources/subscribe","uri":"care://ray/weight_bearing"}
-{"t":"2026-09-01T21:33:42.613Z","event":"notifications/resources/updated","uri":"care://ray/weight_bearing","latencyMs":0.896}
-{"t":"2026-09-01T21:33:42.616Z","event":"resources/read","uri":"care://ray/weight_bearing","afterCorrection":true,"value":"Full weight-bearing as tolerated."}
-{"t":"2026-09-01T21:33:42.619Z","event":"resources/read","uri":"care://ray/anticoagulant","stale":true}
-{"t":"2026-09-01T21:33:42.621Z","event":"tools/call","tool":"whats_changed","changedCount":1}
-{"t":"2026-09-01T21:33:42.622Z","event":"summary","writeToNotificationMs":0.896,"speechWindowMs":3400,"landsMidSentence":true,"correctionApplied":true,"staleFactAnnouncedAge":true,"fallbackExercised":true,"verdict":"PASS"}
+{"t":"2026-09-04T09:25:14.651Z","event":"unauthenticated","status":401,"wwwAuthenticate":"Bearer realm=\"unsay\", resource_metadata=\"http://127.0.0.1:62027/.well-known/oauth-protected-resource/mcp\""}
+{"t":"2026-09-04T09:25:14.673Z","event":"initialize","capabilities":{"logging":{},"completions":{},"prompts":{},"resources":{"subscribe":true,"listChanged":true},"tools":{}}}
+{"t":"2026-09-04T09:25:14.679Z","event":"templates/list","count":2}
+{"t":"2026-09-04T09:25:14.689Z","event":"resources/list","pages":3,"uris":["care-internal://ray/adherence","care-internal://ray/gait_note","care-internal://ray/risk","care://ray/anticoagulant","care://ray/contact","care://ray/exercise","care://ray/exercise_clip","care://ray/weight_bearing"]}
+{"t":"2026-09-04T09:25:14.694Z","event":"completion/complete","arg":"version","context":{"domain":"weight_bearing"},"values":["v2","v1"]}
+{"t":"2026-09-04T09:25:14.696Z","event":"resources/read","uri":"care://ray/weight_bearing","audience":"user","meta":{"unsay/version":2,"unsay/versionHash":"f709337db83a57a271e69da3bb6803e278c71def53c9423cea814921101ef65a","unsay/prevHash":"8396b80c4953f86ab7f19152c9d17ab7c0eae009af783825714755b1b3f5bfc6","unsay/audience":"user","unsay/lastModified":"2026-10-06T09:14:00.000Z","unsay/stale":false}}
+{"t":"2026-09-04T09:25:14.699Z","event":"resources/read","uri":"care-internal://ray/risk","audience":"assistant","spoken":false}
+{"t":"2026-09-04T09:25:14.701Z","event":"resources/read","uri":"care://ray/exercise_clip","blob":"audio/wav","bytes":24044}
+{"t":"2026-09-04T09:25:14.708Z","event":"audience partition","uri":"care-internal://ray/risk","refusedForUserScope":true,"leakedUris":0}
+{"t":"2026-09-04T09:25:14.713Z","event":"resources/subscribe","uri":"care://ray/weight_bearing"}
+{"t":"2026-09-04T09:25:14.714Z","event":"write rejected","status":401,"reason":"one byte changed after signing"}
+{"t":"2026-09-04T09:25:14.716Z","event":"notifications/resources/updated","uri":"care://ray/weight_bearing","latencyMs":2.139,"version":3,"subscribers":1}
+{"t":"2026-09-04T09:25:14.717Z","event":"resources/read","uri":"care://ray/weight_bearing","afterCorrection":true,"value":"Full weight-bearing as tolerated.","chained":true}
+{"t":"2026-09-04T09:25:14.719Z","event":"resources/read","uri":"care://ray/anticoagulant","stale":true}
+{"t":"2026-09-04T09:25:14.722Z","event":"prompts/get","name":"brief_carer","speakableOnly":true,"chars":873}
+{"t":"2026-09-04T09:25:14.724Z","event":"tools/call","tool":"whats_changed","changedCount":1}
+{"t":"2026-09-04T09:25:14.725Z","event":"GET /verify","intact":true,"versions":7,"sealed":0}
+{"t":"2026-09-04T09:25:14.725Z","event":"summary","atRest":"at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)","unauthenticatedRefused":true,"audiencePartitionHeld":true,"blobBytes":24044,"tamperedWriteRefused":true,"subscribersNotified":1,"writeToNotificationMs":2.139,"speechWindowMs":3400,"landsMidSentence":true,"correctionApplied":true,"retractionChainsToPreviousVersion":true,"staleFactAnnouncedAge":true,"briefingSpeakableOnly":true,"fallbackExercised":true,"chainIntact":true,"verdict":"PASS"}

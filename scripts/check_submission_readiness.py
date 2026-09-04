@@ -10,6 +10,10 @@ So: no check here asks whether something was *planned*. Every one is a file that
 exists, a command that exits 0, a grep that hits, or a URL that returns 200.
 
 Exit 0 = safe to submit. Exit 1 = do not submit.
+
+Side effect, deliberately: this regenerates ARCHITECTURE.md in order to diff it. If the
+working tree is dirty afterwards, that IS the finding — the committed copy had drifted
+from the code it claims to be generated from.
 """
 import json, os, re, subprocess, sys
 
@@ -30,9 +34,10 @@ print("unsay · submission readiness\n")
 
 # ── required files ─────────────────────────────────────────────────────────────
 print("required artifacts")
-for f in ["README.md", "LICENSE", "DEMO.md", "FRICTION.md", "ARCHITECTURE.md",
-          "docs/proof/live_run.jsonl", "docs/proof/bench.txt",
-          "scripts/bench.ts", "scripts/verify.ts", "scripts/fresh_clone_check.sh"]:
+for f in ["README.md", "LICENSE", "DEMO.md", "FRICTION.md", "ARCHITECTURE.md", ".env.example",
+          "docs/proof/live_run.jsonl", "docs/proof/bench.txt", "docs/proof/resume.json",
+          "scripts/bench.ts", "scripts/verify.ts", "scripts/serve.ts",
+          "scripts/fresh_clone_check.sh"]:
     check(f, os.path.isfile(os.path.join(ROOT, f)))
 
 # FRICTION.md must be at ROOT, not docs/ (R12 mechanical fix)
@@ -91,15 +96,89 @@ check("bench receipt records the speech-window verdict",
 check("bench receipt discloses the loopback caveat",
       "not the production figure" in bench or "loopback" in bench)
 
+# ── the receipts are from THIS code, not a run someone remembers ──────────────
+# R13 again: a committed receipt is evidence only while the code that produced it
+# still produces it. A stale live_run.jsonl is a sentence describing an intention.
+print("\nreceipts are current")
+live = read("docs/proof/live_run.jsonl") or ""
+summary = {}
+for line in live.strip().splitlines():
+    try:
+        row = json.loads(line)
+    except ValueError:
+        continue
+    if row.get("event") == "summary":
+        summary = row
+check("live_run.jsonl carries a summary line", bool(summary))
+for field in ["unauthenticatedRefused", "audiencePartitionHeld", "tamperedWriteRefused",
+              "retractionChainsToPreviousVersion", "briefingSpeakableOnly", "chainIntact"]:
+    check(f"live_run.jsonl · {field}", summary.get(field) is True)
+check("live_run.jsonl verdict is PASS", summary.get("verdict") == "PASS")
+
+try:
+    resume = json.loads(read("docs/proof/resume.json") or "{}")
+except ValueError:
+    resume = {}
+check("resume.json verdict is PASS", resume.get("verdict") == "PASS")
+check("resume.json proves a replay, not a live send",
+      all(resume.get("checks", {}).values()) and resume.get("sseResumes", 0) >= 1,
+      f"{sum(1 for v in resume.get('checks', {}).values() if v)}/{len(resume.get('checks', {}))} checks")
+
+bench_json = {}
+try:
+    bench_json = json.loads(read("docs/proof/bench.json") or "{}")
+except ValueError:
+    pass
+check("bench receipt landed every run inside the speech window",
+      bench_json.get("midSentence", {}).get("count") == bench_json.get("n"),
+      f"{bench_json.get('midSentence', {}).get('count')}/{bench_json.get('n')}")
+check("bench receipt confirms a host was subscribed for every run",
+      bench_json.get("subscribedEveryRun") is True)
+
 # ── the safety property actually holds ────────────────────────────────────────
 print("\nsafety property")
-for name, script in [("npm run verify exits 0", "verify"), ("npm run e2e exits 0", "e2e")]:
+for name, script in [("npm run verify exits 0", "verify"),
+                     ("npm run e2e exits 0", "e2e"),
+                     ("npm run probe:resume exits 0", "probe:resume"),
+                     ("npm run typecheck exits 0", "typecheck")]:
     try:
         rc = subprocess.run(["npm", "run", "--silent", script], cwd=ROOT,
                             capture_output=True, text=True, timeout=300).returncode
     except Exception:                                     # noqa: BLE001
         rc = 1
     check(name, rc == 0)
+
+# ── ARCHITECTURE.md has not drifted from the code it is generated from ───────
+# R6: eight prior submissions documented routes that were never built. The doc is
+# generated, so the check is mechanical — regenerate it and diff everything but the
+# timestamp line. A stale generated file is exactly as misleading as a hand-written one.
+print("\ngenerated docs match the code")
+before = read("ARCHITECTURE.md") or ""
+try:
+    rc = subprocess.run(["npm", "run", "--silent", "docs:arch"], cwd=ROOT,
+                        capture_output=True, text=True, timeout=120).returncode
+except Exception:                                         # noqa: BLE001
+    rc = 1
+after = read("ARCHITECTURE.md") or ""
+strip_ts = lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("_Generated:"))
+current = strip_ts(before) == strip_ts(after)
+check("npm run docs:arch exits 0", rc == 0)
+check("ARCHITECTURE.md is current", current,
+      "" if current else "regenerating it changed the file — commit the regenerated copy")
+
+# Every MCP surface the doc lists must have a handler in src/, and every handler in
+# src/ must be listed. The generator guarantees one direction; this asserts the doc
+# on disk was not edited by hand afterwards.
+src_all = ""
+for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, "src")):
+    dirnames[:] = [d for d in dirnames if d != "node_modules"]
+    for fn in sorted(filenames):
+        if fn.endswith(".ts"):
+            src_all += open(os.path.join(dirpath, fn), encoding="utf-8").read()
+registered = len(set(re.findall(r"setRequestHandler\((\w+)Schema", src_all)))
+documented = len(set(re.findall(r"^\| `([\w/]+)` \| `src/", after, re.M)))
+check("ARCHITECTURE.md lists every registered MCP surface",
+      documented >= registered, f"{documented} documented vs {registered} handlers in src/")
 
 # ── licence ────────────────────────────────────────────────────────────────────
 print("\nlicence")

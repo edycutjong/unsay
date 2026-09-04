@@ -1,14 +1,18 @@
-unsay bench · 200 revisions · 2026-09-01T21:30:48.712Z
+unsay bench · 200 revisions · 2026-09-04T09:24:40.516Z
 transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk 1.30.0
+path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read
+at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)
 
 segment                             p50        p95        max
-write → notification              0.2ms      0.4ms      1.4ms
-notification → re-read            0.6ms      1.6ms      3.6ms
+signed write → notification       0.8ms      2.0ms      3.7ms
+notification → re-read            0.9ms      1.8ms      3.7ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        0.8ms      2.0ms      4.6ms
+END-TO-END (write → value)        1.7ms      3.3ms      7.2ms
 
-speech window: a 12-word utterance ≈ 3400 ms
+speech window: a 12-word utterance ≈ 3400 ms (an assumed speech rate, not a
+measurement of Alexa+ TTS)
 retraction lands mid-sentence in 200/200 runs (100%)
+a host was subscribed for every run: yes
 
 NOTE: loopback transport. The deployed path adds API Gateway → DynamoDB Streams
 → Lambda; those segments are measured separately once deployed and this file is

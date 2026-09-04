@@ -29,7 +29,30 @@ const all = [...bodies.values()].join('\n')
 // MCP request schemas actually registered
 const handlers = [...all.matchAll(/setRequestHandler\((\w+)Schema/g)].map((m) => m[1]!)
 const notifications = [...all.matchAll(/server\.(send\w+)\(/g)].map((m) => m[1]!)
-const capabilities = /capabilities:\s*\{([\s\S]*?)\n {4}\}/.exec(all)?.[1]?.trim()
+const capabilities = /capabilities: \{\n([\s\S]*?)\n      \},/.exec(all)?.[1]
+
+/**
+ * HTTP routes, read out of the router in src/http.ts rather than out of a list
+ * someone maintained by hand. `path === '/x'` is the only shape the router uses
+ * to dispatch, and STATIC_PAGES is the only other thing it serves — so anything
+ * this misses is a route the router does not have either.
+ */
+const httpSource = bodies.get('src/http.ts') ?? ''
+const routes = [...new Set([...httpSource.matchAll(/path === '([^']+)'/g)].map((m) => m[1]!))]
+const staticPages = [...httpSource.matchAll(/^ {2}'(\/[\w.]+)': '[\w.]+',$/gm)].map((m) => m[1]!)
+const routeMethods = (path: string) => {
+  if (path === '/mcp') return 'POST · GET · DELETE'
+  if (path === '/write') return 'POST'
+  return 'GET'
+}
+const ROUTE_AUTH: Record<string, string> = {
+  '/mcp': 'Bearer (care.read.user / care.read.assistant)',
+  '/write': 'HMAC-SHA256 over the raw body, or Bearer care.write',
+  '/verify': 'public — a token widens what it lists',
+  '/health': 'public',
+  '/.well-known/oauth-protected-resource': 'public (RFC 9728)',
+  '/.well-known/oauth-protected-resource/mcp': 'public (RFC 9728)',
+}
 
 const SCHEMA_TO_METHOD: Record<string, string> = {
   ListResources: 'resources/list',
@@ -38,12 +61,15 @@ const SCHEMA_TO_METHOD: Record<string, string> = {
   Unsubscribe: 'resources/unsubscribe',
   ListResourceTemplates: 'resources/templates/list',
   Complete: 'completion/complete',
+  ListPrompts: 'prompts/list',
+  GetPrompt: 'prompts/get',
   ListTools: 'tools/list',
   CallTool: 'tools/call',
 }
 const NOTIF_TO_METHOD: Record<string, string> = {
   sendResourceUpdated: 'notifications/resources/updated',
   sendResourceListChanged: 'notifications/resources/list_changed',
+  sendLoggingMessage: 'notifications/message',
 }
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
@@ -82,11 +108,31 @@ for (const n of [...new Set(notifications)].sort()) {
 A()
 A(`**${new Set(handlers).size} request handlers + ${new Set(notifications).size} notification sender(s).**`)
 A()
+A('Declaring `logging` also makes the SDK serve `logging/setLevel` without a handler of')
+A('our own, so it is a surface a host can call but is deliberately not listed above —')
+A('this table only names methods with a handler in `src/`.')
+A()
+A('## HTTP routes')
+A()
+A('| Route | Methods | Auth |')
+A('|---|---|---|')
+for (const r of routes.filter((r) => r !== '/').sort()) {
+  A(`| \`${r}\` | ${routeMethods(r)} | ${ROUTE_AUTH[r] ?? 'public'} |`)
+}
+for (const page of staticPages) {
+  A(`| \`${page}\`${page === '/index.html' ? ' (and `/`)' : ''} | GET · HEAD | public — served from \`web/\` |`)
+}
+A()
+A(`**${routes.filter((r) => r !== '/').length} routes + ${staticPages.length} static pages**, all in \`src/http.ts\`.`)
+A()
 if (capabilities) {
   A('## Declared capabilities')
   A()
   A('```js')
-  A(capabilities)
+  // Dedent to the shallowest line: the block is lifted verbatim out of a nested
+  // object literal, and its source indentation is not information.
+  const pad = Math.min(...capabilities.split('\n').filter((l) => l.trim()).map((l) => l.match(/^ */)![0].length))
+  A(capabilities.split('\n').map((l) => l.slice(pad)).join('\n'))
   A('```')
   A()
 }
@@ -121,10 +167,19 @@ A('## Not built')
 A()
 A('Stated so this document cannot imply otherwise:')
 A()
-A('- No AWS deployment yet — DynamoDB/Lambda/KMS are in the plan (`../specs/architecture.md`), not in this repo.')
-A('- No HTTP entrypoint deployed; the server is exercised over Streamable HTTP by `scripts/e2e.ts` and `scripts/bench.ts`.')
+A('- **No AWS deployment.** `npm start` runs the server locally and nothing is hosted. The KMS')
+A('  provider in `src/envelope.ts` is SigV4-signed and shaped correctly but has never been')
+A('  executed against a live CMK — see FRICTION.md F-010.')
+A('- **No authorization server.** Unsay is an OAuth 2.1 protected RESOURCE only: no `/authorize`,')
+A('  no `/token`, no refresh, no revocation, no JWKS. Tokens are HS256 under a shared secret,')
+A('  minted by `mintToken()` in the same file that verifies them.')
+A('- **No durable storage.** The store, the event store and the audit log are in memory; the')
+A('  audit log survives only if `UNSAY_AUDIT_LOG` names a file.')
 A('- No ML model of any kind, by design — the reasoning model belongs to the host.')
 A('- No blockchain, token, or payment surface.')
 
 writeFileSync(join(ROOT, 'ARCHITECTURE.md'), lines.join('\n') + '\n')
-console.log(`ARCHITECTURE.md generated — ${new Set(handlers).size} handlers, ${new Set(notifications).size} notifications, ${deps.length} deps`)
+console.log(
+  `ARCHITECTURE.md generated — ${new Set(handlers).size} handlers, ${new Set(notifications).size} notifications, ` +
+    `${routes.length - 1} HTTP routes, ${staticPages.length} pages, ${deps.length} deps`,
+)
