@@ -86,13 +86,17 @@ The two timings move run to run; the six checks do not.
 notification → authorized re-read, 200 times:
 
 ```
-signed write → notification       0.8ms      2.0ms      3.7ms
-notification → re-read            0.9ms      1.8ms      3.7ms
-END-TO-END (write → value)        1.7ms      3.3ms      7.2ms      (p50 · p95 · max)
+signed write → notification       0.8ms      1.6ms     10.0ms
+notification → re-read            0.9ms      2.5ms      3.3ms
+END-TO-END (write → value)        1.8ms      3.4ms     12.9ms      (p50 · p95 · max)
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
 ```
+
+That is the committed run in [`docs/proof/bench.txt`](docs/proof/bench.txt); the milliseconds
+move on every machine and every re-run. The two lines underneath do not, and `npm run bench`
+exits non-zero if either of them ever does.
 
 Loopback figures, and the 3,400 ms speech window is an assumed speech rate rather than a
 measurement of Alexa+ TTS. Neither is ever quoted as a production number.

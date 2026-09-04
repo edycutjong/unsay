@@ -4,7 +4,7 @@
 > Nothing here is hand-written. If a surface is listed, a handler for it exists in `src/`.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-04T09:33:26.200Z_
+_Generated: 2026-09-04T09:39:06.551Z_
 
 ## MCP surfaces actually registered
 

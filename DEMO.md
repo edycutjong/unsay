@@ -244,16 +244,18 @@ store → notification → authorized re-read → the client holds the new value
 
 ```
 segment                             p50        p95        max
-signed write → notification       0.8ms      2.0ms      3.7ms
-notification → re-read            0.9ms      1.8ms      3.7ms
+signed write → notification       0.8ms      1.6ms     10.0ms
+notification → re-read            0.9ms      2.5ms      3.3ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.7ms      3.3ms      7.2ms
+END-TO-END (write → value)        1.8ms      3.4ms     12.9ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
 ```
 
-The figures will differ on your machine. `npm run bench` also rewrites the three numbers the
+The milliseconds will differ on your machine and between two runs on this one — that block is
+the committed run in `docs/proof/bench.txt`. The last two lines are the ones that must not
+change, and the script exits non-zero if either does. `npm run bench` also rewrites the three numbers the
 landing page prints, rounding each **up** to one decimal — so the page can never quote a figure
 faster than the run that produced it, and `web/web.test.ts` fails if anyone edits one by hand.
 

@@ -344,14 +344,15 @@ footer a{color:var(--muted)}
     <p class="lede">A twelve-word utterance is roughly 3,400&nbsp;ms of speech. That is the whole
       budget: the clinician's signed write → HMAC verified → notification → authorized re-read →
       new value at the client.</p>
-    <!-- Every figure below is transcribed from docs/proof/bench.json, and
-         web/web.test.ts fails if it drifts from the committed receipt. -->
+    <!-- Every figure below is WRITTEN HERE by `npm run bench`, from the same run that
+         produces docs/proof/bench.json, rounded up to one decimal so it can never be
+         faster than the measurement. web/web.test.ts fails if one is edited by hand. -->
     <script type="application/json" id="bench" data-source="../docs/proof/bench.json">
-      {"endToEnd":{"p50":1.7,"p95":3.4},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
+      {"endToEnd":{"p50":1.9,"p95":3.5},"writeToNotification":{"p50":0.9},"n":200,"midSentence":200}
     </script>
     <div class="stat">
-      <div><div class="v"><span data-bench="endToEnd.p50">1.7</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
-      <div><div class="v"><span data-bench="endToEnd.p95">3.4</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p50">1.9</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p95">3.5</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
       <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
     </div>
     <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
