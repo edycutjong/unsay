@@ -9,6 +9,7 @@ import {
   KmsUnavailableError,
   LocalKeyProvider,
   MasterKeyMissingError,
+  ReservedSeparatorError,
   describeSealed,
   envelopeFromEnv,
   recordAad,
@@ -23,8 +24,8 @@ const OTHER_MASTER = 'b'.repeat(64)
 const local = (master = MASTER) => new LocalKeyProvider(Buffer.from(master, 'hex'))
 const envelope = (master = MASTER) => Envelope.create(local(master), { announce: false })
 
-const RISK = { patient: RAY, domain: 'risk', version: 1, audience: 'assistant' as const }
-const WEIGHT = { patient: RAY, domain: 'weight_bearing', version: 1, audience: 'user' as const }
+const RISK = { subject: RAY, topic: 'risk', version: 1, audience: 'assistant' as const }
+const WEIGHT = { subject: RAY, topic: 'weight_bearing', version: 1, audience: 'user' as const }
 
 const SECRET = 'Fall risk HIGH. Family disputes the discharge plan.'
 
@@ -79,7 +80,7 @@ describe('AAD binding — a ciphertext only opens in the slot it was sealed in',
   })
 
   it('reserves the separator rather than letting two identities collide', () => {
-    expect(() => recordAad({ ...RISK, domain: 'risk|user' })).toThrow(EnvelopeError)
+    expect(() => recordAad({ ...RISK, topic: 'risk|user' })).toThrow(ReservedSeparatorError)
   })
 })
 
@@ -311,7 +312,7 @@ describe('LiveResourceStore with an envelope', () => {
     const plain = seed(new LiveResourceStore())
     const s = await sealedStore()
     for (const { record } of plain.list(both)) {
-      const stored = s.atRest(record.patient, record.domain, record.version)
+      const stored = s.atRest(record.subject, record.topic, record.version)
       expect(stored).not.toContain(record.value)
       // and not merely base64-hidden: the decoded bytes must not carry it either
       expect(Buffer.from(stored, 'base64').includes(record.value)).toBe(false)

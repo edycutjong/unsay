@@ -319,8 +319,8 @@ describe('notifications', () => {
     const h = await harness(USER_ONLY)
     await expect(h.client.subscribeResource({ uri: RISK })).rejects.toMatchObject({ code: -32002 })
     h.store.publish({
-      patient: RAY,
-      domain: 'risk',
+      subject: RAY,
+      topic: 'risk',
       audience: 'assistant',
       value: 'Fall risk: MODERATE.',
       authorId: 'adeyemi',
@@ -351,8 +351,8 @@ describe('notifications', () => {
   it('does not log an internal revision to a user-scoped host', async () => {
     const h = await harness(USER_ONLY)
     h.store.publish({
-      patient: RAY,
-      domain: 'risk',
+      subject: RAY,
+      topic: 'risk',
       audience: 'assistant',
       value: 'Fall risk: MODERATE.',
       authorId: 'adeyemi',
@@ -380,8 +380,8 @@ describe('notifications', () => {
 
     // The GP adds wound care — the host is holding a list now, and it is wrong.
     store.publish({
-      patient: RAY,
-      domain: 'wound_care',
+      subject: RAY,
+      topic: 'wound_care',
       audience: 'user',
       value: 'Dressing stays on until day seven. Keep it dry.',
       authorId: 'gp.mensah',

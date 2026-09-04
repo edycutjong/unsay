@@ -475,10 +475,9 @@ export async function createHttpServer(
       subscriptions: built.subscriptions,
       close: async () => {
         // Dispose before closing: a store listener that outlives its Server would
-        // fire a notification down a transport that no longer exists. buildServer
-        // hands back the unsubscribe handles for exactly this.
+        // fire a notification down a transport that no longer exists. dispose()
+        // detaches the listeners and drops this session's subscriptions with them.
         built.dispose()
-        built.subscriptions.clear()
         sessions.delete(session.id)
         await built.server.close().catch(() => {})
       },
@@ -620,8 +619,8 @@ export async function createHttpServer(
       // writtenAt is the SERVER clock. A writer that could set it could backdate
       // a correction, and "how old is this instruction" is a spoken safety claim.
       const record = store.publish({
-        patient,
-        domain,
+        subject: patient,
+        topic: domain,
         audience: audience as Audience,
         value,
         authorId,
@@ -687,11 +686,11 @@ export async function createHttpServer(
     for (const { uri } of visible) {
       if (wanted && uri !== wanted && !wanted.startsWith(`${uri}/`)) continue
       const parsed = parseUri(uri)!
-      chains.push(store.verify(parsed.patient, parsed.domain))
+      chains.push(store.verify(parsed.subject, parsed.topic))
       // Every field of this is read back out of the STORED bytes — provider, key
       // id, IV, tag, length — without the data key. It is the difference between
       // the server claiming it encrypted something and a reader checking.
-      receipts.push(store.atRestReceipt(parsed.patient, parsed.domain))
+      receipts.push(store.atRestReceipt(parsed.subject, parsed.topic))
     }
 
     if (wanted && chains.length === 0) return json(res, 404, { error: 'not_found', uri: wanted })

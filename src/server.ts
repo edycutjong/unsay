@@ -27,6 +27,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 
 import { blobFor } from './blobs.ts'
+import { ResourceNotifier } from '../packages/live-resources/src/index.ts'
 import { LiveResourceStore, NotFoundError, parseUri, uriFor } from './store.ts'
 import { DEMO_NOW, RAY, seed, seedDemo } from './seed.ts'
 import { SCOPE, type Principal } from './types.ts'
@@ -89,7 +90,6 @@ function decodeCursor(cursor: string): string {
 export function buildServer(opts: BuildOptions) {
   const store = opts.store ?? seedDemo()
   const now = opts.now ?? (() => new Date())
-  const subscriptions = new Set<string>()
 
   const server = new Server(
     { name: 'unsay', version: '0.1.0' },
@@ -107,12 +107,15 @@ export function buildServer(opts: BuildOptions) {
     },
   )
 
-  // A revision written while no host is attached is not an error — the store is the
-  // source of truth and the next read is correct either way. Anything else is real
-  // and is surfaced, but never by killing the process mid-demo.
-  const notify = (p: Promise<void>) =>
-    void p.catch((e: unknown) => {
-      if (!/not connected/i.test(String(e))) console.error('[unsay] notification failed:', e)
+  /**
+   * Same tolerance the notifier applies to resource notifications: a revision
+   * written while no host is attached is not an error — the store is the source of
+   * truth and the next read is correct either way. Anything else is surfaced, but
+   * never by killing the process mid-demo.
+   */
+  const logged = (sent: Promise<void>) =>
+    void sent.catch((e: unknown) => {
+      if (!/not connected/i.test(String(e))) console.error('[unsay] revision log failed:', e)
     })
 
   /**
@@ -133,9 +136,9 @@ export function buildServer(opts: BuildOptions) {
       return
     }
     if (!scopes.includes(SCOPE[parsed.audience])) return
-    const latest = store.versions(parsed.patient, parsed.domain).at(-1)
+    const latest = store.versions(parsed.subject, parsed.topic).at(-1)
     if (!latest) return
-    notify(
+    logged(
       server.sendLoggingMessage({
         level: 'notice',
         logger: 'unsay.revision',
@@ -151,27 +154,23 @@ export function buildServer(opts: BuildOptions) {
     )
   }
 
-  // Any revision fires the notification the whole product depends on, and is logged.
-  const offUpdated = store.onUpdated((uri) => {
-    if (subscriptions.has(uri)) notify(server.sendResourceUpdated({ uri }))
-    logRevision(uri)
-  })
-
   /**
-   * A new domain (the GP adds wound care) changes the list, not a resource — but
-   * seeding fills that list too, and a host must not be told the plan changed
-   * because the server just started.
+   * The store-to-protocol wiring, from @unsay/live-resources: it owns the
+   * subscription set, sends `updated` only for URIs this session actually
+   * subscribed to, and holds `list_changed` back until a list has been SERVED —
+   * seeding a store is not news to a client that holds no list to invalidate.
    *
-   * The guard is the notification's own meaning: list_changed invalidates a list,
-   * and a client that has never called resources/list holds none. Arming on the
-   * first list served makes the seeding window structural rather than a race
-   * against how fast the store is filled — a store seeded lazily, minutes after
-   * boot, is still silent until someone has a stale list to correct.
+   * `onRevision` is the second channel, and it is Unsay's: the notifier does not
+   * know what a care record is, and it must not, because deciding who may be TOLD
+   * a URI changed is the same authorization question as deciding who may read it.
    */
-  let listServed = false
-  const offListChanged = store.onListChanged(() => {
-    if (listServed) notify(server.sendResourceListChanged())
+  const notifier = new ResourceNotifier({
+    store,
+    target: server,
+    onRevision: logRevision,
+    onError: (e, uri) => console.error(`[unsay] notification failed for ${uri ?? 'the list'}:`, e),
   })
+  const subscriptions = notifier.subscriptions
 
   // ── resources/list — cursor-paginated ──────────────────────────────────────
   server.setRequestHandler(ListResourcesRequestSchema, async (req) => {
@@ -187,15 +186,15 @@ export function buildServer(opts: BuildOptions) {
     const last = page.at(-1)
 
     // The client now holds a list, so a later change to it is something it can act
-    // on. Set after the cursor is validated — a rejected cursor served no list.
-    listServed = true
+    // on. Armed after the cursor is validated — a rejected cursor served no list.
+    notifier.armListChanged()
 
     return {
       resources: page.map(({ record, uri }) => {
         const blob = blobFor(uri)
         return {
           uri,
-          name: `${record.domain.replace(/_/g, ' ')} (v${record.version})`,
+          name: `${record.topic.replace(/_/g, ' ')} (v${record.version})`,
           description: `Last changed by ${record.authorLabel}`,
           mimeType: blob?.mimeType ?? 'text/plain',
           ...(blob ? { size: blob.bytes } : {}),
@@ -280,12 +279,14 @@ export function buildServer(opts: BuildOptions) {
 
   // ── resources/subscribe · unsubscribe ──────────────────────────────────────
   server.setRequestHandler(SubscribeRequestSchema, async (req) => {
-    store.read(req.params.uri, opts.principal()) // authorize before subscribing
-    subscriptions.add(req.params.uri)
+    // Authorize FIRST. The notifier cannot do this for us — only the store knows
+    // whether this principal is allowed to learn that the URI exists at all.
+    store.read(req.params.uri, opts.principal())
+    notifier.subscribe(req.params.uri)
     return {}
   })
   server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
-    subscriptions.delete(req.params.uri)
+    notifier.unsubscribe(req.params.uri)
     return {}
   })
 
@@ -330,7 +331,7 @@ export function buildServer(opts: BuildOptions) {
 
     const facts = store
       .list(speakableOnly)
-      .filter(({ record }) => record.patient === patient)
+      .filter(({ record }) => record.subject === patient)
       .sort((a, b) => b.record.priority - a.record.priority)
 
     const at = now()
@@ -339,7 +340,7 @@ export function buildServer(opts: BuildOptions) {
       const ageDays = Math.floor(s.ageMs / 86_400_000)
       const age = ageDays === 0 ? 'today' : `${ageDays}d ago`
       const stale = s.stale ? ' — PAST ITS REVIEW DATE, say its age aloud' : ''
-      return `- ${record.domain.replace(/_/g, ' ')} (v${record.version}, ${age}, ${record.authorLabel}${stale})\n  ${record.value}`
+      return `- ${record.topic.replace(/_/g, ' ')} (v${record.version}, ${age}, ${record.authorLabel}${stale})\n  ${record.value}`
     })
 
     const body = lines.length
@@ -384,7 +385,7 @@ export function buildServer(opts: BuildOptions) {
     }
 
     if (argName === 'domain') {
-      const domains = [...new Set(store.list(p).map((x) => parseUri(x.uri)!.domain))]
+      const domains = [...new Set(store.list(p).map((x) => parseUri(x.uri)!.topic))]
       return {
         completion: { values: domains.filter((d) => d.startsWith(prefix)).sort(), hasMore: false },
       }
@@ -477,10 +478,7 @@ export function buildServer(opts: BuildOptions) {
    * closed without this would keep a listener calling into a disconnected Server
    * for the lifetime of the store.
    */
-  const dispose = () => {
-    offUpdated()
-    offListChanged()
-  }
+  const dispose = () => notifier.dispose()
 
   return { server, store, subscriptions, dispose }
 }

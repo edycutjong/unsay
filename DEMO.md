@@ -381,10 +381,12 @@ npm test
 npm run typecheck
 ```
 
-**156 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face)
-and `web/**` (the three pages). Coverage is deliberately not headlined — two projects in this
-builder's history shipped 458 and 404 passing tests at 100 % coverage over demos that were broken
-from a fresh clone. Which is why:
+**184 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face),
+`web/**` (the three pages), and `packages/live-resources/test/**` (the extracted package, imported
+through its public entry point only, against a scenario it was not extracted from).
+
+Coverage is deliberately not headlined — two projects in this builder's history shipped 458 and
+404 passing tests at 100 % coverage over demos that were broken from a fresh clone. Which is why:
 
 ```bash
 ./scripts/fresh_clone_check.sh

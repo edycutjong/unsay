@@ -66,7 +66,7 @@ describe('audience partition — the safety property', () => {
   it('refuses to change a record audience on a later write', () => {
     expect(() =>
       fresh().publish({
-        patient: RAY, domain: 'risk', audience: 'user', value: 'x',
+        subject: RAY, topic: 'risk', audience: 'user', value: 'x',
         authorId: 'a', authorLabel: 'a', writtenAt: DEMO_NOW.toISOString(),
       }),
     ).toThrow(/refusing to change audience/)

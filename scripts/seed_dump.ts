@@ -24,8 +24,8 @@ const chainsOf = (store: LiveResourceStore) =>
     .map(({ uri }) => uri)
     .sort()
     .map((uri) => {
-      const { patient, domain } = parseUri(uri)!
-      return { uri, versions: store.versions(patient, domain) }
+      const { subject, topic } = parseUri(uri)!
+      return { uri, versions: store.versions(subject, topic) }
     })
 
 const A = chainsOf(a)
@@ -55,7 +55,7 @@ if (process.argv.includes('--json')) {
     console.log('')
   }
   console.log(`  NOT seeded — fired live on stage:`)
-  console.log(`    care://${RAY}/${STAGED_REVISION.domain}  "${STAGED_REVISION.value}"\n`)
+  console.log(`    care://${RAY}/${STAGED_REVISION.topic}  "${STAGED_REVISION.value}"\n`)
 }
 
 const total = A.reduce((n, c) => n + c.versions.length, 0)

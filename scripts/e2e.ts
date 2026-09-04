@@ -173,7 +173,7 @@ say(`\n  subscribed to ${WB}`)
 const body = Buffer.from(
   JSON.stringify({
     patient: RAY,
-    domain: STAGED_REVISION.domain,
+    domain: STAGED_REVISION.topic,
     audience: STAGED_REVISION.audience,
     value: STAGED_REVISION.value,
     authorId: STAGED_REVISION.authorId,

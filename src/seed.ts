@@ -37,8 +37,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   // completion/complete over {version} and the `_meta` prevHash chain only
   // demonstrate anything against a chain longer than one.
   store.publish({
-    patient: RAY,
-    domain: 'weight_bearing',
+    subject: RAY,
+    topic: 'weight_bearing',
     audience: 'user',
     value: 'No weight through the operated leg. Transfers with the frame only.',
     authorId: 'adeyemi',
@@ -48,8 +48,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   })
 
   store.publish({
-    patient: RAY,
-    domain: 'weight_bearing',
+    subject: RAY,
+    topic: 'weight_bearing',
     audience: 'user',
     value: 'Partial weight-bearing, about half your body weight through the operated leg.',
     authorId: 'adeyemi',
@@ -59,8 +59,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   })
 
   store.publish({
-    patient: RAY,
-    domain: 'anticoagulant',
+    subject: RAY,
+    topic: 'anticoagulant',
     audience: 'user',
     value: 'Rivaroxaban 10mg once daily. Stop date: 4 October 2026.',
     authorId: 'gp.mensah',
@@ -72,8 +72,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   })
 
   store.publish({
-    patient: RAY,
-    domain: 'exercise',
+    subject: RAY,
+    topic: 'exercise',
     audience: 'user',
     value:
       'Ankle pumps hourly. Heel slides ten times, twice daily. No hip flexion past ninety degrees.',
@@ -84,8 +84,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   })
 
   store.publish({
-    patient: RAY,
-    domain: 'contact',
+    subject: RAY,
+    topic: 'contact',
     audience: 'user',
     value: 'Ward 4 physio line, weekdays nine to five. Out of hours, call 111.',
     authorId: 'ward4',
@@ -97,8 +97,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   // ── never speakable ────────────────────────────────────────────────────────
   // Shapes the answer ("have someone nearby") and is never said to Ray.
   store.publish({
-    patient: RAY,
-    domain: 'risk',
+    subject: RAY,
+    topic: 'risk',
     audience: 'assistant',
     value:
       'Fall risk: HIGH. Lives alone Monday to Thursday. Family disputes the discharge plan — daughter believes discharge was premature.',
@@ -109,8 +109,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   })
 
   store.publish({
-    patient: RAY,
-    domain: 'adherence',
+    subject: RAY,
+    topic: 'adherence',
     audience: 'assistant',
     value: 'Reported adherence unreliable; over-reports exercise completion.',
     authorId: 'okafor',
@@ -126,8 +126,8 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
     const meta = blobFor(uriFor(clip.patient, clip.domain, clip.audience))!
     const speakable = clip.audience === 'user'
     store.publish({
-      patient: clip.patient,
-      domain: clip.domain,
+      subject: clip.patient,
+      topic: clip.domain,
       audience: clip.audience,
       value: meta.description,
       authorId: 'okafor',
@@ -154,8 +154,8 @@ export function seedDemo(store?: LiveResourceStore, opts: SeedOptions = {}) {
  * This is the thirty seconds that the whole product exists for.
  */
 export const STAGED_REVISION = {
-  patient: RAY,
-  domain: 'weight_bearing',
+  subject: RAY,
+  topic: 'weight_bearing',
   audience: 'user' as const,
   value: 'Full weight-bearing as tolerated.',
   authorId: 'okafor',

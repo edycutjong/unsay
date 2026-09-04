@@ -24,7 +24,6 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto'
-import type { Audience } from './types.ts'
 
 const FORMAT_VERSION = 1
 const IV_BYTES = 12 // 96-bit, the GCM-recommended nonce size
@@ -55,24 +54,22 @@ export interface KeyProvider {
   describe(): string
 }
 
-export interface RecordIdentity {
-  patient: string
-  domain: string
-  version: number
-  audience: Audience
-}
-
 /**
- * The AAD. This string IS the safety boundary: GCM authenticates it, so bytes sealed
- * under one identity cannot be opened under another. `|` is reserved as the separator,
- * so a component containing one would make two distinct identities collide.
+ * The AAD — what a ciphertext is bound to — is decided by the store, not by this
+ * file: it is a property of the record, and the record shape belongs to
+ * @unsay/live-resources. Re-exported here because everything that seals or opens
+ * reaches for it alongside the Envelope, and a second local copy of the rule is
+ * exactly how the sealing and opening sides drift apart.
+ *
+ * The string is `subject|topic|v<n>|audience` — for Unsay, `patient|domain|v<n>|audience`.
+ * GCM authenticates it, so bytes sealed under one identity cannot be opened under
+ * another, and `|` is reserved so two identities can never collide into one AAD.
  */
-export function recordAad(id: RecordIdentity): string {
-  for (const part of [id.patient, id.domain, id.audience]) {
-    if (part.includes('|')) throw new EnvelopeError(`"|" is reserved in a record identity: ${part}`)
-  }
-  return `${id.patient}|${id.domain}|v${id.version}|${id.audience}`
-}
+export {
+  recordAad,
+  ReservedSeparatorError,
+} from '../packages/live-resources/src/index.ts'
+export type { RecordIdentity } from '../packages/live-resources/src/index.ts'
 
 // ── wire format ──────────────────────────────────────────────────────────────
 // [1] format version │ [1] provider len P │ [P] provider │ [1] keyId len K │ [K] keyId

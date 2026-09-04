@@ -117,7 +117,7 @@ console.log('\n5. audience cannot be changed by a later write')
 let flipped = false
 try {
   fresh.publish({
-    patient: RAY, domain: 'risk', audience: 'user',
+    subject: RAY, topic: 'risk', audience: 'user',
     value: 'Fall risk: HIGH.', authorId: 'attacker', authorLabel: 'x',
     writtenAt: new Date().toISOString(),
   })
@@ -257,7 +257,7 @@ check(
 
 // The same bytes must still open in their own slot, or the test above proves only
 // that decryption is broken generally.
-const risk1 = { patient: RAY, domain: 'risk', version: 1, audience: 'assistant' as const }
+const risk1 = { subject: RAY, topic: 'risk', version: 1, audience: 'assistant' as const }
 let opensInPlace = false
 try {
   opensInPlace = envelope.open(riskBytes, recordAad(risk1)).includes('Fall risk')

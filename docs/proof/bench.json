@@ -1,18 +1,18 @@
 {
-  "ranAt": "2026-09-04T09:33:56.644Z",
+  "ranAt": "2026-09-04T10:04:27.296Z",
   "n": 200,
   "transport": "streamable-http-loopback",
   "path": "POST /write → notification → re-read",
   "atRest": "at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)",
   "speechWindowMs": 3400,
   "endToEnd": {
-    "p50": 1.82,
-    "p95": 3.406,
-    "max": 12.854
+    "p50": 1.583,
+    "p95": 2.929,
+    "max": 6.258
   },
   "writeToNotification": {
-    "p50": 0.845,
-    "p95": 1.642
+    "p50": 0.749,
+    "p95": 1.998
   },
   "midSentence": {
     "count": 200,

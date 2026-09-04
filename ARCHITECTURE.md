@@ -1,10 +1,10 @@
 # Architecture
 
 > **Generated from the codebase** by `scripts/gen_architecture.ts` — run `npm run docs:arch`.
-> Nothing here is hand-written. If a surface is listed, a handler for it exists in `src/`.
+> Nothing here is hand-written. If a surface is listed, code for it exists in `src/` or `packages/`.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-04T09:39:06.551Z_
+_Generated: 2026-09-04T10:04:33.584Z_
 
 ## MCP surfaces actually registered
 
@@ -21,14 +21,14 @@ _Generated: 2026-09-04T09:39:06.551Z_
 | `resources/subscribe` | `src/server.ts` |
 | `resources/unsubscribe` | `src/server.ts` |
 | `notifications/message` | `src/server.ts` |
-| `notifications/resources/list_changed` | `src/server.ts` |
-| `notifications/resources/updated` | `src/server.ts` |
+| `notifications/resources/list_changed` | `packages/live-resources/src/notifier.ts` |
+| `notifications/resources/updated` | `packages/live-resources/src/notifier.ts` |
 
 **10 request handlers + 3 notification sender(s).**
 
 Declaring `logging` also makes the SDK serve `logging/setLevel` without a handler of
 our own, so it is a surface a host can call but is deliberately not listed above —
-this table only names methods with a handler in `src/`.
+this table only names methods with a sender or handler in the source.
 
 ## HTTP routes
 
@@ -64,12 +64,29 @@ tools: {},
 |---|---|
 | `src/audit.ts` | `AuditLog` |
 | `src/blobs.ts` | `EXERCISE_CLIP`, `GAIT_NOTE`, `CLIPS`, `blobFor` |
-| `src/envelope.ts` | `EnvelopeError`, `MasterKeyMissingError`, `KmsUnavailableError`, `DecryptionFailedError`, `EnvelopeKeyMismatchError`, `recordAad`, `describeSealed`, `Envelope`, `startupLine`, `announceOnce`, `LocalKeyProvider`, `KmsKeyProvider`, `envelopeFromEnv` |
+| `src/envelope.ts` | `EnvelopeError`, `MasterKeyMissingError`, `KmsUnavailableError`, `DecryptionFailedError`, `EnvelopeKeyMismatchError`, `describeSealed`, `Envelope`, `startupLine`, `announceOnce`, `LocalKeyProvider`, `KmsKeyProvider`, `envelopeFromEnv` |
 | `src/http.ts` | `DEV_TOKEN_SECRET`, `DEV_WRITE_SECRET`, `SCOPES_SUPPORTED`, `WRITE_SKEW_MS`, `mintToken`, `TokenError`, `verifyToken`, `writeSigningMaterial`, `signWriteBody`, `MemoryEventStore`, `createHttpServer` |
 | `src/seed.ts` | `RAY`, `DEMO_NOW`, `seed`, `seedDemo`, `STAGED_REVISION` |
 | `src/server.ts` | `SERVER_INSTRUCTIONS`, `RESOURCE_PAGE_SIZE`, `BRIEF_CARER`, `buildServer` |
-| `src/store.ts` | `NotFoundError`, `hashVersion`, `uriFor`, `LiveResourceStore`, `parseUri` |
+| `src/store.ts` | `CARE_PARTITION`, `uriFor`, `parseUri`, `LiveResourceStore` |
 | `src/types.ts` | `SCHEME`, `SCOPE` |
+
+## Extracted package
+
+The generic half — versioned resources, revision notifications, the hash chain,
+and the audience/scope partition — lifted out of `src/` so it can be depended on
+without Unsay. Consumed here by relative import; not published to npm.
+
+| File | Exports |
+|---|---|
+| `packages/live-resources/src/chain.ts` | `hashVersion`, `AAD_SEPARATOR`, `recordAad` |
+| `packages/live-resources/src/codec.ts` | — |
+| `packages/live-resources/src/errors.ts` | `LiveResourceError`, `NotFoundError`, `ReservedSeparatorError`, `PartitionConfigError` |
+| `packages/live-resources/src/index.ts` | — |
+| `packages/live-resources/src/notifier.ts` | `ResourceNotifier` |
+| `packages/live-resources/src/partition.ts` | `AUDIENCES`, `AudiencePartition`, `DEFAULT_PARTITION` |
+| `packages/live-resources/src/store.ts` | `LiveResourceStore` |
+| `packages/live-resources/src/types.ts` | — |
 
 ## Executable scripts
 
@@ -92,7 +109,7 @@ tools: {},
 
 | Package | Version | Used in |
 |---|---|---|
-| `@modelcontextprotocol/sdk` | `^1.30.0` | `src/http.ts`, `src/server.ts`, `scripts/bench.ts`, `scripts/e2e.ts`, `scripts/probe_resume.ts`, `scripts/probe_subscribe.ts`, `scripts/verify.ts` |
+| `@modelcontextprotocol/sdk` | `^1.30.0` | `src/http.ts`, `src/server.ts`, `packages/live-resources/src/notifier.ts`, `scripts/bench.ts`, `scripts/e2e.ts`, `scripts/probe_resume.ts`, `scripts/probe_subscribe.ts`, `scripts/verify.ts` |
 
 ## Not built
 

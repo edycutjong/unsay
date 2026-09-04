@@ -1,0 +1,47 @@
+{
+  "//": "Not published to npm. Extracted from the Unsay MCP server; the repository field points at the monorepo it lives in.",
+  "name": "@unsay/live-resources",
+  "version": "0.1.0",
+  "description": "Versioned, notifying, audience-partitioned resources for MCP servers whose state changes while the model is answering.",
+  "license": "MIT",
+  "author": "Edy Tjong",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edycu/unsay.git",
+    "directory": "packages/live-resources"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "resources",
+    "subscriptions",
+    "notifications",
+    "hash-chain",
+    "audience"
+  ],
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.20.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  }
+}

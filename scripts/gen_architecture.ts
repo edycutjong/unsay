@@ -8,7 +8,7 @@
  *
  * Run: npm run docs:arch
  */
-import { readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname
@@ -22,13 +22,29 @@ const walk = (dir: string, out: string[] = []): string[] => {
   return out
 }
 
-const files = walk(join(ROOT, 'src')).concat(walk(join(ROOT, 'scripts')))
+/**
+ * `packages/<name>/src` is walked too, and BEFORE scripts/: the notification
+ * senders moved into @unsay/live-resources when the generic half was extracted, so
+ * a generator that only read src/ would report two notification surfaces where the
+ * server ships three. Only each package's `src` — its tests are not the product.
+ * Order matters because the "where" column takes the first file that matches, and
+ * the product path must win over a probe harness that also sends one.
+ */
+const packagesDir = join(ROOT, 'packages')
+const packageSources = existsSync(packagesDir)
+  ? readdirSync(packagesDir).flatMap((name) => {
+      const dir = join(packagesDir, name, 'src')
+      return existsSync(dir) ? walk(dir) : []
+    })
+  : []
+
+const files = walk(join(ROOT, 'src')).concat(packageSources, walk(join(ROOT, 'scripts')))
 const bodies = new Map(files.map((f) => [f.replace(ROOT, ''), readFileSync(f, 'utf8')]))
 const all = [...bodies.values()].join('\n')
 
 // MCP request schemas actually registered
 const handlers = [...all.matchAll(/setRequestHandler\((\w+)Schema/g)].map((m) => m[1]!)
-const notifications = [...all.matchAll(/server\.(send\w+)\(/g)].map((m) => m[1]!)
+const notifications = [...all.matchAll(/\.(send[A-Z]\w+)\(/g)].map((m) => m[1]!)
 const capabilities = /capabilities: \{\n([\s\S]*?)\n      \},/.exec(all)?.[1]
 
 /**
@@ -86,7 +102,7 @@ const A = (s = '') => lines.push(s)
 A('# Architecture')
 A()
 A('> **Generated from the codebase** by `scripts/gen_architecture.ts` — run `npm run docs:arch`.')
-A('> Nothing here is hand-written. If a surface is listed, a handler for it exists in `src/`.')
+A('> Nothing here is hand-written. If a surface is listed, code for it exists in `src/` or `packages/`.')
 A('> LESSONS R6: eight prior submissions documented routes that were never built.')
 A()
 A(`_Generated: ${new Date().toISOString()}_`)
@@ -102,7 +118,7 @@ for (const h of [...new Set(handlers)].sort()) {
 }
 for (const n of [...new Set(notifications)].sort()) {
   const method = NOTIF_TO_METHOD[n] ?? n
-  const where = [...bodies.entries()].find(([, b]) => b.includes(`server.${n}(`))?.[0]
+  const where = [...bodies.entries()].find(([, b]) => b.includes(`.${n}(`))?.[0]
   A(`| \`${method}\` | \`${where}\` |`)
 }
 A()
@@ -110,7 +126,7 @@ A(`**${new Set(handlers).size} request handlers + ${new Set(notifications).size}
 A()
 A('Declaring `logging` also makes the SDK serve `logging/setLevel` without a handler of')
 A('our own, so it is a surface a host can call but is deliberately not listed above —')
-A('this table only names methods with a handler in `src/`.')
+A('this table only names methods with a sender or handler in the source.')
 A()
 A('## HTTP routes')
 A()
@@ -145,6 +161,21 @@ for (const f of [...bodies.keys()].filter((f) => f.startsWith('src/')).sort()) {
   A(`| \`${f}\` | ${ex.length ? ex.map((e) => `\`${e}\``).join(', ') : '—'} |`)
 }
 A()
+if (packageSources.length) {
+  A('## Extracted package')
+  A()
+  A('The generic half — versioned resources, revision notifications, the hash chain,')
+  A('and the audience/scope partition — lifted out of `src/` so it can be depended on')
+  A('without Unsay. Consumed here by relative import; not published to npm.')
+  A()
+  A('| File | Exports |')
+  A('|---|---|')
+  for (const f of [...bodies.keys()].filter((f) => f.startsWith('packages/')).sort()) {
+    const ex = exportsOf(f)
+    A(`| \`${f}\` | ${ex.length ? ex.map((e) => `\`${e}\``).join(', ') : '—'} |`)
+  }
+  A()
+}
 A('## Executable scripts')
 A()
 A('| Command | File |')
