@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsay — Echo Show card</title>
+<meta name="description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0B0D0E">
+<style>
+:root{
+  --page:#0B0D0E; --panel:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
+  --ink:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --amber:#F2A93B; --amber-ink:#F2A93B;
+  --red:#D9564A; --red-ink:#E4695E;
+  --green:#3F9E63; --green-ink:#5CB77E;
+  --accent:#5B8DEF; --accent-ink:#7FA6F3; --focus:#7FA6F3;
+  --field:#101314;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --page:#EDF0F2; --panel:#FFFFFF; --raise:#F6F8F9; --line:#DDE2E5; --line-soft:#E7EBEE;
+    --ink:#0B0D0E; --muted:#4F5A60; --dim:#727E85;
+    --amber:#DE8F13; --amber-ink:#845005;
+    --red:#C0392B; --red-ink:#96291E;
+    --green:#2C7A4B; --green-ink:#1D5734;
+    --accent:#2C55C4; --accent-ink:#1D3F9E; --focus:#2C55C4;
+    --field:#FFFFFF;
+  }
+}
+/* The device screen is a fixed instrument: it does not follow the viewer's theme,
+   because it is a photograph of an Echo Show at 3am and it has to look like one
+   in every screenshot. Only the page around it is theme-aware. */
+.screen{
+  --s-bg:#0B0D0E; --s-ink:#F5F7F8; --s-muted:#9BA3A8; --s-dim:#767F85;
+  --s-amber:#F2A93B; --s-red:#E4695E; --s-green:#5CB77E;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--page); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased; letter-spacing:-0.005em}
+h1{margin:0; font-size:20px; font-weight:640; letter-spacing:-0.02em}
+a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+a:hover{border-bottom-color:var(--accent)}
+:where(a,button,summary,input):focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:4px}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+
+.shell{width:min(1180px,calc(100% - 32px)); margin:0 auto; padding:22px 0 60px}
+.chrome{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px}
+.chrome .sub{color:var(--muted); font-size:14px}
+.spacer{margin-left:auto}
+button{font:inherit; cursor:pointer; border-radius:8px;
+  transition:background .15s, border-color .15s, color .15s, transform .06s}
+button:active{transform:translateY(1px)}
+button[disabled]{opacity:.45; cursor:not-allowed; transform:none}
+.btn{background:var(--raise); color:var(--muted); border:1px solid var(--line); padding:8px 14px; font-size:14px}
+.btn:hover:not([disabled]){color:var(--ink); border-color:var(--muted)}
+.btn[aria-pressed="true"]{color:var(--ink); border-color:var(--amber); background:color-mix(in srgb,var(--amber) 12%,transparent)}
+
+details.setup{margin:0 0 18px; background:var(--panel); border:1px solid var(--line); border-radius:12px}
+details.setup[open]{border-color:var(--muted)}
+summary{cursor:pointer; padding:13px 17px; font-size:14px; color:var(--muted); list-style:none; display:flex; gap:10px; align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾"; margin-left:auto; color:var(--dim); transition:transform .18s}
+details[open] > summary::after{transform:rotate(180deg)}
+summary:hover{color:var(--ink)}
+.setup-body{padding:4px 17px 17px; border-top:1px solid var(--line-soft)}
+.field{display:block; margin:14px 0 0}
+.field .lab{display:block; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:6px}
+input{width:100%; font:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px;
+  color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px 12px}
+input:hover{border-color:var(--muted)}
+input::placeholder{color:var(--dim)}
+.hint{margin:7px 0 0; font-size:13px; color:var(--dim); line-height:1.5}
+.hint code,.note code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;
+  background:var(--raise); border:1px solid var(--line-soft); border-radius:4px; padding:1px 5px; color:var(--muted)}
+.row{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap}
+
+/* ── the device ─────────────────────────────────────────────────────────── */
+.stagearea{position:relative}
+.fit{position:relative; overflow:hidden}
+.device{
+  width:1280px; height:800px; position:relative; transform-origin:top left;
+  border-radius:26px; padding:16px; background:linear-gradient(160deg,#2A2F33,#141719 60%);
+  box-shadow:0 40px 90px -50px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05) inset;
+}
+.screen{width:100%; height:100%; border-radius:12px; background:var(--s-bg); color:var(--s-ink);
+  position:relative; overflow:hidden; padding:52px 64px; display:flex; flex-direction:column}
+.screen::after{ /* the glass */
+  content:""; position:absolute; inset:0; border-radius:12px; pointer-events:none;
+  background:radial-gradient(120% 90% at 20% -10%, rgba(255,255,255,.05), transparent 55%);
+}
+.s-top{display:flex; align-items:center; gap:16px; font-size:20px; letter-spacing:.02em}
+.s-status{display:inline-flex; align-items:center; gap:9px; color:var(--s-muted);
+  border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:6px 14px; font-size:18px; white-space:nowrap}
+.s-status .led{width:9px; height:9px; border-radius:50%; background:var(--s-dim)}
+.s-status.live{color:var(--s-green); border-color:rgba(92,183,126,.45)}
+.s-status.live .led{background:var(--s-green)}
+.s-status.down{color:var(--s-red); border-color:rgba(228,105,94,.45)}
+.s-status.down .led{background:var(--s-red)}
+.s-clock{margin-left:auto; color:var(--s-muted); font-size:24px; font-variant-numeric:tabular-nums}
+
+.s-body{flex:1; display:flex; flex-direction:column; justify-content:center; min-height:0}
+.s-label{font-size:30px; letter-spacing:.22em; text-transform:uppercase; color:var(--s-dim); margin-bottom:26px}
+.s-old{font-size:44px; line-height:1.22; color:var(--s-dim); margin:0 0 22px; max-width:22ch}
+.s-old .w{text-decoration:line-through; text-decoration-thickness:3px; text-decoration-color:transparent;
+  transition:text-decoration-color .35s ease}
+.s-old.struck .w{text-decoration-color:var(--s-amber)}
+.s-old.gone{opacity:0; transition:opacity 1.6s ease}
+.s-fact{font-size:72px; line-height:1.14; font-weight:600; letter-spacing:-0.02em; margin:0; max-width:19ch}
+.s-fact.enter{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+.s-meta{margin:34px 0 0; font-size:30px; color:var(--s-muted); display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.s-dot{width:18px; height:18px; border-radius:50%; background:var(--s-dim); flex:none}
+.s-dot.amber{background:var(--s-amber); animation:dotIn .5s cubic-bezier(.2,.7,.3,1) both,
+  halo 2.4s ease-out 3}
+.s-dot.red{background:var(--s-red)}
+.s-dot.green{background:var(--s-green)}
+@keyframes dotIn{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes halo{0%{box-shadow:0 0 0 0 rgba(242,169,59,.55)}100%{box-shadow:0 0 0 22px rgba(242,169,59,0)}}
+.s-meta .who{color:var(--s-ink)}
+.s-meta.changed{color:var(--s-amber)}
+.s-meta.stale{color:var(--s-red)}
+.s-advice{margin:18px 0 0; font-size:28px; color:var(--s-muted); max-width:34ch; line-height:1.35}
+
+@media (prefers-reduced-motion: reduce){
+  .s-fact.enter{animation:none}
+  .s-dot.amber{animation:none}
+  .s-old{transition:none}
+}
+
+/* ── presentation mode: nothing but the device ──────────────────────────── */
+body.present{background:#000; overflow:hidden}
+body.present .shell{display:none}
+.present-stage{display:none}
+body.present .present-stage{display:flex; position:fixed; inset:0; align-items:center; justify-content:center}
+body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+  color:#4A5155; font-size:13px; letter-spacing:.06em}
+
+.note{margin:20px 0 0; color:var(--muted); font-size:14.5px; line-height:1.65; max-width:78ch}
+.note b{color:var(--ink); font-weight:600}
+.note + .note{margin-top:10px}
+.chips{display:flex; gap:8px; flex-wrap:wrap; margin:18px 0 0}
+.chips .btn{font-size:13.5px}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="chrome">
+    <h1>Echo Show card · 1280 × 800</h1>
+    <span class="sub" id="pathLabel">connecting…</span>
+    <span class="spacer"></span>
+    <button class="btn" id="present" type="button">Presentation mode</button>
+    <button class="btn" id="reconnect" type="button">Reconnect</button>
+  </div>
+
+  <details class="setup" id="setup">
+    <summary>Server and read token</summary>
+    <div class="setup-body">
+      <label class="field">
+        <span class="lab">Unsay server</span>
+        <input type="text" id="base" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:39500">
+        <span class="hint">Defaults to this page’s own origin when it is served over http.</span>
+      </label>
+      <label class="field">
+        <span class="lab">Read token — Bearer, scope care.read.user</span>
+        <input type="password" id="token" spellcheck="false" autocomplete="off" placeholder="paste the bearer token">
+        <span class="hint">This screen is an MCP host: <code>initialize</code>,
+          <code>resources/list</code>, <code>resources/read</code>, <code>resources/subscribe</code>,
+          then the SSE stream. It renders <code>care://</code> only — a token carrying
+          <code>care.read.assistant</code> would not change that, because the one thing this screen
+          must never do is show Ray why he is being told to have someone nearby.</span>
+      </label>
+      <div class="row">
+        <button class="btn" id="forget" type="button">Forget token</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="stagearea">
+    <div class="fit" id="fit">
+      <div class="device" id="device">
+        <div class="screen" id="screen">
+          <div class="s-top">
+            <span class="s-status" id="sStatus"><span class="led"></span><span id="sStatusText">connecting</span></span>
+            <span class="s-clock" id="sClock"></span>
+          </div>
+          <div class="s-body">
+            <div class="s-label" id="sLabel">weight bearing</div>
+            <p class="s-old" id="sOld" hidden></p>
+            <p class="s-fact" id="sFact">—</p>
+            <div class="s-meta" id="sMeta"></div>
+            <p class="s-advice" id="sAdvice" hidden></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <p class="note"><b>This is the screen, not a picture of one.</b> It holds an MCP session against the
+    running server and repaints when <code>notifications/resources/updated</code> arrives. The status
+    chip on the device says which path is carrying the change — a native subscription, or the
+    <code>whats_changed</code> tool, which is the fallback for a host that cannot subscribe. Both are
+    built, and this page exercises whichever one is actually available.</p>
+  <p class="note">With no server answering, the chip reads <b>SEED · NOT LIVE</b> and the screen shows
+    the committed record from <code>src/seed.ts</code> with its pinned clock. It never invents a
+    correction: no strike-through and no amber dot can appear unless a real revision arrived.</p>
+  <p class="note"><b>Serve this page from the server’s own origin.</b> The Unsay server sends no CORS
+    headers and answers a preflight with <code>405</code>, so a browser blocks these requests before
+    they leave when the page is opened from <code>file://</code> or a different port. Same origin, and
+    everything above is live.</p>
+  <p class="note">Press <b>F</b> for presentation mode — the page chrome disappears and the device fills
+    the display, which is what the demo video films. <a href="clinician.html">Open the clinician
+    screen</a> in another window and publish a revision to watch this one retract.</p>
+</div>
+
+<div class="present-stage" id="presentStage"></div>
+<span class="exit-hint" id="exitHint" hidden>press F or Escape to leave presentation mode</span>
+
+<script>
+(() => {
+  'use strict'
+
+  const PROTOCOL = '2025-11-25'
+  const SEED_NOW = '2026-10-08T09:14:00Z'
+  // Committed seed record (src/seed.ts) — speakable facts only, as this screen is Ray's.
+  const SEED = [
+    { uri:'care://ray/weight_bearing', domain:'weight_bearing', version:2,
+      text:'Partial weight-bearing, about half your body weight through the operated leg.',
+      author:'Mr Adeyemi, surgical team', lastModified:'2026-10-06T09:14:00Z', stale:false },
+    { uri:'care://ray/exercise', domain:'exercise', version:1,
+      text:'Ankle pumps hourly. Heel slides ten times, twice daily. No hip flexion past ninety degrees.',
+      author:'Sarah Okafor, physio', lastModified:'2026-10-07T09:14:00Z', stale:false },
+    { uri:'care://ray/anticoagulant', domain:'anticoagulant', version:1,
+      text:'Rivaroxaban 10mg once daily. Stop date: 4 October 2026.',
+      author:'Dr Mensah, GP', lastModified:'2026-09-29T09:14:00Z', stale:true },
+    { uri:'care://ray/contact', domain:'contact', version:1,
+      text:'Ward 4 physio line, weekdays nine to five. Out of hours, call 111.',
+      author:'Ward 4 admin', lastModified:'2026-10-03T09:14:00Z', stale:false },
+  ]
+
+  const $ = (id) => document.getElementById(id)
+  const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n }
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
+  const S = {
+    get(a, k) { try { return window[a].getItem(k) } catch { return null } },
+    set(a, k, v) { try { window[a].setItem(k, v) } catch { /* nothing to do */ } },
+    del(a, k) { try { window[a].removeItem(k) } catch { /* nothing to do */ } },
+  }
+
+  // ── config ───────────────────────────────────────────────────────────────
+  const httpOrigin = /^https?:$/.test(location.protocol) ? location.origin : ''
+  const q = new URLSearchParams(location.search)
+  const baseIn = $('base'), tokenIn = $('token')
+  baseIn.value = q.get('base') || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
+  tokenIn.value = q.get('token') || S.get('sessionStorage', 'unsay.token') || ''
+  let shown = q.get('domain') || 'weight_bearing'
+  if (q.has('token') || q.has('base')) {
+    S.set('localStorage', 'unsay.base', baseIn.value)
+    S.set('sessionStorage', 'unsay.token', tokenIn.value)
+    history.replaceState(null, '', location.pathname + location.hash)
+  }
+  if (!tokenIn.value) $('setup').open = true
+
+  const base = () => baseIn.value.trim().replace(/\/+$/, '')
+  const token = () => tokenIn.value.trim()
+
+  baseIn.addEventListener('change', () => { S.set('localStorage', 'unsay.base', base()); connect() })
+  tokenIn.addEventListener('change', () => { S.set('sessionStorage', 'unsay.token', token()); connect() })
+  $('reconnect').addEventListener('click', connect)
+  $('forget').addEventListener('click', () => { tokenIn.value = ''; S.del('sessionStorage', 'unsay.token'); connect() })
+
+  // ── a minimal MCP client over Streamable HTTP ────────────────────────────
+  const mcp = { sid: null, proto: PROTOCOL, id: 0, lastEventId: null, streaming: false }
+
+  function mcpHeaders(extra) {
+    const h = Object.assign({
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      Authorization: 'Bearer ' + token(),
+    }, extra || {})
+    if (mcp.sid) { h['Mcp-Session-Id'] = mcp.sid; h['MCP-Protocol-Version'] = mcp.proto }
+    return h
+  }
+
+  /**
+   * SSE framing, done properly. Verified against the running server: the
+   * transport emits an empty `data:` keep-alive ack before the real message, and
+   * the spec allows a block to carry several data lines that concatenate. A naive
+   * "one data line per block, always JSON" reader throws on the first frame.
+   */
+  function drain(buf, onMessage) {
+    let cut
+    while ((cut = buf.indexOf('\n\n')) !== -1) {
+      const block = buf.slice(0, cut)
+      buf = buf.slice(cut + 2)
+      let data = '', eventId = null
+      for (const line of block.split('\n')) {
+        if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).replace(/^ /, '')
+        else if (line.startsWith('id:')) eventId = line.slice(3).trim()
+      }
+      if (eventId) onMessage(null, eventId)
+      if (!data) continue
+      let msg
+      try { msg = JSON.parse(data) } catch { continue }
+      onMessage(msg, eventId)
+    }
+    return buf
+  }
+
+  async function firstMessage(res, wantId) {
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) return res.json()
+    const reader = res.body.getReader(), dec = new TextDecoder()
+    let buf = '', found = null
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      buf = drain(buf, (msg) => { if (msg && msg.id === wantId) found = msg })
+      if (found) { reader.cancel().catch(() => {}); return found }
+    }
+    throw new Error('stream closed before a response arrived')
+  }
+
+  async function rpc(method, params) {
+    const id = ++mcp.id
+    const res = await fetch(base() + '/mcp', {
+      method: 'POST', headers: mcpHeaders(),
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params: params || {} }),
+    })
+    const sid = res.headers.get('mcp-session-id')
+    if (sid) mcp.sid = sid
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + method)
+    const msg = await firstMessage(res, id)
+    if (msg.error) throw new Error(msg.error.message + ' (' + msg.error.code + ')')
+    return msg.result
+  }
+
+  const notify = (method, params) => fetch(base() + '/mcp', {
+    method: 'POST', headers: mcpHeaders(),
+    body: JSON.stringify({ jsonrpc: '2.0', method, params: params || {} }),
+  })
+
+  // ── state ────────────────────────────────────────────────────────────────
+  let live = false
+  let path = 'none'              // 'subscription' | 'whats_changed' | 'none'
+  let facts = SEED.slice()
+  let clockIso = SEED_NOW        // the clock ages are measured against
+  let current = null             // the fact on screen
+  let corrected = null           // { from, at } — set ONLY by a real revision
+  let generation = 0             // invalidates in-flight loops after a reconnect
+
+  const byUri = () => facts.find((f) => f.uri === 'care://ray/' + shown) || facts[0] || null
+
+  // ── connect ──────────────────────────────────────────────────────────────
+  async function connect() {
+    const gen = ++generation
+    mcp.sid = null; mcp.id = 0; mcp.lastEventId = null; mcp.streaming = false
+    live = false; path = 'none'; corrected = null
+
+    if (!token()) {
+      facts = SEED.slice(); clockIso = SEED_NOW
+      chips(); paint('no token — showing the seed record')
+      return
+    }
+    try {
+      const init = await rpc('initialize', {
+        protocolVersion: PROTOCOL, capabilities: {},
+        clientInfo: { name: 'unsay-echo-web', version: '0.1.0' },
+      })
+      mcp.proto = init.protocolVersion || PROTOCOL
+      await notify('notifications/initialized')
+      await load(gen)
+      if (gen !== generation) return
+      live = true
+      clockIso = new Date().toISOString()
+      const target = byUri()
+      if (target) { try { await rpc('resources/subscribe', { uri: target.uri }) } catch { /* fallback covers it */ } }
+      chips(); paint()
+      void watch(gen)
+    } catch (e) {
+      if (gen !== generation) return
+      facts = SEED.slice(); clockIso = SEED_NOW
+      chips(); paint(String(e.message || e))
+    }
+  }
+
+  function parseRead(uri, listed, read) {
+    const textPart = (read.contents || []).find((c) => typeof c.text === 'string')
+    const meta = (textPart && textPart._meta) || {}
+    const rawText = textPart ? textPart.text : ''
+    const nl = rawText.indexOf('\n')
+    return {
+      uri,
+      domain: uri.split('/').pop(),
+      version: meta['unsay/version'] ?? null,
+      text: rawText.startsWith('[') && nl > -1 ? rawText.slice(nl + 1) : rawText,
+      author: (listed.description || '').replace(/^Last changed by\s*/, '') || 'unknown author',
+      lastModified: meta['unsay/lastModified'] || (listed.annotations && listed.annotations.lastModified) || null,
+      stale: meta['unsay/stale'] === true,
+    }
+  }
+
+  async function load(gen) {
+    const listed = []
+    let cursor
+    do {
+      const page = await rpc('resources/list', cursor ? { cursor } : {})
+      listed.push(...(page.resources || []))
+      cursor = page.nextCursor
+    } while (cursor)
+    if (gen !== generation) return
+
+    const next = []
+    for (const r of listed) {
+      // Ray's screen renders speakable facts and nothing else, whatever the token
+      // happens to carry. The partition is the server's job; not showing it is ours.
+      if (!r.uri.startsWith('care://')) continue
+      if (r.mimeType && r.mimeType !== 'text/plain') continue
+      next.push(parseRead(r.uri, r, await rpc('resources/read', { uri: r.uri })))
+    }
+    if (gen !== generation) return
+    facts = next.length ? next : facts
+  }
+
+  /** Native subscription if the SSE stream opens; the whats_changed tool if it does not. */
+  async function watch(gen) {
+    try {
+      const h = mcpHeaders({ Accept: 'text/event-stream' })
+      delete h['Content-Type']
+      if (mcp.lastEventId) h['Last-Event-ID'] = mcp.lastEventId
+      const res = await fetch(base() + '/mcp', { method: 'GET', headers: h })
+      if (!res.ok || !res.body) throw new Error('stream HTTP ' + res.status)
+      path = 'subscription'; paint()
+
+      const reader = res.body.getReader(), dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        if (gen !== generation) { reader.cancel().catch(() => {}); return }
+        buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+        const pending = []
+        buf = drain(buf, (msg, eventId) => {
+          if (eventId) mcp.lastEventId = eventId
+          if (msg && msg.method) pending.push(msg)
+        })
+        for (const msg of pending) {
+          if (msg.method === 'notifications/resources/updated') await refresh(gen, msg.params && msg.params.uri)
+          if (msg.method === 'notifications/resources/list_changed') { await load(gen); if (gen === generation) { chips(); paint() } }
+        }
+      }
+      // The stream ended — resume from where it stopped. This is the Last-Event-ID
+      // path, which is what keeps a correction alive across a dropped connection.
+      if (gen === generation) setTimeout(() => watch(gen), 400)
+    } catch {
+      if (gen !== generation) return
+      path = 'whats_changed'; paint()
+      void pollFallback(gen)
+    }
+  }
+
+  /** The designed fallback, actually exercised — not merely built. */
+  async function pollFallback(gen) {
+    let since = current ? current.lastModified : new Date(Date.now() - 60000).toISOString()
+    while (gen === generation) {
+      await new Promise((r) => setTimeout(r, 1500))
+      if (gen !== generation) return
+      try {
+        const out = await rpc('tools/call', { name: 'whats_changed', arguments: { since } })
+        const changed = (out.structuredContent && out.structuredContent.changed) || []
+        if (changed.length) {
+          since = changed.reduce((a, c) => (c.changedAt > a ? c.changedAt : a), since)
+          for (const c of changed) await refresh(gen, c.uri)
+        }
+      } catch { /* transient; the next tick tries again */ }
+    }
+  }
+
+  async function refresh(gen, uri) {
+    const target = byUri()
+    const before = target ? target.text : null
+    // Re-list rather than re-read one URI: the author, the version and the list
+    // itself can all have moved, and the screen must not show a new value beside
+    // the old author's name.
+    try { await load(gen) } catch { return }
+    if (gen !== generation) return
+    chips()
+    const now = byUri()
+    const changedHere = now && before !== null && now.text !== before &&
+      (!uri || !target || uri === target.uri)
+    if (changedHere) {
+      corrected = { from: before, at: Date.now() }
+      clockIso = new Date().toISOString()
+      paint()
+      strike()
+    } else {
+      paint()
+    }
+  }
+
+  // ── painting ─────────────────────────────────────────────────────────────
+  function relAge(fromIso, nowIso) {
+    const ms = new Date(nowIso).getTime() - new Date(fromIso).getTime()
+    if (!isFinite(ms)) return 'an unknown time'
+    const s = Math.max(0, Math.round(ms / 1000))
+    if (s < 60) return s === 1 ? '1 second' : s + ' seconds'
+    const m = Math.round(s / 60); if (m < 60) return m === 1 ? '1 minute' : m + ' minutes'
+    const h = Math.round(m / 60); if (h < 36) return h === 1 ? '1 hour' : h + ' hours'
+    const d = Math.round(h / 24); return d === 1 ? '1 day' : d + ' days'
+  }
+
+  function paint(reason) {
+    current = byUri()
+    const st = $('sStatus'), stt = $('sStatusText')
+    if (live) {
+      st.className = 's-status live'
+      stt.textContent = path === 'subscription' ? 'LIVE · native subscription'
+        : path === 'whats_changed' ? 'LIVE · whats_changed fallback' : 'LIVE'
+    } else {
+      st.className = 's-status down'
+      stt.textContent = 'SEED · NOT LIVE'
+    }
+    $('pathLabel').textContent = live
+      ? (path === 'subscription' ? 'notifications/resources/updated over SSE' : 'polling the whats_changed tool')
+      : 'not connected' + (reason ? ' — ' + reason : '')
+
+    if (!current) { $('sFact').textContent = 'No speakable resource'; return }
+    $('sLabel').textContent = current.domain.replace(/_/g, ' ')
+
+    const fact = $('sFact')
+    if (fact.textContent !== current.text) {
+      fact.textContent = current.text
+      if (!reduced.matches) { fact.classList.remove('enter'); void fact.offsetWidth; fact.classList.add('enter') }
+    }
+
+    const meta = $('sMeta'); meta.textContent = ''
+    const recent = corrected && Date.now() - corrected.at < 120000
+    meta.className = 's-meta' + (current.stale ? ' stale' : recent ? ' changed' : '')
+    meta.appendChild(el('span', 's-dot ' + (current.stale ? 'red' : recent ? 'amber' : 'green')))
+    meta.appendChild(el('span', null, current.stale
+      ? 'not updated for ' + relAge(current.lastModified, live ? new Date().toISOString() : clockIso)
+      : 'changed ' + relAge(current.lastModified, live ? new Date().toISOString() : clockIso) + ' ago'))
+    meta.appendChild(el('span', 'who', current.author))
+
+    const advice = $('sAdvice')
+    if (current.stale) {
+      advice.hidden = false
+      advice.textContent = 'Check with the ward before your next dose.'
+    } else { advice.hidden = true; advice.textContent = '' }
+  }
+
+  /** The old value crosses out and fades. Only ever called by a real revision. */
+  function strike() {
+    const old = $('sOld')
+    old.textContent = ''
+    old.hidden = false
+    old.classList.remove('struck', 'gone')
+    const parts = corrected.from.split(' ')
+    parts.forEach((word, i) => {
+      const s = el('span', 'w', word + (i < parts.length - 1 ? ' ' : ''))
+      s.style.transitionDelay = (i * 30) + 'ms'
+      old.appendChild(s)
+    })
+    if (reduced.matches) { old.classList.add('struck'); setTimeout(() => { old.hidden = true }, 4000); return }
+    requestAnimationFrame(() => old.classList.add('struck'))
+    setTimeout(() => old.classList.add('gone'), 4200)
+    setTimeout(() => { old.hidden = true; old.classList.remove('gone', 'struck') }, 6200)
+  }
+
+  // The age on screen is a live number, so "changed 40 seconds ago" keeps being true.
+  setInterval(() => { if (current) paint() }, 1000)
+  const clock = () => {
+    const d = live ? new Date() : new Date(SEED_NOW)
+    $('sClock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+  }
+  clock(); setInterval(clock, 10000)
+
+  // ── domain chips ─────────────────────────────────────────────────────────
+  function chips() {
+    const box = $('chips'); box.textContent = ''
+    for (const f of facts) {
+      const b = el('button', 'btn', f.domain.replace(/_/g, ' '))
+      b.type = 'button'
+      b.setAttribute('aria-pressed', String(f.domain === shown))
+      b.addEventListener('click', async () => {
+        shown = f.domain; corrected = null
+        chips(); paint()
+        if (live) { try { await rpc('resources/subscribe', { uri: f.uri }) } catch { /* fallback covers it */ } }
+      })
+      box.appendChild(b)
+    }
+  }
+
+  // ── fit the 1280×800 device to whatever space there is ───────────────────
+  const device = $('device'), fit = $('fit'), stage = $('presentStage')
+  function resize() {
+    const present = document.body.classList.contains('present')
+    const host = present ? { w: innerWidth - 24, h: innerHeight - 44 } : { w: fit.clientWidth, h: Infinity }
+    const s = Math.min(host.w / 1280, host.h === Infinity ? Infinity : host.h / 800, 1)
+    device.style.transform = 'scale(' + s + ')'
+    if (!present) fit.style.height = (800 * s) + 'px'
+  }
+  addEventListener('resize', resize)
+
+  function togglePresent(on) {
+    const want = on === undefined ? !document.body.classList.contains('present') : on
+    document.body.classList.toggle('present', want)
+    $('exitHint').hidden = !want
+    $('present').setAttribute('aria-pressed', String(want));
+    (want ? stage : fit).appendChild(device)
+    resize()
+  }
+  $('present').addEventListener('click', () => togglePresent())
+  addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return
+    if (e.key === 'f' || e.key === 'F') togglePresent()
+    if (e.key === 'Escape') togglePresent(false)
+  })
+
+  chips()
+  paint()
+  resize()
+  connect()
+})()
+</script>
+</body>
+</html>

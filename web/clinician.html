@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsay — clinician write screen</title>
+<meta name="description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0B0D0E">
+<style>
+:root{
+  --bg:#0B0D0E; --surface:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
+  --text:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --amber:#F2A93B; --amber-ink:#F2A93B; --amber-wash:rgba(242,169,59,.10);
+  --red:#D9564A; --red-ink:#E4695E; --red-wash:rgba(217,86,74,.10);
+  --green:#3F9E63; --green-ink:#5CB77E; --green-wash:rgba(63,158,99,.10);
+  --accent:#5B8DEF; --accent-ink:#7FA6F3; --focus:#7FA6F3;
+  --field:#101314;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#F3F5F6; --surface:#FFFFFF; --raise:#F7F9FA; --line:#DDE2E5; --line-soft:#E7EBEE;
+    --text:#0B0D0E; --muted:#4F5A60; --dim:#727E85;
+    --amber:#DE8F13; --amber-ink:#845005; --amber-wash:rgba(222,143,19,.12);
+    --red:#C0392B; --red-ink:#96291E; --red-wash:rgba(192,57,43,.09);
+    --green:#2C7A4B; --green-ink:#1D5734; --green-wash:rgba(44,122,75,.10);
+    --accent:#2C55C4; --accent-ink:#1D3F9E; --focus:#2C55C4;
+    --field:#FFFFFF;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased; letter-spacing:-0.005em}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+h1,h2,h3{margin:0; letter-spacing:-0.02em; line-height:1.15}
+a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+a:hover{border-bottom-color:var(--accent)}
+:where(a,button,summary,input,textarea):focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:4px}
+.wrap{width:min(720px,calc(100% - 32px)); margin:0 auto; padding-bottom:90px}
+
+.top{border-bottom:1px solid var(--line-soft); background:var(--surface)}
+.top-in{width:min(720px,calc(100% - 32px)); margin:0 auto; padding:18px 0 16px;
+  display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap}
+.who h1{font-size:22px; font-weight:640}
+.who p{margin:4px 0 0; color:var(--muted); font-size:14.5px}
+.who strong{color:var(--text); font-weight:600}
+.status{margin-left:auto; display:inline-flex; align-items:center; gap:8px; font-size:13px;
+  border:1px solid var(--line); border-radius:999px; padding:5px 12px; color:var(--muted); white-space:nowrap}
+.status .led{width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none}
+.status.live{color:var(--green-ink); border-color:color-mix(in srgb,var(--green) 45%,var(--line))}
+.status.live .led{background:var(--green); box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 18%,transparent)}
+.status.down{color:var(--red-ink); border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.status.down .led{background:var(--red)}
+.status.busy .led{background:var(--amber); animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+details.setup{margin:18px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:12px}
+details.setup[open]{border-color:var(--muted)}
+summary{cursor:pointer; padding:14px 18px; font-size:14.5px; color:var(--muted); list-style:none;
+  display:flex; align-items:center; gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾"; margin-left:auto; color:var(--dim); transition:transform .18s}
+details[open] > summary::after{transform:rotate(180deg)}
+summary:hover{color:var(--text)}
+.setup-body{padding:4px 18px 18px; border-top:1px solid var(--line-soft)}
+.field{display:block; margin:16px 0 0}
+.field .lab{display:block; font-size:12.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:7px}
+input[type=text],input[type=password],textarea{width:100%; font:inherit; font-size:15.5px; color:var(--text);
+  background:var(--field); border:1px solid var(--line); border-radius:9px; padding:11px 13px; transition:border-color .15s}
+input[type=text],input[type=password]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:14px}
+input:hover,textarea:hover{border-color:var(--muted)}
+input::placeholder,textarea::placeholder{color:var(--dim)}
+.hint{margin:8px 0 0; font-size:13.5px; color:var(--dim); line-height:1.5}
+.hint code,.banner code,.foot code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px; background:var(--raise); border:1px solid var(--line-soft); border-radius:4px; padding:1px 5px; color:var(--muted)}
+.row{display:flex; gap:10px; margin-top:18px; flex-wrap:wrap}
+
+button{font:inherit; cursor:pointer; border-radius:9px;
+  transition:background .15s, border-color .15s, color .15s, transform .06s}
+button:active{transform:translateY(1px)}
+button[disabled]{opacity:.45; cursor:not-allowed; transform:none}
+.btn{background:var(--raise); color:var(--muted); border:1px solid var(--line); padding:9px 15px; font-size:14.5px}
+.btn:hover:not([disabled]){color:var(--text); border-color:var(--muted)}
+.btn-primary{background:var(--text); color:var(--bg); border:1px solid var(--text); padding:14px 22px;
+  font-size:16.5px; font-weight:600; letter-spacing:-0.01em}
+.btn-primary:hover:not([disabled]){background:var(--accent); border-color:var(--accent); color:#fff}
+.btn-ghost{background:transparent; color:var(--muted); border:1px solid transparent; padding:14px 12px; font-size:15px}
+.btn-ghost:hover{color:var(--text)}
+
+.banner{margin:18px 0 0; border-radius:12px; padding:16px 18px; font-size:15px; line-height:1.6;
+  border:1px solid var(--line); background:var(--surface); color:var(--muted)}
+.banner.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--line)); background:var(--amber-wash)}
+.banner.bad{border-color:color-mix(in srgb,var(--red) 50%,var(--line)); background:var(--red-wash)}
+.banner b{color:var(--text); display:block; margin-bottom:5px; font-weight:600}
+pre{margin:10px 0 0; overflow-x:auto; background:var(--field); border:1px solid var(--line-soft);
+  border-radius:8px; padding:12px 13px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px; line-height:1.6; color:var(--muted); white-space:pre-wrap; word-break:break-word}
+
+.list-h{display:flex; align-items:baseline; gap:12px; margin:34px 0 12px}
+.list-h h2{font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); font-weight:500}
+.list-h .src{margin-left:auto; font-size:12.5px; color:var(--dim); text-align:right}
+ul.facts{list-style:none; margin:0; padding:0; display:grid; gap:10px}
+.fact{background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.fact.open{border-color:var(--muted)}
+.fact.internal{border-left:3px solid color-mix(in srgb,var(--red) 60%,var(--line))}
+.tap{display:block; width:100%; text-align:left; background:transparent; border:0; border-radius:0;
+  padding:18px 20px; min-height:84px; color:inherit}
+.tap:hover{background:var(--raise)}
+.rowhead{display:flex; align-items:baseline; gap:10px}
+.dom{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim)}
+.badge{font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border-radius:4px}
+.badge.never{color:var(--red-ink); background:var(--red-wash); border:1px solid color-mix(in srgb,var(--red) 35%,transparent)}
+.badge.clip{color:var(--muted); background:var(--raise); border:1px solid var(--line)}
+.edit{margin-left:auto; font-size:13px; color:var(--dim)}
+.tap:hover .edit{color:var(--accent-ink)}
+.val{margin:8px 0 0; font-size:19px; line-height:1.42; font-weight:500}
+.meta{margin:9px 0 0; font-size:13.5px; color:var(--muted); display:flex; flex-wrap:wrap; gap:0 8px; align-items:center}
+.meta .sep{color:var(--dim)}
+.d{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px}
+.d.amber{background:var(--amber); box-shadow:0 0 0 3px var(--amber-wash)}
+.d.red{background:var(--red)}
+.d.green{background:var(--green)}
+.stale-txt{color:var(--red-ink)}
+.static{padding:18px 20px}
+
+.rev{border-top:1px solid var(--line-soft); padding:20px; background:var(--raise)}
+.rev .lab{display:block; font-size:12.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:9px}
+.chips{display:grid; gap:8px; margin-bottom:18px}
+.chip{text-align:left; background:var(--field); color:var(--text); border:1px solid var(--line);
+  padding:13px 15px; font-size:15.5px; line-height:1.4; min-height:54px}
+.chip:hover{border-color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--amber); background:var(--amber-wash)}
+.chip .now{float:right; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin-left:10px}
+textarea{min-height:86px; resize:vertical; line-height:1.5}
+.rev-actions{display:flex; align-items:center; gap:8px; margin-top:18px; flex-wrap:wrap}
+.rev-actions .sig{margin-left:auto; font-size:12px; color:var(--dim);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+.receipt{margin:16px 0 0; border-radius:10px; padding:15px 17px;
+  border:1px solid color-mix(in srgb,var(--green) 45%,var(--line)); background:var(--green-wash)}
+.receipt.sign-only{border-color:color-mix(in srgb,var(--amber) 45%,var(--line)); background:var(--amber-wash)}
+.receipt.bad{border-color:color-mix(in srgb,var(--red) 50%,var(--line)); background:var(--red-wash)}
+.receipt .head{font-size:16.5px; font-weight:600; color:var(--text); display:flex; flex-wrap:wrap; gap:0 10px; align-items:baseline}
+.receipt .head .sep{color:var(--dim); font-weight:400}
+.receipt .sub{margin:9px 0 0; font-size:13.5px; color:var(--muted); line-height:1.6}
+.receipt details{margin-top:10px}
+.receipt summary{padding:0; font-size:13px}
+.receipt summary::after{content:""}
+.receipt summary::before{content:"▸ "; color:var(--dim)}
+.receipt details[open] > summary::before{content:"▾ "}
+
+.foot{margin:46px 0 0; padding-top:22px; border-top:1px solid var(--line-soft); color:var(--dim); font-size:13.5px}
+.foot h3{font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; font-weight:500}
+.foot p{margin:0 0 12px; line-height:1.65}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="top-in">
+    <div class="who">
+      <h1>Ray Dunn · post-op day 5</h1>
+      <p>Signing as <strong>Sarah Okafor, physio</strong> · <span class="mono">okafor</span></p>
+    </div>
+    <span class="status" id="status" role="status"><span class="led"></span><span id="statusText">connecting…</span></span>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <details class="setup" id="setup">
+    <summary>Server, read token, signing key</summary>
+    <div class="setup-body">
+      <label class="field">
+        <span class="lab">Unsay server</span>
+        <input type="text" id="base" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:39500">
+        <span class="hint">Where <code>/mcp</code> and <code>/write</code> live. Defaults to this
+          page’s own origin when it is served over http.</span>
+      </label>
+      <label class="field">
+        <span class="lab">Read token — Bearer, scope care.read.user</span>
+        <input type="password" id="token" spellcheck="false" autocomplete="off" placeholder="paste the bearer token">
+        <span class="hint">This screen reads the plan over MCP like any other host: <code>initialize</code>,
+          <code>resources/list</code>, <code>resources/read</code>. There is no private API behind it,
+          so it needs the same token an assistant would present.</span>
+      </label>
+      <label class="field">
+        <span class="lab">Write key — HMAC secret</span>
+        <input type="password" id="key" spellcheck="false" autocomplete="off" placeholder="paste the write secret">
+        <span class="hint">The secret the server was started with (<code>UNSAY_WRITE_SECRET</code>).
+          Used to compute HMAC-SHA256 over <code>timestamp + "." + body</code> — the timestamp is
+          inside the MAC, so a captured request cannot be replayed. Held in
+          <code>sessionStorage</code> for this tab only; never sent, never hardcoded.</span>
+      </label>
+      <div class="row">
+        <button class="btn" id="reconnect" type="button">Reconnect</button>
+        <button class="btn" id="forget" type="button">Forget token &amp; key</button>
+      </div>
+    </div>
+  </details>
+
+  <div id="banner"></div>
+
+  <div class="list-h">
+    <h2>Current plan</h2>
+    <span class="src" id="listSrc"></span>
+  </div>
+  <ul class="facts" id="facts"></ul>
+
+  <div class="foot">
+    <h3>What this screen sends</h3>
+    <p>One request. The body is signed exactly as it is transmitted — the MAC covers the byte string,
+      not a re-serialisation of a parsed object, because that difference is how signed webhooks get
+      forged.</p>
+    <pre>POST {server}/write
+Content-Type: application/json
+X-Unsay-Timestamp: 2026-10-08T09:14:22.418Z
+X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&gt;
+
+{"patient":"ray","domain":"weight_bearing","audience":"user","value":"…",
+ "authorId":"okafor","authorLabel":"Sarah Okafor, physio","priority":0.9}</pre>
+    <p style="margin-top:14px"><b>Serve this page from the server’s own origin.</b> The Unsay server
+      sends no CORS headers and answers a preflight with <code>405</code>, so a browser blocks every
+      request above before it leaves when this page is opened from <code>file://</code> or a different
+      port. From the same origin it needs nothing.</p>
+    <p><code>writtenAt</code> is not in the body on purpose: the server stamps
+      it from its own clock. A writer that could set it could backdate a correction, and “how old is
+      this instruction” is something the assistant says out loud.</p>
+    <p>See the mechanism on the <a href="index.html">landing page</a>, or watch the correction land on
+      the <a href="echo.html">Echo Show screen</a>. Unsay relays what a clinician wrote; it does not
+      generate clinical guidance.</p>
+  </div>
+</main>
+
+<script>
+(() => {
+  'use strict'
+
+  const AUTHOR = { authorId: 'okafor', authorLabel: 'Sarah Okafor, physio' }
+  const PROTOCOL = '2025-11-25'
+
+  // Committed seed record (src/seed.ts), shown ONLY when no server answers and
+  // labelled as such. The ages are true against the seed's pinned clock, not now.
+  const SEED_NOW = '2026-10-08T09:14:00Z'
+  const SEED = [
+    { uri:'care://ray/weight_bearing', domain:'weight_bearing', audience:'user', version:2, priority:0.9,
+      text:'Partial weight-bearing, about half your body weight through the operated leg.',
+      author:'Mr Adeyemi, surgical team', lastModified:'2026-10-06T09:14:00Z', stale:false, editable:true },
+    { uri:'care://ray/exercise', domain:'exercise', audience:'user', version:1, priority:0.6,
+      text:'Ankle pumps hourly. Heel slides ten times, twice daily. No hip flexion past ninety degrees.',
+      author:'Sarah Okafor, physio', lastModified:'2026-10-07T09:14:00Z', stale:false, editable:true },
+    { uri:'care://ray/anticoagulant', domain:'anticoagulant', audience:'user', version:1, priority:0.85,
+      text:'Rivaroxaban 10mg once daily. Stop date: 4 October 2026.',
+      author:'Dr Mensah, GP', lastModified:'2026-09-29T09:14:00Z', stale:true, editable:true },
+    { uri:'care://ray/contact', domain:'contact', audience:'user', version:1, priority:0.3,
+      text:'Ward 4 physio line, weekdays nine to five. Out of hours, call 111.',
+      author:'Ward 4 admin', lastModified:'2026-10-03T09:14:00Z', stale:false, editable:true },
+  ]
+
+  // Real clinical progression, in order. No free text on the critical path — free
+  // text is how contradictions get authored.
+  const PRESETS = {
+    weight_bearing: [
+      'No weight through the operated leg. Transfers with the frame only.',
+      'Toe-touch weight-bearing. The foot rests for balance only.',
+      'Partial weight-bearing, about half your body weight through the operated leg.',
+      'Full weight-bearing as tolerated.',
+    ],
+  }
+
+  const $ = (id) => document.getElementById(id)
+  const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n }
+
+  // Storage throws outright in some privacy modes, so every access is guarded and
+  // the page is fully usable with none of it.
+  const S = {
+    get(a, k) { try { return window[a].getItem(k) } catch { return null } },
+    set(a, k, v) { try { window[a].setItem(k, v) } catch { /* nothing to do */ } },
+    del(a, k) { try { window[a].removeItem(k) } catch { /* nothing to do */ } },
+  }
+
+  // ── config ───────────────────────────────────────────────────────────────
+  const httpOrigin = /^https?:$/.test(location.protocol) ? location.origin : ''
+  const q = new URLSearchParams(location.search)
+  const baseIn = $('base'), tokenIn = $('token'), keyIn = $('key')
+
+  baseIn.value = q.get('base') || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
+  tokenIn.value = q.get('token') || S.get('sessionStorage', 'unsay.token') || ''
+  keyIn.value = q.get('key') || S.get('sessionStorage', 'unsay.key') || ''
+  if (q.has('token') || q.has('key') || q.has('base')) {
+    S.set('localStorage', 'unsay.base', baseIn.value)
+    S.set('sessionStorage', 'unsay.token', tokenIn.value)
+    S.set('sessionStorage', 'unsay.key', keyIn.value)
+    // Credentials do not belong in the address bar or the history entry.
+    history.replaceState(null, '', location.pathname + location.hash)
+  }
+  if (!tokenIn.value || !keyIn.value) $('setup').open = true
+
+  const base = () => baseIn.value.trim().replace(/\/+$/, '')
+  const token = () => tokenIn.value.trim()
+  const wkey = () => keyIn.value
+
+  baseIn.addEventListener('change', () => { S.set('localStorage', 'unsay.base', base()); connect() })
+  tokenIn.addEventListener('change', () => { S.set('sessionStorage', 'unsay.token', token()); connect() })
+  keyIn.addEventListener('input', () => { S.set('sessionStorage', 'unsay.key', wkey()); render() })
+  $('reconnect').addEventListener('click', connect)
+  $('forget').addEventListener('click', () => {
+    tokenIn.value = ''; keyIn.value = ''
+    S.del('sessionStorage', 'unsay.token'); S.del('sessionStorage', 'unsay.key')
+    connect()
+  })
+
+  // ── a minimal MCP client over Streamable HTTP ────────────────────────────
+  // Plain fetch, no SDK: this page is a host like any other, and the same OAuth
+  // scope decides what it may see. POST responses come back as SSE, so both the
+  // request/response path and the notification stream go through readSse().
+  const mcp = { sid: null, proto: PROTOCOL, id: 0, stream: null, lastEventId: null }
+
+  function mcpHeaders(extra) {
+    const h = Object.assign({
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      Authorization: 'Bearer ' + token(),
+    }, extra || {})
+    if (mcp.sid) h['Mcp-Session-Id'] = mcp.sid
+    if (mcp.sid) h['MCP-Protocol-Version'] = mcp.proto
+    return h
+  }
+
+  /**
+   * SSE framing, done properly. Verified against the running server: the
+   * transport emits an empty `data:` keep-alive ack before the real message, and
+   * the spec allows a block to carry several data lines that concatenate. A naive
+   * "one data line per block, always JSON" reader throws on the first frame.
+   */
+  function drain(buf, onMessage) {
+    let cut
+    while ((cut = buf.indexOf('\n\n')) !== -1) {
+      const block = buf.slice(0, cut)
+      buf = buf.slice(cut + 2)
+      let data = '', eventId = null
+      for (const line of block.split('\n')) {
+        if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).replace(/^ /, '')
+        else if (line.startsWith('id:')) eventId = line.slice(3).trim()
+      }
+      if (eventId) onMessage(null, eventId)
+      if (!data) continue
+      let msg
+      try { msg = JSON.parse(data) } catch { continue }
+      onMessage(msg, eventId)
+    }
+    return buf
+  }
+
+  async function firstMessage(res, wantId) {
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) return res.json()
+    const reader = res.body.getReader(), dec = new TextDecoder()
+    let buf = '', found = null
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      buf = drain(buf, (msg) => { if (msg && msg.id === wantId) found = msg })
+      if (found) { reader.cancel().catch(() => {}); return found }
+    }
+    throw new Error('stream closed before a response arrived')
+  }
+
+  async function rpc(method, params) {
+    const id = ++mcp.id
+    const res = await fetch(base() + '/mcp', {
+      method: 'POST',
+      headers: mcpHeaders(),
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params: params || {} }),
+    })
+    const sid = res.headers.get('mcp-session-id')
+    if (sid) mcp.sid = sid
+    if (!res.ok) {
+      let detail = ''
+      try { detail = ': ' + (await res.text()).slice(0, 200) } catch { /* body already consumed */ }
+      throw new Error('HTTP ' + res.status + ' on ' + method + detail)
+    }
+    const msg = await firstMessage(res, id)
+    if (msg.error) throw new Error(msg.error.message + ' (' + msg.error.code + ')')
+    return msg.result
+  }
+
+  async function notify(method, params) {
+    await fetch(base() + '/mcp', {
+      method: 'POST',
+      headers: mcpHeaders(),
+      body: JSON.stringify({ jsonrpc: '2.0', method, params: params || {} }),
+    })
+  }
+
+  // The standalone SSE stream. This page subscribes to whatever it is editing, so
+  // the "notification came back in N ms" on the receipt is a number this browser
+  // measured, not one the server asserted.
+  const updateWaiters = new Set()
+  async function openStream() {
+    if (mcp.stream) return
+    mcp.stream = true
+    try {
+      const h = mcpHeaders({ Accept: 'text/event-stream' })
+      delete h['Content-Type']
+      if (mcp.lastEventId) h['Last-Event-ID'] = mcp.lastEventId
+      const res = await fetch(base() + '/mcp', { method: 'GET', headers: h })
+      if (!res.ok || !res.body) throw new Error('stream HTTP ' + res.status)
+      const reader = res.body.getReader(), dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+        buf = drain(buf, (msg, eventId) => {
+          if (eventId) mcp.lastEventId = eventId
+          if (msg && msg.method === 'notifications/resources/updated') {
+            for (const w of [...updateWaiters]) w(msg.params && msg.params.uri)
+          }
+        })
+      }
+    } catch { /* the stream is an optimisation here; the write still succeeds */ }
+    mcp.stream = null
+  }
+
+  const waitForUpdate = (uri, ms) => new Promise((resolve) => {
+    const t = setTimeout(() => { updateWaiters.delete(w); resolve(null) }, ms)
+    const w = (u) => { if (u !== uri) return; clearTimeout(t); updateWaiters.delete(w); resolve(performance.now()) }
+    updateWaiters.add(w)
+  })
+
+  // ── connect + load ───────────────────────────────────────────────────────
+  let state = { phase: 'connecting', facts: SEED, now: SEED_NOW, live: false, error: '' }
+
+  const setStatus = (cls, text) => { $('status').className = 'status ' + cls; $('statusText').textContent = text }
+
+  function parseRead(uri, listed, read) {
+    const textPart = (read.contents || []).find((c) => typeof c.text === 'string')
+    const blobPart = (read.contents || []).find((c) => typeof c.blob === 'string')
+    const meta = (textPart && textPart._meta) || {}
+    // The read prefixes a spoken-age header line; the instruction is what follows.
+    const raw = textPart ? textPart.text : ''
+    const nl = raw.indexOf('\n')
+    const text = raw.startsWith('[') && nl > -1 ? raw.slice(nl + 1) : raw
+    const author = (listed.description || '').replace(/^Last changed by\s*/, '') || 'unknown author'
+    return {
+      uri,
+      domain: uri.split('/').pop(),
+      audience: meta['unsay/audience'] || (uri.startsWith('care-internal://') ? 'assistant' : 'user'),
+      version: meta['unsay/version'] ?? null,
+      versionHash: meta['unsay/versionHash'] || null,
+      priority: (listed.annotations && listed.annotations.priority) ?? 0.5,
+      lastModified: meta['unsay/lastModified'] || (listed.annotations && listed.annotations.lastModified) || null,
+      stale: meta['unsay/stale'] === true,
+      author, text,
+      editable: !blobPart,
+      mimeType: blobPart ? blobPart.mimeType : 'text/plain',
+    }
+  }
+
+  async function connect() {
+    setStatus('busy', 'connecting…')
+    mcp.sid = null; mcp.id = 0; mcp.lastEventId = null
+    if (!token()) {
+      state = { phase: 'down', facts: SEED, now: SEED_NOW, live: false, error: 'no read token set' }
+      setStatus('down', 'no token'); render(); return
+    }
+    try {
+      const init = await rpc('initialize', {
+        protocolVersion: PROTOCOL,
+        capabilities: {},
+        clientInfo: { name: 'unsay-clinician-web', version: '0.1.0' },
+      })
+      mcp.proto = init.protocolVersion || PROTOCOL
+      await notify('notifications/initialized')
+      void openStream()
+
+      const listed = []
+      let cursor
+      do {
+        const page = await rpc('resources/list', cursor ? { cursor } : {})
+        listed.push(...(page.resources || []))
+        cursor = page.nextCursor
+      } while (cursor)
+
+      const facts = []
+      for (const r of listed) facts.push(parseRead(r.uri, r, await rpc('resources/read', { uri: r.uri })))
+      state = { phase: 'live', facts, now: new Date().toISOString(), live: true, error: '' }
+      setStatus('live', 'live · ' + listed.length + ' resources')
+    } catch (e) {
+      state = { phase: 'down', facts: SEED, now: SEED_NOW, live: false, error: String(e.message || e) }
+      setStatus('down', 'no server')
+    }
+    render()
+  }
+
+  // ── signing ──────────────────────────────────────────────────────────────
+  const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('')
+
+  async function sign(material, secret) {
+    if (!globalThis.crypto || !crypto.subtle) {
+      throw new Error('Web Crypto is unavailable here. crypto.subtle needs a secure context — use https, http://localhost, or open the file directly.')
+    }
+    const enc = new TextEncoder()
+    const k = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    return hex(await crypto.subtle.sign('HMAC', k, enc.encode(material)))
+  }
+
+  // ── rendering ────────────────────────────────────────────────────────────
+  function age(fromIso, nowIso) {
+    const ms = new Date(nowIso).getTime() - new Date(fromIso).getTime()
+    if (!isFinite(ms)) return 'an unknown time'
+    const s = Math.max(0, Math.round(ms / 1000))
+    if (s < 60) return s === 1 ? '1 second' : s + ' seconds'
+    const m = Math.round(s / 60); if (m < 60) return m === 1 ? '1 minute' : m + ' minutes'
+    const h = Math.round(m / 60); if (h < 36) return h === 1 ? '1 hour' : h + ' hours'
+    return Math.round(h / 24) + ' days'
+  }
+
+  let openUri = null
+
+  function banner() {
+    const b = $('banner'); b.textContent = ''
+    if (state.phase === 'down') {
+      const n = el('div', 'banner bad')
+      n.appendChild(el('b', null, 'Not connected to an Unsay server at ' + (base() || '(no address set)') + '.'))
+      n.appendChild(document.createTextNode(state.error + '. Nothing on this screen can be published until it answers. '))
+      n.appendChild(document.createTextNode('The plan below is the committed seed record from '))
+      n.appendChild(el('code', null, 'src/seed.ts'))
+      n.appendChild(document.createTextNode(' — real values, read out of this file rather than from a server, with the seed’s own pinned clock. '))
+      n.appendChild(document.createTextNode('You can still sign a revision: the signature will be genuine and the '))
+      n.appendChild(el('code', null, 'curl'))
+      n.appendChild(document.createTextNode(' it hands you publishes it the moment a server is up.'))
+      b.appendChild(n)
+      return
+    }
+    if (state.live && !wkey()) {
+      const n = el('div', 'banner warn')
+      n.appendChild(el('b', null, 'Connected, but no write key is set.'))
+      n.appendChild(document.createTextNode('Open the panel above and paste '))
+      n.appendChild(el('code', null, 'UNSAY_WRITE_SECRET'))
+      n.appendChild(document.createTextNode('. An unsigned write is rejected with a uniform 401 — the server never says which check failed.'))
+      b.appendChild(n)
+    }
+  }
+
+  function render() {
+    banner()
+    $('listSrc').textContent = state.live
+      ? state.facts.length + ' resources over MCP · resources/list + read'
+      : 'seed record · clock pinned to ' + SEED_NOW
+    const list = $('facts'); list.textContent = ''
+
+    for (const f of state.facts) {
+      const internal = f.audience === 'assistant'
+      const li = el('li', 'fact' + (openUri === f.uri ? ' open' : '') + (internal ? ' internal' : ''))
+
+      const head = el('div', 'rowhead')
+      head.appendChild(el('span', 'dom', f.domain.replace(/_/g, ' ')))
+      if (internal) head.appendChild(el('span', 'badge never', 'never spoken'))
+      if (!f.editable) head.appendChild(el('span', 'badge clip', f.mimeType))
+
+      const meta = el('div', 'meta')
+      meta.appendChild(el('span', 'd ' + (f.stale ? 'red' : 'green')))
+      meta.appendChild(el('span', f.stale ? 'stale-txt' : null,
+        (f.stale ? 'not updated for ' : 'changed ') + age(f.lastModified, state.now) + ' ago'))
+      meta.appendChild(el('span', 'sep', '·'))
+      meta.appendChild(el('span', null, f.author))
+      if (f.version != null) {
+        meta.appendChild(el('span', 'sep', '·'))
+        meta.appendChild(el('span', 'mono', 'v' + f.version))
+      }
+
+      if (f.editable) {
+        const tap = el('button', 'tap')
+        tap.type = 'button'
+        tap.setAttribute('aria-expanded', String(openUri === f.uri))
+        head.appendChild(el('span', 'edit', openUri === f.uri ? 'close' : 'change'))
+        tap.appendChild(head)
+        tap.appendChild(el('p', 'val', f.text))
+        tap.appendChild(meta)
+        tap.addEventListener('click', () => { openUri = openUri === f.uri ? null : f.uri; render() })
+        li.appendChild(tap)
+        if (openUri === f.uri) li.appendChild(revisionPanel(f))
+      } else {
+        const box = el('div', 'static')
+        box.appendChild(head)
+        box.appendChild(el('p', 'val', f.text))
+        box.appendChild(meta)
+        li.appendChild(box)
+      }
+      list.appendChild(li)
+    }
+  }
+
+  function revisionPanel(fact) {
+    const wrap = el('div', 'rev')
+    let value = fact.text
+
+    const presets = PRESETS[fact.domain]
+    let chips = null
+    if (presets) {
+      wrap.appendChild(el('span', 'lab', fact.domain.replace(/_/g, ' ')))
+      chips = el('div', 'chips')
+      for (const p of presets) {
+        const c = el('button', 'chip'); c.type = 'button'
+        c.setAttribute('aria-pressed', String(p.trim() === value.trim()))
+        if (p.trim() === fact.text.trim()) c.appendChild(el('span', 'now', 'current'))
+        c.appendChild(document.createTextNode(p))
+        c.addEventListener('click', () => {
+          value = p; ta.value = p
+          for (const o of chips.children) o.setAttribute('aria-pressed', 'false')
+          c.setAttribute('aria-pressed', 'true')
+        })
+        chips.appendChild(c)
+      }
+      wrap.appendChild(chips)
+    }
+
+    wrap.appendChild(el('span', 'lab', presets ? 'or write it out' : 'revised instruction'))
+    const ta = el('textarea')
+    ta.value = fact.text
+    ta.setAttribute('aria-label', 'Revised value for ' + fact.domain.replace(/_/g, ' '))
+    ta.addEventListener('input', () => {
+      value = ta.value
+      if (chips) for (const c of chips.children) {
+        c.setAttribute('aria-pressed', String(c.textContent.replace(/current$/, '').trim() === value.trim()))
+      }
+    })
+    wrap.appendChild(ta)
+
+    const actions = el('div', 'rev-actions')
+    const go = el('button', 'btn-primary'); go.type = 'button'
+    go.textContent = state.live ? 'Publish revision' : 'Sign it anyway'
+    const cancel = el('button', 'btn-ghost', 'Cancel'); cancel.type = 'button'
+    cancel.addEventListener('click', () => { openUri = null; render() })
+    const sig = el('span', 'sig')
+    actions.append(go, cancel, sig)
+    wrap.appendChild(actions)
+
+    const out = el('div')
+    wrap.appendChild(out)
+
+    go.addEventListener('click', async () => {
+      out.textContent = ''
+      if (!value.trim()) return out.appendChild(bad('Nothing to publish', 'The revised instruction is empty.'))
+      if (value.trim() === fact.text.trim()) {
+        return out.appendChild(bad('Unchanged',
+          'This is already v' + fact.version + '. Publishing it would still fire notifications/resources/updated and make a subscribed assistant retract a sentence that was correct.'))
+      }
+      if (!wkey()) {
+        $('setup').open = true
+        return out.appendChild(bad('No write key', 'Paste UNSAY_WRITE_SECRET above. Nothing was sent.'))
+      }
+
+      const label = go.textContent
+      go.disabled = true; go.textContent = 'signing…'
+
+      // One byte string, signed and sent. The timestamp is inside the MAC.
+      const body = JSON.stringify({
+        patient: fact.uri.split('/')[2] || 'ray',
+        domain: fact.domain,
+        audience: fact.audience,
+        value: value.trim(),
+        authorId: AUTHOR.authorId,
+        authorLabel: AUTHOR.authorLabel,
+        priority: fact.priority,
+      })
+      const ts = new Date().toISOString()
+
+      let signature
+      try { signature = await sign(ts + '.' + body, wkey()) }
+      catch (e) { go.disabled = false; go.textContent = label; return out.appendChild(bad('Could not sign', String(e.message || e))) }
+      sig.textContent = signature.slice(0, 12) + '…'
+
+      if (!state.live) {
+        go.disabled = false; go.textContent = label
+        return out.appendChild(signOnly(body, ts, signature))
+      }
+
+      go.textContent = 'publishing…'
+      // Subscribe first so the notification this write causes comes back to THIS
+      // page over SSE — that is what makes the latency on the receipt measured.
+      let updated = null
+      try {
+        await rpc('resources/subscribe', { uri: fact.uri })
+        updated = waitForUpdate(fact.uri, 4000)
+      } catch { /* the write does not depend on it; the receipt just says less */ }
+
+      const t0 = performance.now()
+      let res, text
+      try {
+        res = await fetch(base() + '/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Unsay-Timestamp': ts, 'X-Unsay-Signature': signature },
+          body,
+        })
+        text = await res.text()
+      } catch (e) {
+        go.disabled = false; go.textContent = label
+        out.appendChild(bad('The request never completed', String(e.message || e) +
+          '. If this page and the server are on different origins the browser needs CORS on /write, with X-Unsay-Signature and X-Unsay-Timestamp allowed on the preflight.'))
+        connect(); return
+      }
+      const roundTrip = performance.now() - t0
+      const notifiedAt = updated ? await updated : null
+
+      let json = null
+      try { json = JSON.parse(text) } catch { /* raw text is shown below */ }
+      go.disabled = false; go.textContent = label
+
+      if (!res.ok) {
+        const n = bad('Rejected · HTTP ' + res.status, res.status === 401
+          ? 'The server refused this write, and deliberately does not say which check failed — a bad signature and a stale timestamp look identical from out here. Check the write key, and that your clock is inside the 300-second window.'
+          : 'The server refused the write.')
+        n.appendChild(raw('signed material', ts + '.' + body))
+        n.appendChild(raw('X-Unsay-Signature', signature))
+        n.appendChild(raw('response', text || '(empty)'))
+        out.appendChild(n); return
+      }
+
+      out.appendChild(receipt(json, text, roundTrip, notifiedAt === null ? null : notifiedAt - t0))
+      openUri = null
+      await connect()
+    })
+
+    return wrap
+  }
+
+  function bad(head, sub) {
+    const n = el('div', 'receipt bad')
+    n.appendChild(el('div', 'head', head))
+    n.appendChild(el('p', 'sub', sub))
+    return n
+  }
+
+  function raw(label, text) {
+    const d = el('details')
+    d.appendChild(el('summary', null, label))
+    d.appendChild(el('pre', null, text))
+    return d
+  }
+
+  function signOnly(body, ts, signature) {
+    const n = el('div', 'receipt sign-only')
+    n.appendChild(el('div', 'head', 'Signed. Nothing was published.'))
+    n.appendChild(el('p', 'sub', 'There is no server to send it to, so this is a real HMAC-SHA256 over the exact material below and nothing more. The timestamp is inside the MAC and the server allows 300 seconds of skew, so replay it soon:'))
+    n.appendChild(el('pre', null,
+      "curl -sS -X POST '" + base() + "/write' \\\n" +
+      "  -H 'Content-Type: application/json' \\\n" +
+      "  -H 'X-Unsay-Timestamp: " + ts + "' \\\n" +
+      "  -H 'X-Unsay-Signature: " + signature + "' \\\n" +
+      "  --data-binary '" + body.replace(/'/g, "'\\''") + "'"))
+    n.appendChild(raw('signed material (timestamp + "." + body)', ts + '.' + body))
+    return n
+  }
+
+  function receipt(json, text, roundTrip, notifyMs) {
+    const n = el('div', 'receipt')
+    const head = el('div', 'head')
+    head.appendChild(el('span', null, 'published'))
+
+    // Every value on this line came off the response or off this browser's clock.
+    const version = json && json.version
+    head.appendChild(el('span', 'sep', '·'))
+    head.appendChild(el('span', null, version == null ? 'version not reported' : 'v' + version))
+
+    head.appendChild(el('span', 'sep', '·'))
+    head.appendChild(el('span', null, notifyMs === null
+      ? 'no subscription open'
+      : 'a subscribed host was corrected in ' + notifyMs.toFixed(0) + ' ms'))
+
+    head.appendChild(el('span', 'sep', '·'))
+    head.appendChild(el('span', null, roundTrip.toFixed(0) + ' ms round-trip'))
+    n.appendChild(head)
+
+    const bits = []
+    bits.push('Round-trip measured in this browser: tap to response, ' + roundTrip.toFixed(0) + ' ms.')
+    if (notifyMs !== null) {
+      bits.push('This page subscribed to ' + (json && json.uri ? json.uri : 'the resource') +
+        ' before writing, so notifications/resources/updated came back to it over SSE ' + notifyMs.toFixed(0) +
+        ' ms after the request left — inside a 3,400 ms utterance, with room to spare.')
+    } else {
+      bits.push('No subscription was open on this page, so nothing here can tell you whether a host was mid-sentence. Open the Echo Show screen and watch it retract instead.')
+    }
+    if (json && json.versionHash) bits.push('Version hash ' + String(json.versionHash).slice(0, 12) + '… — replay the chain at /verify.')
+    if (json && json.writtenAt) bits.push('Stamped ' + json.writtenAt + ' by the server clock, not this one.')
+    n.appendChild(el('p', 'sub', bits.join(' ')))
+    n.appendChild(raw('raw response', text))
+    return n
+  }
+
+  render()
+  connect()
+})()
+</script>
+</body>
+</html>

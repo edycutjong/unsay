@@ -9,11 +9,17 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "node --experimental-strip-types scripts/serve.ts",
     "probe": "node --experimental-strip-types scripts/probe_subscribe.ts",
+    "probe:resume": "node --experimental-strip-types scripts/probe_resume.ts",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "verify": "node --experimental-strip-types scripts/verify.ts",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "bench": "node --experimental-strip-types scripts/bench.ts",
+    "seed": "node --experimental-strip-types scripts/seed_dump.ts",
+    "fixtures": "node --experimental-strip-types fixtures/gen.ts",
+    "keygen": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
     "docs:arch": "node --experimental-strip-types scripts/gen_architecture.ts"
   },
   "dependencies": {

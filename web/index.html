@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsay — the assistant that can be corrected</title>
+<meta name="description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0B0D0E">
+<style>
+/* Palette is the product's vocabulary, not decoration: amber = this changed,
+   red = this is stale, green = this is current. Used nowhere else on the page. */
+:root{
+  --bg:#0B0D0E; --surface:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
+  --text:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --amber:#F2A93B; --amber-ink:#F2A93B; --amber-wash:rgba(242,169,59,.12);
+  --red:#D9564A; --red-ink:#E4695E;
+  --green:#3F9E63; --green-ink:#5CB77E;
+  --accent:#5B8DEF; --accent-ink:#7FA6F3;
+  --focus:#7FA6F3;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 18px 50px -30px rgba(0,0,0,.9);
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#F3F5F6; --surface:#FFFFFF; --raise:#F7F9FA; --line:#DDE2E5; --line-soft:#E7EBEE;
+    --text:#0B0D0E; --muted:#535E64; --dim:#78848A;
+    --amber:#DE8F13; --amber-ink:#8A5405; --amber-wash:rgba(222,143,19,.13);
+    --red:#C0392B; --red-ink:#9E2C20;
+    --green:#2C7A4B; --green-ink:#1F5D38;
+    --accent:#2C55C4; --accent-ink:#1F44AB;
+    --focus:#2C55C4;
+    --shadow:0 1px 2px rgba(11,13,14,.05), 0 16px 40px -32px rgba(11,13,14,.45);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px; line-height:1.62; letter-spacing:-0.005em;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  font-size:.86em; letter-spacing:0}
+h1,h2,h3{letter-spacing:-0.022em; line-height:1.12; margin:0}
+a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+a:hover{border-bottom-color:var(--accent)}
+:where(a,button,summary,input,textarea):focus-visible{
+  outline:2px solid var(--focus); outline-offset:3px; border-radius:3px}
+.wrap{width:min(1080px,calc(100% - 48px)); margin-inline:auto}
+@media (max-width:640px){ .wrap{width:calc(100% - 32px)} body{font-size:16px} }
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+header{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--bg) 86%,transparent);
+  backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid var(--line-soft)}
+.bar{display:flex; align-items:center; gap:20px; height:58px}
+.mark{font-weight:640; letter-spacing:-0.03em; font-size:19px; border:0; color:var(--text)}
+.mark .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--amber);
+  margin-left:3px; vertical-align:2px}
+nav{margin-left:auto; display:flex; gap:22px; font-size:14.5px}
+nav a{color:var(--muted); border:0}
+nav a:hover{color:var(--text)}
+@media (max-width:720px){ nav a[data-opt]{display:none} }
+
+/* ── hero ───────────────────────────────────────────────────────────────── */
+.hero{padding:76px 0 12px}
+.eyebrow{font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:0 0 22px}
+h1{font-size:clamp(38px,6.2vw,68px); font-weight:660; max-width:16ch}
+.claim{font-size:clamp(19px,2.3vw,23px); color:var(--muted); max-width:46ch; margin:22px 0 0; line-height:1.5}
+.stake{margin:38px 0 0; padding:20px 0 20px 22px; border-left:2px solid var(--amber);
+  font-size:clamp(18px,2.1vw,21px); line-height:1.5; max-width:60ch; font-weight:500}
+.stake b{font-weight:640}
+
+/* ── the stage: the mechanism, shown ────────────────────────────────────── */
+.stage{margin:56px 0 0; background:var(--surface); border:1px solid var(--line);
+  border-radius:14px; box-shadow:var(--shadow); overflow:hidden}
+.stage-head{display:flex; align-items:center; gap:12px; padding:12px 16px;
+  border-bottom:1px solid var(--line-soft); background:var(--raise)}
+.chip{display:inline-flex; align-items:center; gap:7px; font-size:12px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); border:1px solid var(--line);
+  padding:4px 9px; border-radius:999px; white-space:nowrap}
+.chip::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--dim)}
+.chip.is-illus::before{background:var(--accent)}
+.btn{font:inherit; font-size:13px; color:var(--muted); background:transparent;
+  border:1px solid var(--line); border-radius:7px; padding:5px 12px; cursor:pointer;
+  transition:color .15s, border-color .15s, background .15s, transform .06s}
+.btn:hover{color:var(--text); border-color:var(--muted); background:var(--raise)}
+.btn:active{transform:translateY(1px)}
+.stage-head .btn{margin-left:auto}
+.stage-grid{display:grid; grid-template-columns:1.35fr 1fr; gap:0; align-items:stretch}
+@media (max-width:820px){ .stage-grid{grid-template-columns:1fr} }
+.transcript{padding:26px 26px 30px; min-height:290px}
+.who{margin:0 0 6px; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim)}
+.who + .who{margin-top:26px}
+.line{margin:0; font-size:clamp(18px,2.2vw,22px); line-height:1.48; min-height:1.48em}
+.line.ray{color:var(--muted); font-style:normal}
+.utt{display:inline}
+/* --d staggers ONLY the strike, never the reveal: a shorthand delay would also
+   push each word's fade-in, and the last word of the retraction would arrive
+   almost a second late. */
+.w{opacity:0; transition:opacity .18s ease, color .4s ease var(--d,0ms), text-decoration-color .4s ease var(--d,0ms)}
+.w.on{opacity:1}
+/* Staggered per-word line-through so the strike SWEEPS across the retracted
+   words even when they wrap — the correction has to be visible as a correction. */
+.utt.retracted .w{color:var(--dim); text-decoration:line-through; text-decoration-color:var(--amber);
+  text-decoration-thickness:2px}
+.frames{padding:22px 22px 26px; border-left:1px solid var(--line-soft);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--raise) 60%,transparent), transparent 40%)}
+@media (max-width:820px){ .frames{border-left:0; border-top:1px solid var(--line-soft)} }
+.frames-h{font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim);
+  margin:0 0 14px; font-weight:500}
+.framelist{list-style:none; margin:0; padding:0}
+.frame{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:baseline;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; font-size:12.5px;
+  line-height:1.55; color:var(--muted); margin-bottom:10px;
+  opacity:0; transform:translateY(3px); transition:opacity .22s ease, transform .22s ease}
+.frame.on{opacity:1; transform:none}
+.frame .t{color:var(--dim); font-variant-numeric:tabular-nums}
+.frame .m{color:var(--text)}
+.frame .sub{display:block; color:var(--dim)}
+.frame.hot .m{color:var(--amber-ink)}
+.frame.hot .t{color:var(--amber-ink)}
+.frame.secret .sub{color:var(--red-ink)}
+.stage-foot{border-top:1px solid var(--line-soft); padding:13px 16px; font-size:13px; color:var(--dim);
+  background:var(--raise)}
+.stage-foot code{color:var(--muted)}
+.jump{display:flex; flex-wrap:wrap; gap:10px; margin:22px 0 0}
+.jump a{display:inline-flex; align-items:center; gap:8px; font-size:14.5px; color:var(--text);
+  border:1px solid var(--line); border-radius:9px; padding:9px 14px; background:var(--surface);
+  transition:border-color .15s, background .15s, transform .06s}
+.jump a:hover{border-color:var(--muted); background:var(--raise)}
+.jump a:active{transform:translateY(1px)}
+.jump a .arw{color:var(--dim)}
+
+/* ── sections ───────────────────────────────────────────────────────────── */
+section{padding:84px 0 0}
+.sec-h{font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:0 0 16px}
+h2{font-size:clamp(27px,3.6vw,38px); font-weight:640; max-width:20ch}
+.lede{color:var(--muted); max-width:62ch; margin:18px 0 0; font-size:18px}
+
+.steps{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin:38px 0 0;
+  background:var(--line-soft); border:1px solid var(--line-soft); border-radius:12px; overflow:hidden}
+@media (max-width:820px){ .steps{grid-template-columns:1fr} }
+.step{background:var(--surface); padding:24px 22px 26px}
+.step .n{font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums}
+.step h3{font-size:19px; margin:10px 0 8px; font-weight:600}
+.step p{margin:0; color:var(--muted); font-size:15.5px; line-height:1.58}
+.step .api{display:block; margin-top:14px; color:var(--accent-ink);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; word-break:break-all}
+
+/* ── the partition ──────────────────────────────────────────────────────── */
+.split{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:38px 0 0}
+@media (max-width:820px){ .split{grid-template-columns:1fr} }
+.rec{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px}
+.rec.internal{border-color:color-mix(in srgb,var(--red) 42%,var(--line))}
+.rec .uri{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px;
+  color:var(--text); word-break:break-all}
+.rec .tag{display:inline-block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 8px; border-radius:5px; margin:14px 0 12px}
+.rec .tag.say{color:var(--green-ink); background:color-mix(in srgb,var(--green) 14%,transparent)}
+.rec .tag.never{color:var(--red-ink); background:color-mix(in srgb,var(--red) 14%,transparent)}
+.rec .val{margin:0; font-size:16.5px; line-height:1.5}
+.rec .scope{margin:16px 0 0; font-size:13px; color:var(--dim);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.gate{margin:18px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:20px 22px}
+.gate p{margin:0 0 10px; color:var(--muted); font-size:16px}
+.gate p:last-child{margin-bottom:0}
+.gate strong{color:var(--text); font-weight:600}
+kbd,code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.88em;
+  background:var(--raise); border:1px solid var(--line-soft); border-radius:5px; padding:1px 5px; color:var(--text)}
+
+/* ── the number ─────────────────────────────────────────────────────────── */
+.stat{display:grid; grid-template-columns:repeat(3,auto); gap:0 48px; margin:34px 0 0;
+  justify-content:start}
+@media (max-width:640px){ .stat{grid-template-columns:1fr 1fr; gap:22px 32px} }
+.stat .v{font-size:clamp(34px,5vw,52px); font-weight:640; letter-spacing:-0.03em;
+  font-variant-numeric:tabular-nums; line-height:1.05}
+.stat .k{font-size:13px; color:var(--dim); margin-top:8px}
+.caveat{margin:30px 0 0; border-left:2px solid var(--line); padding-left:18px; color:var(--muted);
+  font-size:15.5px; max-width:70ch}
+.caveat b{color:var(--text); font-weight:600}
+
+/* ── proof ──────────────────────────────────────────────────────────────── */
+.proof{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin:34px 0 0}
+@media (max-width:720px){ .proof{grid-template-columns:1fr} }
+.card{display:block; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:20px 22px; color:var(--text); transition:border-color .15s, background .15s, transform .08s}
+a.card:hover{border-color:var(--muted); background:var(--raise)}
+a.card:active{transform:translateY(1px)}
+.card .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px;
+  color:var(--accent-ink)}
+.card h3{font-size:16.5px; font-weight:600; margin:10px 0 6px}
+.card p{margin:0; color:var(--muted); font-size:14.5px; line-height:1.55}
+.card .path{display:block; margin-top:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px; color:var(--dim); word-break:break-all}
+.card.dead{opacity:.72}
+.card .note{display:block; margin-top:12px; font-size:13px; color:var(--amber-ink)}
+
+/* ── friction ───────────────────────────────────────────────────────────── */
+.fric{margin:34px 0 0; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.fric-row{display:grid; grid-template-columns:auto 1fr auto; gap:18px; align-items:baseline;
+  padding:18px 22px; background:var(--surface); border-bottom:1px solid var(--line-soft)}
+.fric-row:last-child{border-bottom:0}
+@media (max-width:720px){ .fric-row{grid-template-columns:1fr; gap:6px} }
+.fric-row .id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; color:var(--dim)}
+.fric-row .txt{font-size:15.5px; color:var(--muted)}
+.fric-row .txt b{color:var(--text); font-weight:600}
+.fric-row .sev{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--amber-ink); white-space:nowrap}
+.fric-row .sev.med{color:var(--muted)}
+
+footer{margin-top:96px; border-top:1px solid var(--line-soft); padding:34px 0 64px; color:var(--dim); font-size:14px}
+footer p{margin:0 0 10px; max-width:74ch}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <span class="mark">unsay<span class="dot" aria-hidden="true"></span></span>
+    <nav>
+      <a href="#mechanism">Mechanism</a>
+      <a href="#partition" data-opt>Safety</a>
+      <a href="#number">The number</a>
+      <a href="#proof">Proof</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <p class="eyebrow">Alexa+ · Amazon Developer Hackathon</p>
+    <h1>The assistant that can be corrected.</h1>
+    <p class="claim">An MCP server whose resources can be revised <em>mid-sentence</em> — so the
+      assistant stops, retracts what it just said, and names what changed, who changed it, and how
+      long ago.</p>
+    <p class="stake"><b>Ray Dunn is 68, five days after a hip replacement, and he is about to put
+      full weight on the wrong leg</b> — his physio changed the instruction thirty seconds ago, and
+      the assistant beside his bed is still reading the discharge PDF.</p>
+
+    <!-- The hero must SHOW the mechanism. Copy is the seed record and the scripted
+         retraction; it is labelled an illustration because it is not a live session. -->
+    <div class="stage" id="stage">
+      <div class="stage-head">
+        <span class="chip is-illus">Illustration of the mechanism</span>
+        <button class="btn" id="replay" type="button">Replay</button>
+      </div>
+      <div class="stage-grid">
+        <div class="transcript">
+          <p class="who">Ray</p>
+          <p class="line ray" id="rayLine"></p>
+          <p class="who">Alexa</p>
+          <p class="line"><span class="utt" id="uttA"></span> <span class="utt" id="uttB"></span></p>
+        </div>
+        <div class="frames">
+          <h2 class="frames-h">Protocol</h2>
+          <ol class="framelist" id="frames"></ol>
+        </div>
+      </div>
+      <p class="stage-foot">Not a recording of a live session. The wording is the scripted
+        retraction and the values are the committed seed record; the offsets are the measured
+        loopback latencies from <code>docs/proof/bench.json</code>. The live run is
+        <code>npm run e2e</code>.</p>
+    </div>
+
+    <div class="jump">
+      <a href="echo.html">The Echo Show screen <span class="arw" aria-hidden="true">→</span></a>
+      <a href="clinician.html">The clinician write screen <span class="arw" aria-hidden="true">→</span></a>
+    </div>
+  </div>
+
+  <section id="mechanism">
+    <p class="sec-h">The mechanism</p>
+    <h2>Three MCP surfaces, doing the work of a product.</h2>
+    <p class="lede">Remove MCP and there is nothing left. The resource graph, the notification and
+      the audience split <em>are</em> the application — not a wrapper around one.</p>
+    <div class="steps">
+      <div class="step">
+        <span class="n">01</span>
+        <h3>The assistant subscribes</h3>
+        <p>Before answering, the host subscribes to the facts it is about to speak. Unsay declares
+          the capability, so a compliant host can.</p>
+        <span class="api">resources/subscribe · capabilities.resources.subscribe</span>
+      </div>
+      <div class="step">
+        <span class="n">02</span>
+        <h3>The physio writes</h3>
+        <p>One tap on a tablet between appointments. The write is HMAC-signed, appended as a new
+          version, and hash-chained to the one before it.</p>
+        <span class="api">POST /write · X-Unsay-Signature</span>
+      </div>
+      <div class="step">
+        <span class="n">03</span>
+        <h3>The sentence stops</h3>
+        <p>The notification reaches the host mid-utterance. It re-reads, and the retraction is
+          spoken with the age and the author — no apology, because the system was not wrong.</p>
+        <span class="api">notifications/resources/updated</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="partition">
+    <p class="sec-h">The safety property</p>
+    <h2>Not everything true is speakable.</h2>
+    <p class="lede">The reason Alexa says <em>“have someone nearby”</em> is a fact Ray must never
+      hear. In healthcare that is not a rendering preference — it is a boundary, and a boundary
+      needs a control, not an annotation.</p>
+
+    <div class="split">
+      <div class="rec">
+        <span class="uri">care://ray/weight_bearing</span>
+        <span class="tag say">Spoken to Ray</span>
+        <p class="val">Full weight-bearing as tolerated.</p>
+        <p class="scope">scope: care.read.user</p>
+      </div>
+      <div class="rec internal">
+        <span class="uri">care-internal://ray/risk</span>
+        <span class="tag never">Never spoken</span>
+        <p class="val">Fall risk: HIGH. Lives alone Monday to Thursday. Family disputes the
+          discharge plan — daughter believes discharge was premature.</p>
+        <p class="scope">scope: care.read.assistant</p>
+      </div>
+    </div>
+
+    <div class="gate">
+      <p><strong>Two URI schemes behind two OAuth scopes, enforced at the resource server.</strong>
+        A principal holding only <code>care.read.user</code> gets JSON-RPC <code>-32002</code> on
+        every <code>care-internal://</code> URI — <em>not</em> “forbidden”, which would confirm the
+        record exists. It is never sent the content, so it cannot leak it.</p>
+      <p>We do not rely on <code>annotations.audience</code>, because the 2025-11-25 spec places no
+        obligation on a client to honour it. That gap is filed as
+        <a href="../FRICTION.md">FRICTION.md F-002</a>, with proposed spec language. The enforcement
+        point is about fifteen lines: <a href="../src/store.ts"><code>src/store.ts</code></a>
+        <code>read()</code>. The reads that must fail are asserted as failures by
+        <code>npm run verify</code>.</p>
+    </div>
+  </section>
+
+  <section id="number">
+    <p class="sec-h">The number</p>
+    <h2>The correction has to land before the sentence ends.</h2>
+    <p class="lede">A twelve-word utterance is roughly 3,400&nbsp;ms of speech. That is the whole
+      budget: the clinician's signed write → HMAC verified → notification → authorized re-read →
+      new value at the client.</p>
+    <!-- Every figure below is transcribed from docs/proof/bench.json, and
+         web/web.test.ts fails if it drifts from the committed receipt. -->
+    <script type="application/json" id="bench" data-source="../docs/proof/bench.json">
+      {"endToEnd":{"p50":1.7,"p95":3.4},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
+    </script>
+    <div class="stat">
+      <div><div class="v"><span data-bench="endToEnd.p50">1.7</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p95">3.4</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
+      <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
+    </div>
+    <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
+      200 revisions, produced by <code>npm run bench -- --n 200</code> and committed to
+      <code>docs/proof/bench.txt</code>. The deployed path adds API&nbsp;Gateway, DynamoDB Streams and
+      Lambda; those segments are measured separately and this page is updated when they are. It is
+      not a production figure and is never quoted as one.</p>
+  </section>
+
+  <section id="proof">
+    <p class="sec-h">Proof</p>
+    <h2>Four commands, no flags.</h2>
+    <p class="lede">There is no <code>MOCK=</code>, no <code>OFFLINE=1</code>, no
+      <code>--dry-run</code> anywhere in the reproduce path. If a flag could switch off the thing
+      being judged, the submission would be worthless.</p>
+    <div class="proof" id="proofGrid">
+      <a class="card" href="../DEMO.md" data-probe="../DEMO.md">
+        <span class="cmd">npm run verify</span>
+        <h3>The safety property, asserted as failures</h3>
+        <p>Eleven assertions. A user-scoped principal must fail to reach every internal URI, a
+          tampered version must break the chain and be located exactly.</p>
+        <span class="path">DEMO.md · scripts/verify.ts</span>
+      </a>
+      <a class="card" href="../docs/proof/live_run.jsonl" data-probe="../docs/proof/live_run.jsonl">
+        <span class="cmd">npm run e2e</span>
+        <h3>The whole demo, as code</h3>
+        <p>Capability negotiation, <code>completion/complete</code> resolved through
+          <code>context.arguments</code>, the write landing mid-answer, the retraction, the stale
+          fact announcing its age, and the fallback tool.</p>
+        <span class="path">docs/proof/live_run.jsonl — the real protocol frames</span>
+      </a>
+      <a class="card" href="../docs/proof/bench.txt" data-probe="../docs/proof/bench.txt">
+        <span class="cmd">npm run bench -- --n 200</span>
+        <h3>The latency, with its caveat attached</h3>
+        <p>p50, p95 and max for each segment, plus the count of runs that landed inside the speech
+          window. The caveat is printed by the script, not added afterwards.</p>
+        <span class="path">docs/proof/bench.txt · docs/proof/bench.json</span>
+      </a>
+      <a class="card" href="../FRICTION.md" data-probe="../FRICTION.md">
+        <span class="cmd">FRICTION.md</span>
+        <h3>What fought back</h3>
+        <p>Four entries written the day they were hit, including two proposed changes to the MCP
+          specification found by building against it.</p>
+        <span class="path">FRICTION.md — root level</span>
+      </a>
+      <!-- /verify is live only while a server is running; the link is enabled by probe,
+           never rendered as a link that goes nowhere. -->
+      <a class="card" id="verifyCard" href="/verify" data-probe="/verify" data-live-only="1">
+        <span class="cmd">GET /verify</span>
+        <h3>The judge’s instrument</h3>
+        <p>Public and unauthenticated. The <code>initialize</code> block the host actually
+          negotiated, live <code>notifications/resources/updated</code> frames, and the current
+          version hash per domain — recomputable from the audit log.</p>
+        <span class="path">/verify</span>
+      </a>
+      <a class="card" href="clinician.html">
+        <span class="cmd">web/clinician.html</span>
+        <h3>The write path you can drive yourself</h3>
+        <p>Signs the request body with HMAC-SHA256 in the browser and posts it. With no server
+          reachable it signs anyway and hands you the <code>curl</code> to replay — it never claims
+          to have published.</p>
+        <span class="path">web/clinician.html · web/echo.html</span>
+      </a>
+    </div>
+  </section>
+
+  <section id="friction">
+    <p class="sec-h">Friction log</p>
+    <h2>Two of these are proposed spec changes.</h2>
+    <p class="lede">Written the day each was hit, not assembled the week of the deadline.
+      <a href="../FRICTION.md">Read all four →</a></p>
+    <div class="fric">
+      <div class="fric-row">
+        <span class="id">F-002</span>
+        <span class="txt"><b>annotations.audience is advisory, with no enforcement story.</b>
+          The spec defines the field and its two legal values, and places no obligation on a client
+          to honour it. A safety-relevant annotation a client may ignore is a documentation comment,
+          not a control.</span>
+        <span class="sev">High · architectural</span>
+      </div>
+      <div class="fric-row">
+        <span class="id">F-003</span>
+        <span class="txt"><b>No defined client behaviour on <code>notifications/resources/updated</code>.</b>
+          The spec settles delivery, not consequence. A conforming host may receive the notification
+          and never re-read — and Ray hears the stale answer to completion.</span>
+        <span class="sev med">Medium</span>
+      </div>
+      <div class="fric-row">
+        <span class="id">F-001</span>
+        <span class="txt"><b>SDK method name diverges from the protocol method name</b> at exactly
+          the surface that is hardest to discover: <code>client.subscribeResource()</code>, not
+          <code>subscribe()</code>, and no subscription example in the README.</span>
+        <span class="sev med">Low</span>
+      </div>
+      <div class="fric-row">
+        <span class="id">F-004</span>
+        <span class="txt"><b>An Amazon retail payment hold gated the developer console</b>, blocking
+          the Ring and Fire TV tracks entirely. Alexa+ survived only because a self-hosted MCP
+          server needs no Amazon credential.</span>
+        <span class="sev">High · blocking</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>Unsay relays what a clinician wrote. It does not generate clinical guidance and is not a
+      medical device.</b> Ray Dunn, Sarah Okafor and the care plan on this page are a scenario;
+      the seed record is committed at <code>src/seed.ts</code>.</p>
+    <p>MIT licensed · <a href="../LICENSE">LICENSE</a> · <a href="../README.md">README</a> ·
+      <a href="../DEMO.md">DEMO</a> · <a href="../ARCHITECTURE.md">ARCHITECTURE</a> ·
+      <a href="../FRICTION.md">FRICTION</a></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict'
+
+  // ── the hero demonstration ───────────────────────────────────────────────
+  // Copy: seed value + the scripted retraction. Offsets: docs/proof/bench.json.
+  const RAY_Q = '“Can I put weight on it yet?”'
+  const A1 = 'You can put about half your weight on it—'
+  const A2 = '—actually, stop. That changed thirty seconds ago. Sarah’s moved you to full weight-bearing as tolerated, from today. Take it slowly the first time, and have someone nearby.'
+  const CUT_AT_WORD = 7          // fires while “on it—” is still being spoken
+  const WORD_A = 155, WORD_B = 108
+
+  // The offsets are read from the same bench island the headline stats use, so a
+  // regenerated docs/proof/bench.json cannot leave a stale number on this page.
+  const BENCH = JSON.parse(document.getElementById('bench').textContent)
+  const ms = (n) => '+' + n.toFixed(2)
+
+  const FRAMES = [
+    { off: '+0.00', m: 'resources/subscribe', sub: 'care://ray/weight_bearing' },
+    { off: '+0.00', m: 'resources/read', sub: 'care-internal://ray/risk · audience: assistant', cls: 'secret', subx: 'shapes the answer · never spoken' },
+    { off: '+0.00', m: 'notifications/resources/updated', sub: 'care://ray/weight_bearing → v2', cls: 'hot' },
+    { off: ms(BENCH.writeToNotification.p50), m: 'notification received by host', sub: 'p50, loopback' },
+    { off: ms(BENCH.endToEnd.p50), m: 'resources/read', sub: 'new value at the client' },
+  ]
+
+  const stage = document.getElementById('stage')
+  const rayLine = document.getElementById('rayLine')
+  const uttA = document.getElementById('uttA')
+  const uttB = document.getElementById('uttB')
+  const framesEl = document.getElementById('frames')
+  const replay = document.getElementById('replay')
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+  const words = (host, text) => {
+    host.textContent = ''
+    return text.split(' ').map((word, i) => {
+      const s = document.createElement('span')
+      s.className = 'w'
+      s.textContent = word + (i < text.split(' ').length - 1 ? ' ' : '')
+      // Stagger so the strike-through sweeps across the retracted words.
+      s.style.setProperty('--d', (i * 26) + 'ms')
+      host.appendChild(s)
+      return s
+    })
+  }
+
+  const frameEls = FRAMES.map((f) => {
+    const li = document.createElement('li')
+    li.className = 'frame' + (f.cls ? ' ' + f.cls : '')
+    const t = document.createElement('span'); t.className = 't'; t.textContent = f.off + ' ms'
+    const m = document.createElement('span')
+    const mm = document.createElement('span'); mm.className = 'm'; mm.textContent = f.m
+    m.appendChild(mm)
+    const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = f.sub
+    m.appendChild(sub)
+    if (f.subx) { const x = document.createElement('span'); x.className = 'sub'; x.textContent = f.subx; m.appendChild(x) }
+    li.append(t, m)
+    framesEl.appendChild(li)
+    return li
+  })
+
+  let timers = []
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms))
+  const clear = () => { timers.forEach(clearTimeout); timers = [] }
+
+  const wa = words(uttA, A1)
+  const wb = words(uttB, A2)
+
+  function reset() {
+    clear()
+    rayLine.style.opacity = '0'
+    uttA.classList.remove('retracted')
+    for (const s of wa) s.classList.remove('on')
+    for (const s of wb) s.classList.remove('on')
+    for (const el of frameEls) el.classList.remove('on')
+  }
+
+  function final() {
+    reset()
+    rayLine.style.opacity = '1'
+    uttA.classList.add('retracted')
+    for (const s of wa) s.classList.add('on')
+    for (const s of wb) s.classList.add('on')
+    for (const el of frameEls) el.classList.add('on')
+  }
+
+  function run() {
+    reset()
+    rayLine.textContent = RAY_Q
+    at(120, () => { rayLine.style.transition = 'opacity .3s ease'; rayLine.style.opacity = '1' })
+    at(560, () => frameEls[0].classList.add('on'))
+    at(760, () => frameEls[1].classList.add('on'))
+
+    const t0 = 1050
+    wa.forEach((s, i) => at(t0 + i * WORD_A, () => s.classList.add('on')))
+
+    const cut = t0 + CUT_AT_WORD * WORD_A
+    at(cut, () => { frameEls[2].classList.add('on'); uttA.classList.add('retracted') })
+    at(cut + 180, () => frameEls[3].classList.add('on'))
+    at(cut + 340, () => frameEls[4].classList.add('on'))
+
+    const t1 = cut + 620
+    wb.forEach((s, i) => at(t1 + i * WORD_B, () => s.classList.add('on')))
+
+    const end = t1 + wb.length * WORD_B + 3200
+    at(end, () => { if (!document.hidden && visible) run(); else pending = true })
+  }
+
+  // Do not burn cycles animating a stage nobody is looking at.
+  let visible = true, pending = false
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting
+      if (visible && pending) { pending = false; if (!reduced.matches) run() }
+    }, { threshold: 0.15 }).observe(stage)
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && pending && visible && !reduced.matches) { pending = false; run() }
+  })
+
+  const start = () => { if (reduced.matches) final(); else run() }
+  replay.addEventListener('click', start)
+  reduced.addEventListener('change', start)
+  start()
+
+  // ── proof links: never render a link that goes nowhere ────────────────────
+  // Served from the repository root, the sibling files resolve. Served from
+  // web/ alone, or with no server running, they do not — so say so instead.
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    for (const card of document.querySelectorAll('[data-probe]')) {
+      const target = card.getAttribute('data-probe')
+      fetch(target, { method: 'GET', headers: { Range: 'bytes=0-0' } })
+        .then((r) => { if (!r.ok) throw new Error(String(r.status)) })
+        .catch(() => {
+          card.classList.add('dead')
+          card.removeAttribute('href')
+          card.setAttribute('role', 'group')
+          const note = document.createElement('span')
+          note.className = 'note'
+          note.textContent = card.dataset.liveOnly
+            ? 'Not reachable — /verify exists only while the server is running.'
+            : 'Not reachable from this deployment — open it in the repository.'
+          card.appendChild(note)
+        })
+    }
+  } else {
+    // file:// — fetch cannot report on a sibling file, and /verify is a server
+    // route that plainly is not there. Relative repo links still work.
+    const v = document.getElementById('verifyCard')
+    v.classList.add('dead'); v.removeAttribute('href'); v.setAttribute('role', 'group')
+    const note = document.createElement('span')
+    note.className = 'note'
+    note.textContent = 'Opened from a file — /verify is a server route. Start the server and reload over http.'
+    v.appendChild(note)
+  }
+})()
+</script>
+</body>
+</html>
