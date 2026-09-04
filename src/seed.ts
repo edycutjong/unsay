@@ -1,25 +1,52 @@
 /**
- * Deterministic seed — Ray Dunn's post-operative record.
+ * Deterministic seed — Ray Dunn's post-operative record, day 5 after a hip
+ * replacement.
  *
- * Six records, not six hundred. The contribution is a mechanism, not a corpus,
- * and every record has a named job in the 3-minute demo (../specs/seed-data.md).
+ * A handful of records, not a corpus. The contribution is a mechanism, and every
+ * record has a named job in the three-minute demo.
  *
- * All dates are constants relative to DEMO_NOW so `seed()` is byte-identical on
- * every run. The v2 revision is deliberately NOT applied here — it is fired live
- * during the demo, so the notification a judge sees is a real one.
+ * Determinism: every date is derived from an injected clock (`SeedOptions.now`,
+ * default DEMO_NOW), never from `Date.now()`, so two runs produce byte-identical
+ * records and therefore byte-identical version hashes. The hash chain is the
+ * staleness proof; a seed that drifted with wall-clock time would make it
+ * unverifiable.
+ *
+ * The v-next revision of weight_bearing is deliberately NOT applied here — it is
+ * fired live during the demo, so the notification a judge sees is a real one.
  */
-import type { LiveResourceStore } from './store.ts'
+import { LiveResourceStore, uriFor } from './store.ts'
+import { CLIPS, blobFor } from './blobs.ts'
 
 export const RAY = 'ray'
 
 /** Pinned "now" for the demo. Everything else is relative to it. */
 export const DEMO_NOW = new Date('2026-10-08T09:14:00Z')
 
-const daysBefore = (n: number) =>
-  new Date(DEMO_NOW.getTime() - n * 86_400_000).toISOString()
+export interface SeedOptions {
+  /** Injected clock. All record timestamps are offsets from it. */
+  now?: Date
+}
 
-export function seed(store: LiveResourceStore) {
+export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
+  const now = opts.now ?? DEMO_NOW
+  const daysBefore = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString()
+
   // ── speakable ──────────────────────────────────────────────────────────────
+  // Day 1: what the surgical team said before it was superseded. Present so the
+  // retraction has a real previous version to walk back to, not an implied one —
+  // completion/complete over {version} and the `_meta` prevHash chain only
+  // demonstrate anything against a chain longer than one.
+  store.publish({
+    patient: RAY,
+    domain: 'weight_bearing',
+    audience: 'user',
+    value: 'No weight through the operated leg. Transfers with the frame only.',
+    authorId: 'adeyemi',
+    authorLabel: 'Mr Adeyemi, surgical team',
+    writtenAt: daysBefore(4),
+    priority: 0.9,
+  })
+
   store.publish({
     patient: RAY,
     domain: 'weight_bearing',
@@ -92,7 +119,34 @@ export function seed(store: LiveResourceStore) {
     priority: 0.7,
   })
 
+  // ── clips ──────────────────────────────────────────────────────────────────
+  // The record carries the words; blobs.ts carries the bytes. Both live behind the
+  // same URI, so the audience partition that guards the text guards the audio too.
+  for (const clip of CLIPS) {
+    const meta = blobFor(uriFor(clip.patient, clip.domain, clip.audience))!
+    const speakable = clip.audience === 'user'
+    store.publish({
+      patient: clip.patient,
+      domain: clip.domain,
+      audience: clip.audience,
+      value: meta.description,
+      authorId: 'okafor',
+      authorLabel: 'Sarah Okafor, physio',
+      writtenAt: daysBefore(speakable ? 1 : 2),
+      priority: speakable ? 0.55 : 0.8,
+    })
+  }
+
   return store
+}
+
+/**
+ * The store the demo and the server run on. Identical to `seed()` — kept as the
+ * name every entrypoint reaches for, and because `seedDemo()` reads as an
+ * intention where `seed(new LiveResourceStore())` reads as plumbing.
+ */
+export function seedDemo(store?: LiveResourceStore, opts: SeedOptions = {}) {
+  return seed(store ?? new LiveResourceStore(), opts)
 }
 
 /**

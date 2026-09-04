@@ -1,0 +1,510 @@
+/**
+ * Protocol-level tests. Every assertion here goes through a real MCP Client over a
+ * real transport pair — no internal function is called directly — because the
+ * thing being defended is what a HOST observes, not what our functions return.
+ *
+ * Bias is toward the cases that MUST FAIL: a wrong-scope read of a clip, a cursor
+ * the server never issued, a prompt that could leak reasoning-only text.
+ */
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import {
+  LoggingMessageNotificationSchema,
+  ResourceListChangedNotificationSchema,
+  ResourceUpdatedNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js'
+
+import { EXERCISE_CLIP, GAIT_NOTE, blobFor } from '../src/blobs.ts'
+import { BRIEF_CARER, RESOURCE_PAGE_SIZE, buildServer } from '../src/server.ts'
+import { DEMO_NOW, RAY, STAGED_REVISION, seed, seedDemo } from '../src/seed.ts'
+import { LiveResourceStore, uriFor } from '../src/store.ts'
+import { SCOPE } from '../src/types.ts'
+
+const BOTH = [SCOPE.user, SCOPE.assistant]
+const USER_ONLY = [SCOPE.user]
+
+const WB = uriFor(RAY, 'weight_bearing', 'user')
+const RISK = uriFor(RAY, 'risk', 'assistant')
+const CLIP = uriFor(EXERCISE_CLIP.patient, EXERCISE_CLIP.domain, EXERCISE_CLIP.audience)
+const GAIT = uriFor(GAIT_NOTE.patient, GAIT_NOTE.domain, GAIT_NOTE.audience)
+
+/** InMemoryTransport delivers asynchronously; let every queued message land. */
+const flush = async () => {
+  for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0))
+}
+
+type Built = ReturnType<typeof buildServer>
+
+function build(store: LiveResourceStore, scopes: string[]) {
+  return buildServer({
+    store,
+    principal: () => ({ sub: 'test-host', scopes }),
+    now: () => DEMO_NOW,
+  })
+}
+
+async function attach(built: Built) {
+  const client = new Client({ name: 'unsay-test', version: '0.0.0' }, { capabilities: {} })
+  const updated: string[] = []
+  const logs: { level: string; logger?: string; data?: unknown }[] = []
+  const listChanged = { count: 0 }
+  client.setNotificationHandler(ResourceUpdatedNotificationSchema, (n) => {
+    updated.push(n.params.uri)
+  })
+  client.setNotificationHandler(ResourceListChangedNotificationSchema, () => {
+    listChanged.count++
+  })
+  client.setNotificationHandler(LoggingMessageNotificationSchema, (n) => {
+    logs.push(n.params)
+  })
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
+  await Promise.all([built.server.connect(serverSide), client.connect(clientSide)])
+  return { client, updated, logs, listChanged }
+}
+
+async function harness(scopes: string[] = BOTH, store: LiveResourceStore = seedDemo()) {
+  const built = build(store, scopes)
+  const wired = await attach(built)
+  return { ...built, ...wired, store }
+}
+
+/** Walk every page of resources/list, returning the URIs and the page count. */
+async function walk(client: Client) {
+  const uris: string[] = []
+  let pages = 0
+  let cursor: string | undefined
+  do {
+    const page = await client.listResources(cursor ? { cursor } : {})
+    pages++
+    uris.push(...page.resources.map((r) => r.uri))
+    cursor = page.nextCursor
+    if (pages > 20) throw new Error('cursor did not terminate')
+  } while (cursor)
+  return { uris, pages }
+}
+
+describe('capabilities', () => {
+  it('declares every surface it implements, so a host does not have to probe', async () => {
+    const { client } = await harness()
+    const caps = client.getServerCapabilities()
+    expect(caps?.resources).toEqual({ subscribe: true, listChanged: true })
+    expect(caps?.prompts).toBeDefined()
+    expect(caps?.logging).toBeDefined()
+    expect(caps?.completions).toBeDefined()
+    expect(client.getInstructions()).toContain('whats_changed')
+  })
+})
+
+describe('resources/list — cursor pagination', () => {
+  it('pages at RESOURCE_PAGE_SIZE and the cursor round-trips to the rest', async () => {
+    const { client, store } = await harness()
+    const total = store.list({ sub: 't', scopes: BOTH }).length
+    expect(total).toBeGreaterThan(RESOURCE_PAGE_SIZE * 2) // or the cursor is never exercised
+
+    const first = await client.listResources({})
+    expect(first.resources).toHaveLength(RESOURCE_PAGE_SIZE)
+    expect(first.nextCursor).toBeTypeOf('string')
+
+    const second = await client.listResources({ cursor: first.nextCursor })
+    const firstUris = first.resources.map((r) => r.uri)
+    const secondUris = second.resources.map((r) => r.uri)
+    expect(secondUris.some((u) => firstUris.includes(u))).toBe(false)
+
+    const { uris, pages } = await walk(client)
+    expect(pages).toBe(Math.ceil(total / RESOURCE_PAGE_SIZE))
+    expect(new Set(uris).size).toBe(total) // nothing skipped, nothing repeated
+    expect(uris).toEqual([...uris].sort()) // stable ordering across pages
+  })
+
+  it('rejects a cursor it did not issue rather than silently restarting', async () => {
+    const { client } = await harness()
+    await expect(client.listResources({ cursor: 'not-a-cursor' })).rejects.toMatchObject({
+      code: -32602,
+    })
+    // Valid base64url, wrong shape — the decode must not be fooled by encoding alone.
+    const bogus = Buffer.from(JSON.stringify({ offset: 2 })).toString('base64url')
+    await expect(client.listResources({ cursor: bogus })).rejects.toMatchObject({ code: -32602 })
+  })
+
+  it('never pages an internal uri to a user-scoped principal', async () => {
+    const { client } = await harness(USER_ONLY)
+    const { uris } = await walk(client)
+    expect(uris.length).toBeGreaterThan(0)
+    expect(uris.some((u) => u.startsWith('care-internal://'))).toBe(false)
+    expect(uris).not.toContain(GAIT)
+  })
+
+  it('advertises a clip with its real mime type and byte size', async () => {
+    const { client } = await harness()
+    const { uris } = await walk(client)
+    expect(uris).toContain(CLIP)
+    let entry
+    let cursor: string | undefined
+    do {
+      const page = await client.listResources(cursor ? { cursor } : {})
+      entry ??= page.resources.find((r) => r.uri === CLIP)
+      cursor = page.nextCursor
+    } while (cursor && !entry)
+    expect(entry?.mimeType).toBe('audio/wav')
+    expect(entry?.size).toBe(blobFor(CLIP)!.bytes)
+    expect(entry?.annotations?.audience).toEqual(['user'])
+  })
+})
+
+describe('resources/read — blob contents', () => {
+  it('returns a playable blob part alongside the text part', async () => {
+    const { client } = await harness()
+    const res = await client.readResource({ uri: CLIP })
+    expect(res.contents).toHaveLength(2)
+
+    const text = res.contents.find((c) => 'text' in c) as { text: string }
+    const blob = res.contents.find((c) => 'blob' in c) as { blob: string; mimeType: string }
+    expect(text.text).toContain('heel-slide')
+    expect(blob.mimeType).toBe('audio/wav')
+
+    const bytes = Buffer.from(blob.blob, 'base64')
+    // A real WAV, not a text file with a .wav name: RIFF magic, a WAVE form type,
+    // and a declared chunk size that agrees with the payload we actually shipped.
+    expect(bytes.subarray(0, 4).toString('ascii')).toBe('RIFF')
+    expect(bytes.subarray(8, 12).toString('ascii')).toBe('WAVE')
+    expect(bytes.readUInt32LE(4) + 8).toBe(bytes.length)
+    expect(bytes.readUInt32LE(24)).toBe(4000) // sample rate
+    expect(bytes.length).toBe(blobFor(CLIP)!.bytes)
+  })
+
+  it('gives a user-scoped principal -32002 on an assistant-only clip', async () => {
+    const { client } = await harness(USER_ONLY)
+    await expect(client.readResource({ uri: GAIT })).rejects.toMatchObject({ code: -32002 })
+    // Same answer for the versioned form, or the version segment becomes a bypass.
+    await expect(client.readResource({ uri: `${GAIT}/v1` })).rejects.toMatchObject({
+      code: -32002,
+    })
+    // And the same for a text internal record, so the blob path is not a special case.
+    await expect(client.readResource({ uri: RISK })).rejects.toMatchObject({ code: -32002 })
+  })
+
+  it('serves the assistant-only clip to a principal that holds the scope', async () => {
+    const { client } = await harness()
+    const res = await client.readResource({ uri: GAIT })
+    const blob = res.contents.find((c) => 'blob' in c) as { blob: string }
+    expect(Buffer.from(blob.blob, 'base64').subarray(0, 4).toString('ascii')).toBe('RIFF')
+  })
+})
+
+describe('resources/read — _meta version chain', () => {
+  it('carries the hashes that make a retraction auditable', async () => {
+    const { client, store } = await harness()
+    const v1 = await client.readResource({ uri: `${WB}/v1` })
+    const v2 = await client.readResource({ uri: `${WB}/v2` })
+    const m1 = v1.contents[0]!._meta as Record<string, unknown>
+    const m2 = v2.contents[0]!._meta as Record<string, unknown>
+
+    expect(m1['unsay/prevHash']).toBeNull()
+    expect(m2['unsay/prevHash']).toBe(m1['unsay/versionHash'])
+    expect(m2['unsay/versionHash']).toBe(store.versions(RAY, 'weight_bearing')[1]!.versionHash)
+    expect(m2['unsay/version']).toBe(2)
+    expect(m2['unsay/audience']).toBe('user')
+  })
+
+  it('marks a record past its review date as stale in _meta and in the spoken text', async () => {
+    const { client } = await harness()
+    const res = await client.readResource({ uri: uriFor(RAY, 'anticoagulant', 'user') })
+    expect((res.contents[0]!._meta as Record<string, unknown>)['unsay/stale']).toBe(true)
+    expect((res.contents[0] as { text: string }).text.startsWith('[STALE')).toBe(true)
+  })
+})
+
+describe('prompts', () => {
+  it('lists brief_carer with its argument', async () => {
+    const { client } = await harness()
+    const { prompts } = await client.listPrompts()
+    const p = prompts.find((x) => x.name === BRIEF_CARER)
+    expect(p).toBeDefined()
+    expect(p!.arguments?.map((a) => a.name)).toEqual(['patient'])
+  })
+
+  it('cannot emit assistant-only text even for a caller holding BOTH scopes', async () => {
+    const { client } = await harness(BOTH)
+    const res = await client.getPrompt({ name: BRIEF_CARER, arguments: { patient: RAY } })
+    const text = res.messages.map((m) => (m.content as { text: string }).text).join('\n')
+
+    // The exact strings that must never reach a carer's briefing.
+    expect(text).not.toContain('Fall risk')
+    expect(text).not.toContain('disputes the discharge plan')
+    expect(text).not.toContain('over-reports')
+    expect(text).not.toContain('gait')
+    expect(text).not.toContain('care-internal://')
+
+    // …while the speakable plan is genuinely there, or the test above passes vacuously.
+    expect(text).toContain('Partial weight-bearing')
+    expect(text).toContain('Rivaroxaban')
+    expect(text).toContain('PAST ITS REVIEW DATE')
+  })
+
+  it('rejects an unknown prompt name', async () => {
+    const { client } = await harness()
+    await expect(client.getPrompt({ name: 'brief_everyone' })).rejects.toMatchObject({
+      code: -32602,
+    })
+  })
+})
+
+describe('completion/complete', () => {
+  it('resolves {version} against the {domain} in context.arguments', async () => {
+    const { client } = await harness()
+    const res = await client.complete({
+      ref: { type: 'ref/resource', uri: 'care://{patient}/{domain}/{version}' },
+      argument: { name: 'version', value: '' },
+      context: { arguments: { patient: RAY, domain: 'weight_bearing' } },
+    })
+    // Newest first, and both versions present — a chain, not a single snapshot.
+    expect(res.completion.values).toEqual(['v2', 'v1'])
+  })
+
+  it('returns nothing for {version} when the context names no domain', async () => {
+    const { client } = await harness()
+    const res = await client.complete({
+      ref: { type: 'ref/resource', uri: 'care://{patient}/{domain}/{version}' },
+      argument: { name: 'version', value: '' },
+    })
+    expect(res.completion.values).toEqual([])
+  })
+
+  it('completes only versions the principal may see', async () => {
+    const dual = await harness(BOTH)
+    const ask = (client: Client) =>
+      client.complete({
+        ref: { type: 'ref/resource', uri: 'care-internal://{patient}/{domain}/{version}' },
+        argument: { name: 'version', value: '' },
+        context: { arguments: { patient: RAY, domain: GAIT_NOTE.domain } },
+      })
+    expect((await ask(dual.client)).completion.values).toEqual(['v1'])
+
+    const scoped = await harness(USER_ONLY)
+    // The completion surface must not become the oracle that read refuses to be.
+    expect((await ask(scoped.client)).completion.values).toEqual([])
+    const domains = await scoped.client.complete({
+      ref: { type: 'ref/resource', uri: 'care://{patient}/{domain}/{version}' },
+      argument: { name: 'domain', value: '' },
+    })
+    expect(domains.completion.values).not.toContain(GAIT_NOTE.domain)
+    expect(domains.completion.values).not.toContain('risk')
+  })
+})
+
+describe('notifications', () => {
+  it('delivers resources/updated to a subscriber when the physio writes', async () => {
+    const h = await harness()
+    await h.client.subscribeResource({ uri: WB })
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(h.updated).toEqual([WB])
+
+    const after = await h.client.readResource({ uri: WB })
+    expect((after.contents[0] as { text: string }).text).toContain(STAGED_REVISION.value)
+  })
+
+  it('stops delivering after unsubscribe', async () => {
+    const h = await harness()
+    await h.client.subscribeResource({ uri: WB })
+    await h.client.unsubscribeResource({ uri: WB })
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(h.updated).toEqual([])
+  })
+
+  it('refuses a subscription to a resource the principal cannot read', async () => {
+    const h = await harness(USER_ONLY)
+    await expect(h.client.subscribeResource({ uri: RISK })).rejects.toMatchObject({ code: -32002 })
+    h.store.publish({
+      patient: RAY,
+      domain: 'risk',
+      audience: 'assistant',
+      value: 'Fall risk: MODERATE.',
+      authorId: 'adeyemi',
+      authorLabel: 'Mr Adeyemi, surgical team',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    await flush()
+    expect(h.updated).toEqual([])
+  })
+
+  it('logs a revision on notifications/message at level notice', async () => {
+    const h = await harness()
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(h.logs).toHaveLength(1)
+    const entry = h.logs[0]!
+    expect(entry.level).toBe('notice')
+    expect(entry.logger).toBe('unsay.revision')
+    const data = entry.data as Record<string, unknown>
+    expect(data.uri).toBe(WB)
+    expect(data.version).toBe(3)
+    expect(data.versionHash).toBe(h.store.versions(RAY, 'weight_bearing')[2]!.versionHash)
+    // The log names the change; it never carries the value, because a log line is
+    // not a read and only a read is authorized.
+    expect(JSON.stringify(entry)).not.toContain(STAGED_REVISION.value)
+  })
+
+  it('does not log an internal revision to a user-scoped host', async () => {
+    const h = await harness(USER_ONLY)
+    h.store.publish({
+      patient: RAY,
+      domain: 'risk',
+      audience: 'assistant',
+      value: 'Fall risk: MODERATE.',
+      authorId: 'adeyemi',
+      authorLabel: 'Mr Adeyemi, surgical team',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    await flush()
+    // Naming the uri would confirm the record exists — the thing -32002 refuses to do.
+    expect(h.logs).toEqual([])
+  })
+
+  it('fires list_changed for a new domain but never for the seed', async () => {
+    // Seeding happens with the host ALREADY CONNECTED, so nothing but the guard
+    // stands between eight new domains and eight spurious list_changed frames.
+    const store = new LiveResourceStore()
+    const built = build(store, BOTH)
+    const wired = await attach(built)
+    seed(store)
+    await flush()
+    expect(wired.listChanged.count).toBe(0)
+
+    // Suppression, not absence: the seeded resources really are there.
+    const all = store.list({ sub: 't', scopes: BOTH }).length
+    expect((await walk(wired.client)).uris).toHaveLength(all)
+
+    // The GP adds wound care — the host is holding a list now, and it is wrong.
+    store.publish({
+      patient: RAY,
+      domain: 'wound_care',
+      audience: 'user',
+      value: 'Dressing stays on until day seven. Keep it dry.',
+      authorId: 'gp.mensah',
+      authorLabel: 'Dr Mensah, GP',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    await flush()
+    expect(wired.listChanged.count).toBe(1)
+    expect((await walk(wired.client)).uris).toContain(uriFor(RAY, 'wound_care', 'user'))
+
+    // A further VERSION of an existing domain is not a list change.
+    store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(wired.listChanged.count).toBe(1)
+  })
+
+  it('does not arm list_changed off a rejected cursor', async () => {
+    const store = new LiveResourceStore()
+    const wired = await attach(build(store, BOTH))
+    await expect(wired.client.listResources({ cursor: 'garbage' })).rejects.toMatchObject({
+      code: -32602,
+    })
+    seed(store)
+    await flush()
+    expect(wired.listChanged.count).toBe(0)
+  })
+
+  it('releases its store listeners on dispose', async () => {
+    const h = await harness()
+    await h.client.subscribeResource({ uri: WB })
+    h.dispose()
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(h.updated).toEqual([])
+    expect(h.logs).toEqual([])
+  })
+})
+
+describe('tools/call whats_changed — the fallback path', () => {
+  it('returns structuredContent that satisfies the declared outputSchema', async () => {
+    const { client } = await harness()
+    // listTools populates the SDK's output validator, so callTool below is checked
+    // against the schema this server advertises — not against our expectations.
+    const { tools } = await client.listTools()
+    const schema = tools.find((t) => t.name === 'whats_changed')!.outputSchema as unknown as {
+      properties: { changed: { items: { required: string[] } } }
+    }
+    const required = schema.properties.changed.items.required
+
+    const since = new Date(DEMO_NOW.getTime() - 2.5 * 86_400_000).toISOString()
+    const res = await client.callTool({ name: 'whats_changed', arguments: { since } })
+    const changed = (res.structuredContent as { changed: Record<string, unknown>[] }).changed
+
+    expect(changed.map((c) => c.uri).sort()).toEqual(
+      [WB, CLIP, GAIT, uriFor(RAY, 'exercise', 'user')].sort(),
+    )
+    for (const entry of changed) {
+      for (const key of required) expect(entry[key]).toBeDefined()
+      expect(typeof entry.ageSeconds).toBe('number')
+      expect(new Date(entry.changedAt as string).toString()).not.toBe('Invalid Date')
+    }
+  })
+
+  it('hides internal revisions from a user-scoped host', async () => {
+    const { client } = await harness(USER_ONLY)
+    await client.listTools()
+    const since = new Date(DEMO_NOW.getTime() - 2.5 * 86_400_000).toISOString()
+    const res = await client.callTool({ name: 'whats_changed', arguments: { since } })
+    const changed = (res.structuredContent as { changed: { uri: string }[] }).changed
+    expect(changed.some((c) => c.uri.startsWith('care-internal://'))).toBe(false)
+  })
+
+  it('reports the revision the demo turns on, and nothing else', async () => {
+    const h = await harness()
+    await h.client.listTools()
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    const res = await h.client.callTool({
+      name: 'whats_changed',
+      arguments: { since: new Date(DEMO_NOW.getTime() - 60_000).toISOString() },
+    })
+    const changed = (res.structuredContent as { changed: { uri: string; value: string }[] }).changed
+    expect(changed).toHaveLength(1)
+    expect(changed[0]!.uri).toBe(WB)
+    expect(changed[0]!.value).toBe(STAGED_REVISION.value)
+  })
+
+  it('rejects an unknown tool', async () => {
+    const { client } = await harness()
+    await expect(client.callTool({ name: 'unsay_everything' })).rejects.toMatchObject({
+      code: -32602,
+    })
+  })
+})
+
+describe('seed determinism', () => {
+  let a: LiveResourceStore
+  let b: LiveResourceStore
+  beforeEach(() => {
+    a = seedDemo()
+    b = seedDemo()
+  })
+
+  it('produces byte-identical records for the same clock', () => {
+    const hashes = (s: LiveResourceStore) =>
+      s
+        .list({ sub: 't', scopes: BOTH })
+        .map((x) => x.record.versionHash)
+        .sort()
+    expect(hashes(a)).toEqual(hashes(b))
+  })
+
+  it('moves every timestamp when the clock moves, and nothing else', () => {
+    const shifted = seedDemo(new LiveResourceStore(), {
+      now: new Date(DEMO_NOW.getTime() + 86_400_000),
+    })
+    const wbA = a.versions(RAY, 'weight_bearing')
+    const wbS = shifted.versions(RAY, 'weight_bearing')
+    expect(wbS.map((r) => r.value)).toEqual(wbA.map((r) => r.value))
+    expect(wbS[0]!.versionHash).not.toBe(wbA[0]!.versionHash) // writtenAt is hashed
+  })
+
+  it('leaves the staged revision unapplied so the demo notification is real', () => {
+    expect(a.versions(RAY, 'weight_bearing')).toHaveLength(2)
+    expect(a.versions(RAY, 'weight_bearing').at(-1)!.value).not.toBe(STAGED_REVISION.value)
+  })
+})

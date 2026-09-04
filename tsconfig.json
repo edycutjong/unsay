@@ -1,0 +1,22 @@
+{
+  "//": "Node 22 runs these files by stripping types, so the compiler is only ever a checker: noEmit, and the exact subset of TypeScript that erasure supports. Without this file `tsc` fails on the first `.ts` import specifier, which is why F-009 records that the SDK's typings had never actually been checked against this code.",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": false,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "fixtures/**/*.ts", "web/**/*.ts", "vitest.config.ts"]
+}

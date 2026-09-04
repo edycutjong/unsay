@@ -48,11 +48,15 @@ describe('audience partition — the safety property', () => {
   it('omits assistant-only URIs from list() for a user-scoped principal', () => {
     const uris = fresh().list(userOnly).map((x) => x.uri)
     expect(uris.some((u) => u.startsWith('care-internal://'))).toBe(false)
-    expect(uris).toHaveLength(4)
+    // Five speakable domains: weight_bearing, anticoagulant, exercise, contact,
+    // exercise_clip. The seed also holds three assistant-only ones.
+    expect(uris).toHaveLength(5)
   })
 
   it('includes both audiences for a dual-scope principal', () => {
-    expect(fresh().list(both)).toHaveLength(6)
+    const uris = fresh().list(both).map((x) => x.uri)
+    expect(uris).toHaveLength(8)
+    expect(uris.filter((u) => u.startsWith('care-internal://'))).toHaveLength(3)
   })
 
   it('will not let a care:// uri reach an assistant-only record', () => {
@@ -118,12 +122,17 @@ describe('staleness', () => {
 })
 
 describe('revisions and notification', () => {
-  it('does not fire updated for the first version', () => {
+  it('fires updated only where seeding actually supersedes something', () => {
+    // The seed writes weight_bearing twice — the day-1 instruction and the day-2
+    // one that replaced it — and every other domain once. `updated` therefore
+    // fires exactly once, for the one domain that has a previous version. Any
+    // first version firing it would tell a host the plan changed because the
+    // server started.
     const s = new LiveResourceStore()
     const fired: string[] = []
     s.onUpdated((u) => fired.push(u))
     seed(s)
-    expect(fired).toHaveLength(0)
+    expect(fired).toEqual([uriFor(RAY, 'weight_bearing', 'user')])
   })
 
   it('fires updated on a revision, with the unversioned uri', () => {
@@ -157,10 +166,58 @@ describe('seed determinism', () => {
     const b = fresh().versions(RAY, 'weight_bearing')[0]!.versionHash
     expect(a).toBe(b)
   })
-  it('seeds exactly six records', () => {
-    expect(fresh().list(both)).toHaveLength(6)
+  it('seeds exactly eight records', () => {
+    expect(fresh().list(both)).toHaveLength(8)
+  })
+  it('seeds the superseded day-1 weight-bearing instruction', () => {
+    // The retraction has to walk back to a real previous version, not an implied
+    // one: `_meta.prevHash` and completion over {version} both need a chain
+    // longer than one to demonstrate anything.
+    const chain = fresh().versions(RAY, 'weight_bearing')
+    expect(chain).toHaveLength(2)
+    expect(chain[0]!.value).toContain('No weight through the operated leg')
+    expect(chain[1]!.prevHash).toBe(chain[0]!.versionHash)
   })
   it('does not apply the staged revision', () => {
-    expect(fresh().versions(RAY, 'weight_bearing')).toHaveLength(1)
+    // It is fired live on stage. A seed that already contained it would make the
+    // notification a judge sees a replay of state that was there all along.
+    const chain = fresh().versions(RAY, 'weight_bearing')
+    expect(chain.map((r) => r.value)).not.toContain(STAGED_REVISION.value)
+    expect(chain.at(-1)!.value).toContain('Partial weight-bearing')
+  })
+})
+
+describe('at rest, with no envelope configured', () => {
+  it('admits it is holding plaintext rather than implying encryption', () => {
+    const s = fresh()
+    expect(s.atRest(RAY, 'weight_bearing', 1)).toBe(
+      s.read(uriFor(RAY, 'weight_bearing', 'user', 1), userOnly).value,
+    )
+    expect(s.atRestReceipt(RAY, 'risk', 1)).toMatchObject({
+      uri: 'care-internal://ray/risk/v1',
+      encrypted: false,
+      algorithm: 'none',
+      provider: null,
+      keyId: null,
+      aad: null,
+    })
+  })
+
+  it('behaves identically whether the options object is omitted or empty', () => {
+    // The envelope option is additive: every caller that predates it must be unaffected.
+    const omitted = fresh().versions(RAY, 'weight_bearing')[0]!
+    const empty = seed(new LiveResourceStore({})).versions(RAY, 'weight_bearing')[0]!
+    expect(empty.versionHash).toBe(omitted.versionHash)
+    expect(empty.value).toBe(omitted.value)
+  })
+
+  it('will not expose a version that does not exist', () => {
+    expect(() => fresh().atRest(RAY, 'weight_bearing', 99)).toThrow(NotFoundError)
+  })
+
+  it('receipts the newest version when none is named', () => {
+    const s = fresh()
+    s.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    expect(s.atRestReceipt(RAY, 'weight_bearing').uri).toBe('care://ray/weight_bearing/v3')
   })
 })
