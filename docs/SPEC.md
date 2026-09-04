@@ -271,8 +271,13 @@ correct AAD and recompute the chain. AAD binding defeats relocation, not full co
 body**, prefixed `[STALE — …; say this age aloud]`, computed server-side.
 
 **Why.** The failure this product exists to prevent is a confident sentence about an expired
-fact. Ray's anticoagulant record has a stop date of 4 October and is read on 8 October
-(`src/seed.ts`); read flat, it instructs a 68-year-old to keep taking a drug he was told to stop.
+fact. Ray's anticoagulant record carries a stop date four days behind whatever clock the seed is
+built on, and the sentence names that date in words (`src/seed.ts`); read flat, it instructs a
+68-year-old to keep taking a drug he was told to stop. Both halves move together on purpose: the
+`staleAfter` was made relative to the injected clock while the sentence stayed pinned to
+"4 October 2026", so on every day but one the live server flagged the record as past its review
+date while its own words named a stop date still in the future. `scripts/verify.ts` §9 now reads
+the sentence, not only the header.
 
 **Why the age is in the body.** By I-4, an annotation does not survive a read, so a design that
 put the age only in `annotations.lastModified` would announce nothing. Putting it in the text

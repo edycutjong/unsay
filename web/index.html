@@ -310,9 +310,11 @@ footer a{color:var(--muted)}
       <a href="clinician.html">The clinician write screen <span class="arw" aria-hidden="true">→</span></a>
     </div>
     <p class="jump-note">Served from <code>npm start</code>, these two carry a
-      <code>care.read.user</code> token minted by the server when this page was requested — the
-      same one it prints in the terminal. Opened any other way they carry none, and each screen
-      asks for one.</p>
+      <code>care.read.user</code> token this server mints when the page is requested — a
+      different token from the ones the terminal printed, good for twelve hours. The clinician
+      link also carries the write key in its query string, and only while that key is the dev
+      secret this repository publishes. Opened any other way they carry neither, and each
+      screen asks for what it needs.</p>
   </div>
 
   <section id="mechanism">
@@ -392,11 +394,11 @@ footer a{color:var(--muted)}
          produces docs/proof/bench.json, rounded up to one decimal so it can never be
          faster than the measurement. web/web.test.ts fails if one is edited by hand. -->
     <script type="application/json" id="bench" data-source="/docs/proof/bench.json">
-      {"endToEnd":{"p50":1.5,"p95":3.1},"writeToNotification":{"p50":0.7},"n":200,"midSentence":200}
+      {"endToEnd":{"p50":1.8,"p95":3.3},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
     </script>
     <div class="stat">
-      <div><div class="v"><span data-bench="endToEnd.p50">1.5</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
-      <div><div class="v"><span data-bench="endToEnd.p95">3.1</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p50">1.8</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p95">3.3</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
       <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
     </div>
     <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
@@ -416,7 +418,7 @@ footer a{color:var(--muted)}
       <a class="card" href="/doc/demo" data-probe="/doc/demo">
         <span class="cmd">npm run verify</span>
         <h3>The safety property, asserted as failures</h3>
-        <p><span data-count="verify">33</span> assertions — fifteen in process, eighteen against a
+        <p><span data-count="verify">34</span> assertions — fifteen in process, nineteen against a
           real HTTP server. A user-scoped principal must fail to reach every internal URI, a
           tampered version must break the chain and be located exactly.</p>
         <span class="path">DEMO.md · scripts/verify.ts</span>
@@ -602,6 +604,11 @@ footer a{color:var(--muted)}
 
   function reset() {
     clear()
+    // The question lives here, not in run(), because final() — the reduced-motion
+    // end state — calls reset() and never called run(). It rendered the label
+    // "RAY" above an empty line, so a reduced-motion reader saw Alexa contradict
+    // itself with no question on screen to contradict.
+    rayLine.textContent = RAY_Q
     rayLine.style.opacity = '0'
     uttA.classList.remove('retracted')
     for (const s of wa) s.classList.remove('on')
@@ -620,7 +627,6 @@ footer a{color:var(--muted)}
 
   function run() {
     reset()
-    rayLine.textContent = RAY_Q
     at(120, () => { rayLine.style.transition = 'opacity .3s ease'; rayLine.style.opacity = '1' })
     at(560, () => frameEls[0].classList.add('on'))
     at(760, () => frameEls[1].classList.add('on'))

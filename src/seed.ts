@@ -27,6 +27,18 @@ export interface SeedOptions {
   now?: Date
 }
 
+/**
+ * "4 October 2026" — the form a discharge letter writes a stop date in, and the
+ * form the record's own sentence has to be in for a human who hears it read out
+ * to notice that the date has gone by.
+ */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December']
+const spokenDate = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
 export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
   const now = opts.now ?? DEMO_NOW
   const daysBefore = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString()
@@ -58,20 +70,29 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
     priority: 0.9,
   })
 
+  // Relative to the injected clock, not a pinned date. An absolute stop date is
+  // only "already passed" on one particular day; every other day — including any
+  // day a judge runs `npm start` — this record quietly stops being stale and the
+  // one feature it exists to demonstrate goes dark. Four days back from now is
+  // 2026-10-04 at DEMO_NOW, so the pinned receipts are unchanged.
+  //
+  // The SENTENCE is derived from the same instant. It was left pinned to
+  // "4 October 2026" when `staleAfter` was made relative, so the live server
+  // served a record flagged "past its review date" whose own words named a stop
+  // date a month in the FUTURE — the one narrative the product rests on,
+  // demonstrated on a drug the patient had not been told to stop. docs/SPEC.md
+  // I-7 states the opposite as the reason the feature exists; verify §9 now
+  // asserts the date in the text has actually passed.
+  const stopDate = daysBefore(4)
   store.publish({
     subject: RAY,
     topic: 'anticoagulant',
     audience: 'user',
-    value: 'Rivaroxaban 10mg once daily. Stop date: 4 October 2026.',
+    value: `Rivaroxaban 10mg once daily. Stop date: ${spokenDate(stopDate)}.`,
     authorId: 'gp.mensah',
     authorLabel: 'Dr Mensah, GP',
     writtenAt: daysBefore(9),
-    // Relative to the injected clock, not a pinned date. An absolute stop date is
-    // only "already passed" on one particular day; every other day — including any
-    // day a judge runs `npm start` — this record quietly stops being stale and the
-    // one feature it exists to demonstrate goes dark. Four days back from now is
-    // 2026-10-04 at DEMO_NOW, so the pinned receipts are unchanged.
-    staleAfter: daysBefore(4),
+    staleAfter: stopDate,
     priority: 0.85,
   })
 

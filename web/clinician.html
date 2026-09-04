@@ -414,8 +414,18 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
     if (sid) mcp.sid = sid
     if (!res.ok) {
       let detail = ''
-      try { detail = ': ' + (await res.text()).slice(0, 200) } catch { /* body already consumed */ }
-      throw new Error('HTTP ' + res.status + ' on ' + method + detail)
+      try { detail = (await res.text()).slice(0, 200) } catch { /* body already consumed */ }
+      // A 401 whose body says the token expired is not a server that is down. This
+      // page reported it as "Not connected to an Unsay server", which blames the
+      // wrong component and hides the one-line recovery — and the landing page's
+      // own links used to age out after an hour, so it was the likeliest failure
+      // a reader would ever see here.
+      const expired = res.status === 401 && /"error_description":"expired"/.test(detail)
+      const err = new Error(expired
+        ? 'The token in this link has expired. Restart npm start and open the landing page again for a fresh one'
+        : 'HTTP ' + res.status + ' on ' + method + (detail ? ': ' + detail : ''))
+      err.expired = expired
+      throw err
     }
     const msg = await firstMessage(res, id)
     if (msg.error) throw new Error(msg.error.message + ' (' + msg.error.code + ')')
@@ -467,9 +477,31 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
   })
 
   // ── connect + load ───────────────────────────────────────────────────────
-  let state = { phase: 'connecting', facts: SEED, now: SEED_NOW, live: false, error: '' }
+  let state = { phase: 'connecting', facts: SEED, listed: SEED.length, now: SEED_NOW, live: false, error: '' }
 
   const setStatus = (cls, text) => { $('status').className = 'status ' + cls; $('statusText').textContent = text }
+
+  /* LIST-SHAPE:begin — sliced verbatim and executed by web/web.test.ts, so the
+     rule this screen renders by cannot drift from the rule the test asserts. */
+  /**
+   * A care plan holds care records. `resources/list` also carries ui://unsay/echo,
+   * the MCP Apps card — a resource, not a clinical instruction — and this page
+   * rendered it: twelve thousand pixels of raw HTML source titled "ECHO", inside
+   * Ray Dunn's plan, with a "change" button on it. Publishing that card minted a
+   * `care://unsay/echo` chain, which is append-only, so one curious click broke
+   * the `ALL 5 CHAIN(S) INTACT` line /verify prints for the rest of the process's
+   * life. echo.html has had this guard since day 6; this screen did not.
+   */
+  const isCareUri = (uri) => /^care(-internal)?:\/\//.test(uri)
+  /**
+   * The server annotates every record with a clinical priority, this page has
+   * always parsed it and echoes it back on every write — and never ordered by it,
+   * so the live screen led with "anticoagulant" (alphabetical URI order) while the
+   * seed screen led with the weight-bearing instruction the whole demo is about.
+   * Ties fall back to the URI so two runs render identically.
+   */
+  const byClinicalPriority = (a, b) => (b.priority - a.priority) || a.uri.localeCompare(b.uri)
+  /* LIST-SHAPE:end */
 
   function parseRead(uri, listed, read) {
     const textPart = (read.contents || []).find((c) => typeof c.text === 'string')
@@ -499,7 +531,7 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
     setStatus('busy', 'connecting…')
     mcp.sid = null; mcp.id = 0; mcp.lastEventId = null
     if (!token()) {
-      state = { phase: 'down', facts: SEED, now: SEED_NOW, live: false, error: 'no read token set' }
+      state = { phase: 'down', facts: SEED, listed: SEED.length, now: SEED_NOW, live: false, error: 'no read token set' }
       setStatus('down', 'no token'); render(); return
     }
     try {
@@ -521,11 +553,18 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
       } while (cursor)
 
       const facts = []
-      for (const r of listed) facts.push(parseRead(r.uri, r, await rpc('resources/read', { uri: r.uri })))
-      state = { phase: 'live', facts, now: new Date().toISOString(), live: true, error: '' }
-      setStatus('live', 'live · ' + listed.length + ' resources')
+      for (const r of listed) {
+        if (!isCareUri(r.uri)) continue
+        facts.push(parseRead(r.uri, r, await rpc('resources/read', { uri: r.uri })))
+      }
+      state = { phase: 'live', facts, listed: listed.length, now: new Date().toISOString(), live: true, error: '' }
+      // Both numbers, because the difference is the point: the server offered six
+      // resources and this screen is a care plan, so it renders the five that are
+      // care records. Showing only the six was how the card got on the page.
+      setStatus('live', 'live · ' + facts.length + ' of ' + listed.length + ' resources')
     } catch (e) {
-      state = { phase: 'down', facts: SEED, now: SEED_NOW, live: false, error: String(e.message || e) }
+      state = { phase: 'down', facts: SEED, listed: SEED.length, now: SEED_NOW, live: false,
+        error: String(e.message || e), expired: e.expired === true }
       setStatus('down', 'no server')
     }
     render()
@@ -572,8 +611,12 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
     const b = $('banner'); b.textContent = ''
     if (state.phase === 'down') {
       const n = el('div', 'banner bad')
-      n.appendChild(el('b', null, 'Not connected to an Unsay server at ' + (base() || '(no address set)') + '.'))
-      n.appendChild(document.createTextNode(state.error + '. Nothing on this screen can be published until it answers. '))
+      n.appendChild(el('b', null, state.expired
+        ? 'This link’s token has expired.'
+        : 'Not connected to an Unsay server at ' + (base() || '(no address set)') + '.'))
+      n.appendChild(document.createTextNode(state.error + '. ' + (state.expired
+        ? 'The server is up; the credential in this URL is not. '
+        : 'Nothing on this screen can be published until it answers. ')))
       n.appendChild(document.createTextNode('The plan below is the committed seed record from '))
       n.appendChild(el('code', null, 'src/seed.ts'))
       n.appendChild(document.createTextNode(' — real values, read out of this file rather than from a server, with the seed’s own pinned clock. '))
@@ -596,11 +639,13 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
   function render() {
     banner()
     $('listSrc').textContent = state.live
-      ? state.facts.length + ' resources over MCP · resources/list + read'
+      ? state.facts.length + ' of ' + state.listed + ' resources over MCP · resources/list + read'
       : 'seed record · clock pinned to ' + SEED_NOW
     const list = $('facts'); list.textContent = ''
 
-    for (const f of state.facts) {
+    // Sorted here rather than at load, so the seed view and the live view are
+    // ordered by the same rule and lead with the same record.
+    for (const f of state.facts.slice().sort(byClinicalPriority)) {
       const internal = f.audience === 'assistant'
       const li = el('li', 'fact' + (openUri === f.uri ? ' open' : '') + (internal ? ' internal' : ''))
 

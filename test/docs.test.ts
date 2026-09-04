@@ -183,7 +183,7 @@ describe('the counts in the documents are the counts', () => {
   it('agrees with the verify receipt about how many assertions it makes', () => {
     const receipt = JSON.parse(read('docs/proof/verify.json'))
     expect(receipt.verdict).toBe('PASS')
-    const spelled: Record<number, string> = { 29: 'Twenty-nine', 33: 'Thirty-three' }
+    const spelled: Record<number, string> = { 29: 'Twenty-nine', 33: 'Thirty-three', 34: 'Thirty-four' }
     expect(README).toContain(`${spelled[receipt.assertions]} assertions`)
     expect(DEMO).toContain(`${receipt.assertions} assertions`)
   })
@@ -203,6 +203,57 @@ describe('the counts in the documents are the counts', () => {
     const words: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four' }
     expect(SPEC, 'SPEC misstates how many revisions the probe writes into the dark')
       .toContain(`**${words[resume.revisions.missedCount]}** further revisions`)
+  })
+
+  it('quotes the staleness header the server actually prints, everywhere', () => {
+    /**
+     * FRICTION.md F-005 quoted `[STALE — last changed 4 days ago by Dr Mensah, GP;
+     * say this age aloud]` in the entry arguing that the SDK silently drops the
+     * annotation this header exists to replace. Four other copies of the same
+     * string — DEMO.md twice, skill/SKILL.md, and docs/proof/verify.json — said 9.
+     * The header reports the record's AGE, not its staleness overshoot, so "4 days
+     * ago" is a shape `src/server.ts` cannot emit for that record: the friction log
+     * caught transcribing, in the document that buys the project its credibility.
+     *
+     * The header comes from the verify receipt rather than from a rebuild here — a
+     * copy of the format string in a test is one more place for it to drift.
+     */
+    const receipt = JSON.parse(read('docs/proof/verify.json'))
+    const printed = receipt.checks
+      .map((c: { detail: string }) => String(c.detail))
+      .find((d: string) => d.startsWith('[STALE'))
+    expect(printed, 'the verify receipt no longer carries a live staleness header').toBeTypeOf('string')
+    expect(printed).toMatch(/^\[STALE — last changed \d+ days? ago by .+; say this age aloud\]$/)
+
+    for (const file of ['README.md', 'DEMO.md', 'FRICTION.md', 'skill/SKILL.md', 'docs/SPEC.md']) {
+      // Unwrapped first: FRICTION.md breaks the header across a line.
+      const quoted = read(file).replace(/\n\s*/g, ' ').match(/\[STALE[^\]]*\]/g) ?? []
+      for (const q of quoted) {
+        // An elided form — `[STALE — …; say this age aloud]` — states no figure and
+        // is not a quote of a run.
+        if (!q.includes('last changed')) continue
+        expect(q, `${file} quotes a staleness header the server does not print`).toBe(printed)
+      }
+    }
+  })
+
+  it('counts the links npm start prints, and how many carry a token', () => {
+    /**
+     * README said `npm start` "prints three links that already carry a minted
+     * token". It prints three, and the landing link carries none — the first
+     * factual sentence under the first heading a judge reads, checkable in ten
+     * seconds by running the one command the sentence is about.
+     */
+    const banner = /open these:\n\n([\s\S]*?)\n\n/.exec(read('scripts/serve.ts'))
+    expect(banner, 'scripts/serve.ts no longer prints an "open these:" banner').not.toBeNull()
+    const links = banner![1]!.split('\n').filter((l) => l.includes('${srv.baseUrl}'))
+    const carrying = links.filter((l) => l.includes('token:'))
+    const words: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four' }
+    expect(links.length).toBeGreaterThan(1)
+    expect(carrying.length).toBeLessThan(links.length)
+    expect(README, 'README miscounts the links npm start prints').toContain(
+      `prints ${words[links.length]} links, ${words[carrying.length]} of which already carry a\nminted token`,
+    )
   })
 
   it('quotes only VERDICT lines the scripts actually print', () => {
@@ -277,7 +328,9 @@ describe('DEMO.md quotes output the scripts can actually produce', () => {
   const expected = (heading: string) => {
     const from = DEMO.indexOf(`## ${heading}`)
     expect(from, `DEMO.md has no section "${heading}"`).toBeGreaterThan(-1)
-    const m = /\*\*Expected:\*\*\n+```\n([\s\S]*?)\n```/.exec(DEMO.slice(from))
+    // A generated block carries its `<!-- e2e:begin … -->` marker between the
+    // heading and the fence; the capture below it is still the Expected block.
+    const m = /\*\*Expected:\*\*\n+(?:<!--[^\n]*-->\n)?```\n([\s\S]*?)\n```/.exec(DEMO.slice(from))
     expect(m, `DEMO.md has no Expected block under "${heading}"`).not.toBeNull()
     return m![1]!
   }
@@ -349,6 +402,93 @@ describe('DEMO.md quotes output the scripts can actually produce', () => {
     it('says three lines differ, because three do', () => {
       // The envelope prints its banner once on startup and once inside the run.
       expect(DEMO).toContain('Identical output except three lines')
+    })
+  })
+
+  describe('§3 · the e2e block, and the receipt it was written from', () => {
+    /**
+     * README.md and DEMO.md both quoted `read ui://unsay/echo ← text/html+skybridge
+     * · 33625 bytes` — on the one line that exists only because the track is
+     * Alexa+ — while `scripts/e2e.ts` printed 34404 and docs/proof/live_run.jsonl,
+     * written by that same script, said 34404 too. Both documents promised the
+     * block was verbatim apart from one latency figure. The §1 probe block above
+     * has been gated in both directions since day 8; the flagship command's block
+     * was gated by nothing, and drifted.
+     *
+     * `npm run e2e` now writes both copies out of the run that writes the receipt,
+     * the way `npm run bench` has written its table since day 6. These fail if
+     * either copy is edited afterwards.
+     */
+    const e2eSrc = read('scripts/e2e.ts')
+    const receipt = read('docs/proof/live_run.jsonl').trim().split('\n').map((l) => JSON.parse(l))
+    const frame = (event: string, uri?: string) =>
+      receipt.find((f) => f.event === event && (uri === undefined || f.uri === uri))
+
+    const block = (doc: string, name: string) => {
+      const m = /<!-- e2e:begin[^\n]*-->\n```\n([\s\S]*?)\n```\n/.exec(doc)
+      expect(m, `${name} has no e2e:begin block`).not.toBeNull()
+      return m![1]!
+    }
+    const full = block(DEMO, 'DEMO.md')
+    const short = block(README, 'README.md')
+
+    it("quotes in README.md only lines of DEMO.md's capture", () => {
+      const captured = new Set(full.split('\n'))
+      const quoted = short.split('\n').filter(Boolean)
+      expect(quoted.length, 'the README excerpt has shrunk to nothing').toBeGreaterThan(15)
+      expect(quoted.filter((l) => !captured.has(l))).toEqual([])
+    })
+
+    it('quotes no labelled line the script has no format string for', () => {
+      /**
+       * The same shape as the §1 gate, over `label   value` lines. A label
+       * carrying a version number — `v3.prevHash === v2.versionHash` — is a
+       * template in the script, so the literal runs either side of the digits are
+       * what can be greped for.
+       */
+      const traceable = (label: string) => {
+        if (e2eSrc.includes(label)) return true
+        const runs = label.split(/\d+/).filter((r) => r.length >= 8)
+        return runs.length > 0 && runs.every((r) => e2eSrc.includes(r))
+      }
+      const labels = full
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => /\s{2,}/.test(l))
+        .map((l) => l.split(/\s{2,}/)[0]!)
+      expect(labels.length, 'the block no longer looks like a capture').toBeGreaterThan(15)
+      expect(labels.filter((l) => !traceable(l))).toEqual([])
+    })
+
+    it('agrees with docs/proof/live_run.jsonl on every figure but the latency', () => {
+      const card = frame('resources/read', 'ui://unsay/echo')
+      expect(card, 'the receipt has no ui://unsay/echo read').toBeTruthy()
+      expect(full, 'the MCP Apps card line disagrees with the receipt')
+        .toContain(`← ${card.mimeType} · ${card.bytes} bytes · MCP Apps card`)
+
+      const list = frame('resources/list')
+      expect(full).toContain(`${(list.uris as string[]).length} resources over ${list.pages} cursor page(s)`)
+
+      const updated = frame('notifications/resources/updated')
+      expect(full).toContain(`v${updated.version} · ${updated.subscribers} subscribed host(s)`)
+      expect(full, 'the quoted latency is not the one the receipt recorded')
+        .toContain(`notifications/resources/updated  ${Number(updated.latencyMs).toFixed(2)} ms`)
+
+      const verdict = frame('GET /verify')
+      expect(full).toContain(`${verdict.versions} versions · intact ${verdict.intact}`)
+
+      const summary = receipt.at(-1)
+      expect(summary.event).toBe('summary')
+      expect(summary.verdict).toBe('PASS')
+      expect(full).toContain(`PASS — receipt → docs/proof/live_run.jsonl (${receipt.length - 1} frames + summary)`)
+    })
+
+    it('says which figure moves, and names only that one', () => {
+      const updated = frame('notifications/resources/updated')
+      for (const [name, doc] of [['README.md', README], ['DEMO.md', DEMO]] as const) {
+        expect(doc, name).toContain(`\`${Number(updated.latencyMs).toFixed(2)} ms\` will differ`)
+        expect(doc, name).toContain('it is the only figure in this block that moves')
+      }
     })
   })
 

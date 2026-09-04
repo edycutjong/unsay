@@ -384,7 +384,18 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
     })
     const sid = res.headers.get('mcp-session-id')
     if (sid) mcp.sid = sid
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + method)
+    if (!res.ok) {
+      let detail = ''
+      try { detail = (await res.text()).slice(0, 200) } catch { /* nothing to read */ }
+      // An expired token is not a server that is down, and this screen used to say
+      // "not connected" for it — blaming the wrong component and naming no recovery.
+      const expired = res.status === 401 && /"error_description":"expired"/.test(detail)
+      const err = new Error(expired
+        ? 'the token in this link has expired — restart npm start for a fresh one'
+        : 'HTTP ' + res.status + ' on ' + method)
+      err.expired = expired
+      throw err
+    }
     const msg = await firstMessage(res, id)
     if (msg.error) throw new Error(msg.error.message + ' (' + msg.error.code + ')')
     return msg.result
@@ -408,8 +419,12 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   const byUri = () => facts.find((f) => f.uri === 'care://ray/' + shown) || facts[0] || null
 
   // ── connect ──────────────────────────────────────────────────────────────
+  /** Set when the server refuses the link's token as expired — see rpc() above. */
+  let expiredLink = false
+
   async function connect() {
     const gen = ++generation
+    expiredLink = false
     mcp.sid = null; mcp.id = 0; mcp.lastEventId = null; mcp.streaming = false
     live = false; path = 'none'; corrected = null
 
@@ -436,6 +451,7 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
     } catch (e) {
       if (gen !== generation) return
       facts = SEED.slice(); clockIso = SEED_NOW
+      expiredLink = e.expired === true
       chips(); paint(String(e.message || e))
     }
   }
@@ -578,7 +594,7 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
     }
     $('pathLabel').textContent = live
       ? (path === 'subscription' ? 'notifications/resources/updated over SSE' : 'polling the whats_changed tool')
-      : 'not connected' + (reason ? ' — ' + reason : '')
+      : (expiredLink ? 'token expired' : 'not connected') + (reason ? ' — ' + reason : '')
 
     if (!current) { $('sFact').textContent = 'No speakable resource'; return }
     $('sLabel').textContent = current.domain.replace(/_/g, ' ')

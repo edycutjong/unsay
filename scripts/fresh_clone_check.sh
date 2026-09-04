@@ -55,6 +55,19 @@ run "npm run seed"         seed
 run "npm run probe"        probe
 run "npm run verify"       verify
 run "npm run e2e"          e2e
+
+# README.md and DEMO.md quote that run, and `npm run e2e` writes both blocks out of
+# the run that writes docs/proof/live_run.jsonl. Re-running it in a clean clone and
+# finding nothing but the latency changed is the mechanical form of "this block is a
+# capture" — the same check ARCHITECTURE.md gets below. The committed block said
+# 33625 bytes for a card the script prints at 34404 until it was generated.
+e2e_drift() {
+  git --no-pager diff -U0 -- README.md DEMO.md | grep -E '^[+-][^+-]' |
+    grep -vE '(ms\` will differ|notifications/resources/updated +[0-9])'
+}
+printf '  %-34s' "npm run e2e (no doc drift)"
+if [ -z "$(e2e_drift)" ]; then echo "PASS"; else echo "FAIL"; e2e_drift | sed 's/^/      /' | head -10; fail=1; fi
+
 run "npm run probe:resume" probe:resume
 run "npm run bench -- --n 20" bench --n 20
 

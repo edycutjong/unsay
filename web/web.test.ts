@@ -109,11 +109,54 @@ describe('no page can fake a live session', () => {
     expect(all['clinician.html']).toContain('Signed. Nothing was published.')
   })
 
-  it('ships no credential of any kind', () => {
+  it('checks in no credential of any kind — the files on disk', () => {
+    /**
+     * Named for what it reads. It was called "ships no credential of any kind",
+     * which is a claim about the bytes a browser receives, and those are not these
+     * bytes: `src/http.ts` dresses index.html with a minted token and, while the
+     * dev key is in use, with DEV_WRITE_SECRET on the clinician link. The test
+     * passed the whole time and overstated its own scope — the R10 shape this repo
+     * polices everywhere else. The case below reads what a browser actually gets.
+     */
     for (const [name, html] of Object.entries(all)) {
       expect(html, name).not.toContain(DEV_WRITE_SECRET)
       expect(html, name).not.toContain(DEV_TOKEN_SECRET)
       expect(html, name).not.toMatch(/Bearer\s+[A-Za-z0-9_-]{16,}/)
+    }
+  })
+
+  it('serves only the two credentials the landing page says it hands out', async () => {
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const body = await (await fetch(`${srv.baseUrl}/index.html`)).text()
+      // The demo read token, on every link into the two live screens…
+      const bare = (all['index.html']!.match(/href="(?:echo|clinician)\.html"/g) ?? []).length
+      expect(bare, 'the landing page links into neither live screen').toBeGreaterThan(1)
+      expect((body.match(/href="(?:echo|clinician)\.html\?token=/g) ?? []).length).toBe(bare)
+      // …and the dev write key, on the clinician link only, because it is the key
+      // this repository publishes and it protects nothing. The landing note has to
+      // say so: a judge is about to click through with it in the URL bar.
+      expect(body).toContain(`key=${encodeURIComponent(DEV_WRITE_SECRET)}`)
+      expect(all['index.html'], 'the jump note no longer discloses the write key')
+        .toContain('write key in its query string')
+      // The signing secrets themselves never leave the process.
+      expect(body).not.toContain(DEV_TOKEN_SECRET)
+    } finally {
+      await srv.close()
+    }
+  })
+
+  it('serves no write key at all once a real one is configured', async () => {
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false, writeSecret: 'a-real-deployment-secret' })
+    try {
+      const body = await (await fetch(`${srv.baseUrl}/index.html`)).text()
+      expect(body).toContain('href="echo.html?token=')
+      expect(body, 'a configured write secret reached the page').not.toContain('a-real-deployment-secret')
+      expect(body).not.toContain('key=')
+    } finally {
+      await srv.close()
     }
   })
 })
@@ -347,6 +390,200 @@ describe('the retraction on the page is the one the server renders', () => {
     const onPage = /const A2 = '([^']*)'/.exec(all['index.html']!)?.[1]
     expect(onPage, 'the hero no longer defines A2').toBeTypeOf('string')
     expect(onPage).toBe(expected)
+  })
+})
+
+describe('the clinician screen renders a care plan, and nothing else', () => {
+  /**
+   * The page walked `resources/list` with no URI filter, so `ui://unsay/echo` — the
+   * MCP Apps card — was read, parsed as an editable clinical instruction and
+   * rendered inside Ray Dunn's care plan: a 12,086-pixel card titled "ECHO" holding
+   * the entire Echo Show HTML source, with a "change" button on it. Publishing that
+   * card minted a `care://unsay/echo` chain, and the store is append-only, so one
+   * click broke the `ALL 5 CHAIN(S) INTACT` line DEMO.md tells a judge to expect for
+   * the life of that process. echo.html has had the guard since day 6.
+   *
+   * The rule below is sliced out of the page between the LIST-SHAPE markers and run
+   * here against a live server, so this test and the browser cannot disagree.
+   */
+  const shape = /\/\* LIST-SHAPE:begin[\s\S]*?\*\/([\s\S]*?)\/\* LIST-SHAPE:end \*\//
+    .exec(all['clinician.html']!)?.[1]
+
+  const rules = () => {
+    expect(shape, 'clinician.html no longer marks its list shape').toBeTypeOf('string')
+    return new Function(`${shape}\nreturn { isCareUri, byClinicalPriority }`)() as {
+      isCareUri: (uri: string) => boolean
+      byClinicalPriority: (a: { priority: number; uri: string }, b: { priority: number; uri: string }) => number
+    }
+  }
+
+  it('drops every resource outside the care schemes, live', async () => {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
+    const { StreamableHTTPClientTransport } = await import(
+      '@modelcontextprotocol/sdk/client/streamableHttp.js'
+    )
+    const { createHttpServer, mintToken } = await import('../src/http.ts')
+    const { isCareUri } = rules()
+
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const client = new Client({ name: 'clinician-shape', version: '0.1.0' }, { capabilities: {} })
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`${srv.baseUrl}/mcp`), {
+          requestInit: {
+            headers: {
+              Authorization: `Bearer ${mintToken({
+                sub: 'clinician',
+                scopes: ['care.read.user'],
+                audience: srv.resourceUrl,
+              })}`,
+            },
+          },
+        }),
+      )
+      const listed: { uri: string; annotations?: { priority?: number } }[] = []
+      let cursor: string | undefined
+      do {
+        const page = await client.listResources(cursor ? { cursor } : {})
+        listed.push(...page.resources)
+        cursor = page.nextCursor
+      } while (cursor)
+
+      // If the seed ever stops carrying the card, this test proves nothing.
+      expect(listed.map((r) => r.uri), 'the default seed no longer lists the ui:// card')
+        .toContain('ui://unsay/echo')
+
+      const rendered = listed.filter((r) => isCareUri(r.uri))
+      expect(rendered.filter((r) => !r.uri.startsWith('care'))).toEqual([])
+      expect(rendered.length).toBe(listed.length - 1)
+      await client.close()
+    } finally {
+      await srv.close()
+    }
+  })
+
+  it('leads with the record under discussion, live and on seed alike', () => {
+    /**
+     * The server annotates every record with a clinical priority, the page parses
+     * it and echoes it back on every write — and never ordered by it, so the live
+     * screen led with "anticoagulant" in alphabetical URI order while the seed
+     * screen led with the weight-bearing instruction the hero, the echo card and
+     * the README lede are all built around. Same screen, two different first rows.
+     */
+    const { byClinicalPriority } = rules()
+    const seed = [...all['clinician.html']!.matchAll(/\{ uri:'([^']+)'[\s\S]*?priority:([\d.]+)/g)]
+      .map((m) => ({ uri: m[1]!, priority: Number(m[2]!) }))
+    expect(seed.length, 'the page no longer carries a seed list').toBeGreaterThan(3)
+    expect(seed.slice().sort(byClinicalPriority)[0]!.uri).toBe('care://ray/weight_bearing')
+  })
+
+  it('says how many of the listed resources it rendered, rather than only how many exist', () => {
+    // The status chip read "live · 6 resources" over five cards. Both numbers, so
+    // the filtering is visible instead of silent.
+    expect(all['clinician.html']).toContain("' of ' + listed.length + ' resources'")
+    expect(all['clinician.html']).toContain("' of ' + state.listed + ' resources over MCP")
+  })
+})
+
+describe('the pinned seed on the pages is the seed in src/seed.ts', () => {
+  /**
+   * Both pages carry a copy of the seed record, shown when no server answers and
+   * labelled as such. The anticoagulant sentence names a stop date, and that date
+   * was pinned in three places while `staleAfter` was made relative to the injected
+   * clock — so the live server flagged a record as past its review date whose own
+   * words named a stop date a month in the future. The sentence is derived from the
+   * clock now; this fails if a page's copy stops matching what the seed publishes.
+   */
+  it('quotes the anticoagulant value the seed publishes on its pinned clock', async () => {
+    const { RAY, seedDemo } = await import('../src/seed.ts')
+    const value = seedDemo().versions(RAY, 'anticoagulant').at(-1)!.value
+    expect(value).toMatch(/Stop date: \d+ \w+ \d{4}\./)
+    for (const page of ['clinician.html', 'echo.html'] as const) {
+      expect(all[page], `${page}'s seed record has drifted from src/seed.ts`).toContain(value)
+    }
+  })
+
+  it('pins those pages to the clock the seed was built on', async () => {
+    const { DEMO_NOW } = await import('../src/seed.ts')
+    for (const page of ['clinician.html', 'echo.html'] as const) {
+      expect(all[page], page).toContain(`SEED_NOW = '${DEMO_NOW.toISOString().replace('.000', '')}'`)
+    }
+  })
+})
+
+describe('an expired link is reported as an expired link', () => {
+  /**
+   * Both screens turned a 401 with `error_description: "expired"` into "not
+   * connected to an Unsay server" — blaming a component that is up, and naming no
+   * recovery. With the landing page's own links expiring after an hour, it was the
+   * likeliest failure a judge would ever see here. The page's own client is sliced
+   * and run against a live server holding a token that has already run out.
+   */
+  const core = /\/\* MCP-CLIENT-CORE:begin[\s\S]*?\*\/([\s\S]*?)\/\* MCP-CLIENT-CORE:end \*\//
+    .exec(all['echo.html']!)?.[1]
+
+  it('says the token expired, and what to do about it', async () => {
+    const { createHttpServer, mintToken } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const dead = mintToken({
+        sub: 'echo-show',
+        scopes: ['care.read.user'],
+        audience: srv.resourceUrl,
+        ttlSeconds: -60,
+      })
+      const build = new Function('base', 'token', 'PROTOCOL', `${core}\nreturn { rpc }`)
+      const page = build(() => srv.baseUrl, () => dead, '2025-11-25')
+      await expect(page.rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {} }))
+        .rejects.toThrow(/token in this link has expired/)
+      // …and the label the page paints for it is not "not connected".
+      expect(all['echo.html']).toContain("expiredLink ? 'token expired' : 'not connected'")
+      expect(all['clinician.html']).toContain('This link’s token has expired.')
+    } finally {
+      await srv.close()
+    }
+  })
+})
+
+describe('the hero explains itself with motion turned off', () => {
+  /**
+   * Under `prefers-reduced-motion: reduce` the stage rendered the label "RAY" above
+   * an EMPTY line: `final()` set the element's opacity and never its text, which
+   * only `run()` did — so a reduced-motion reader saw an assistant contradict
+   * itself with no question on screen to contradict, plus a labelled blank row that
+   * reads as a rendering bug. That path is taken on load and on every Replay click.
+   *
+   * The two functions are executed here, as the page defines them, against stubs of
+   * the four things they touch.
+   */
+  const slice = (name: string) =>
+    new RegExp(`\n  function ${name}\\(\\) \\{[\\s\\S]*?\n  \\}`).exec(all['index.html']!)?.[0]
+
+  const RAY_Q = /const RAY_Q = '([^']*)'/.exec(all['index.html']!)?.[1]
+
+  it('writes the question in the reduced-motion end state, not only in the animation', () => {
+    expect(RAY_Q, 'the hero no longer defines RAY_Q').toBeTypeOf('string')
+    const reset = slice('reset')
+    const final = slice('final')
+    expect(reset, 'the hero no longer defines reset()').toBeTypeOf('string')
+    expect(final, 'the hero no longer defines final()').toBeTypeOf('string')
+
+    const stub = () => ({
+      textContent: '',
+      style: {} as Record<string, string>,
+      classList: { add() {}, remove() {} },
+    })
+    const rayLine = stub()
+    const run = new Function(
+      'clear', 'rayLine', 'uttA', 'wa', 'wb', 'frameEls', 'RAY_Q',
+      `${reset}
+${final}
+final()`,
+    )
+    run(() => {}, rayLine, stub(), [], [], [], RAY_Q)
+    expect(rayLine.textContent, 'the reduced-motion stage renders "RAY" above an empty line')
+      .toBe(RAY_Q)
+    expect(rayLine.style.opacity).toBe('1')
   })
 })
 
@@ -668,6 +905,46 @@ describe('the served pages are what a judge actually gets', () => {
       // og:image cannot be relative and reach a scraper; the server absolutizes it.
       expect(body).toContain(`content="${srv.baseUrl}/og.png"`)
       expect(body).toContain(`content="${srv.baseUrl}/index.html"`)
+    } finally {
+      await srv.close()
+    }
+  })
+
+  it('hands a fresh, still-valid token to every visitor, an hour later too', async () => {
+    /**
+     * The demo token was minted ONCE in the createHttpServer closure with the
+     * one-hour mintToken default, and the dressed page was cached forever — so
+     * after sixty minutes of `npm start` every judge who clicked the landing
+     * page's own call to action landed on exactly the "not connected" dead end
+     * the substitution was added to remove, and reloading returned the same dead
+     * token. The realistic path — read the README, run the suite, the verify, the
+     * bench, then follow DEMO.md — routinely passes an hour (LESSONS R13).
+     */
+    const { createHttpServer, verifyToken, DEV_TOKEN_SECRET } = await import('../src/http.ts')
+    let clock = new Date('2026-10-08T09:14:00Z')
+    const srv = await createHttpServer({ announce: false, now: () => clock })
+    try {
+      const tokenOn = async () => {
+        const body = await (await fetch(`${srv.baseUrl}/index.html`)).text()
+        return /href="echo\.html\?token=([^"&]+)"/.exec(body)![1]!
+      }
+      const first = await tokenOn()
+      // Two hours later — well past the old one-hour TTL, and past any cache.
+      clock = new Date(clock.getTime() + 2 * 3600_000)
+      const later = await tokenOn()
+      expect(later, 'the page served a cached token from two hours ago').not.toBe(first)
+      const principal = verifyToken(later, {
+        secret: DEV_TOKEN_SECRET,
+        audience: srv.resourceUrl,
+        now: clock,
+      })
+      expect(principal.scopes).toContain('care.read.user')
+
+      // Twelve hours is what the page tells the reader it hands out.
+      const claims = JSON.parse(Buffer.from(later.split('.')[1]!, 'base64url').toString('utf8'))
+      expect(claims.exp - claims.iat).toBe(12 * 3600)
+      expect(all['index.html'], 'the jump note misstates the link lifetime')
+        .toContain('good for twelve hours')
     } finally {
       await srv.close()
     }

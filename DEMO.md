@@ -65,7 +65,7 @@ run in process; sections 6, 8 and 9 stand up a real HTTP server and attack it. S
 one that takes **no injected store and no injected clock** — the defaults `npm start` uses — because
 a defect in the entrypoint's own pairing of those two is invisible to every gate that supplies both.
 
-**Expected — 33 assertions, all ✓:**
+**Expected — 34 assertions, all ✓:**
 
 ```
 1. audience partition
@@ -117,6 +117,7 @@ a defect in the entrypoint's own pairing of those two is invisible to every gate
 9. the live entrypoint serves an honest age
   ✓ no resource reports a negative age on the default clock — 4 headers, all forward in time
   ✓ the anticoagulant record is past its review date on the default clock — [STALE — last changed 9 days ago by Dr Mensah, GP; say this age aloud]
+  ✓ the record's own text names a stop date that has already passed — the stop date in the value is 4 days behind the default clock
   ✓ a fresh record is NOT flagged stale on the default clock — [changed 1d ago by Sarah Okafor, physio]
 
 PASS — 0 failing assertion(s)
@@ -155,6 +156,7 @@ audience partition attacked from Ray's own host, the physio's correction arrivin
 
 **Expected:**
 
+<!-- e2e:begin — written by `npm run e2e`, from the run that wrote the receipt. Do not edit by hand. -->
 ```
 unsay · end-to-end · the demo as code
 
@@ -169,7 +171,7 @@ unsay · end-to-end · the demo as code
 
   templates                 care://{patient}/{domain}/{version}, care-internal://{patient}/{domain}/{version}
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 33625 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html+skybridge · 35146 bytes · MCP Apps card
   agent skill               skill/SKILL.md — 4571 bytes, the same two rules as instructions
   completion {version}      ["v2","v1"]  ← resolved via context.arguments
 
@@ -187,7 +189,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.46 ms
+  notifications/resources/updated  1.39 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -214,8 +216,12 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
+The `1.39 ms` will differ on your machine and between two runs on this one;
+it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
+<!-- e2e:end -->
+
 Exit code 0. Receipt: `docs/proof/live_run.jsonl` — 21 lines: 20 frames of the real protocol
-exchange and a summary line. The `1.46 ms` will differ on your machine; nothing else should.
+exchange and a summary line.
 
 Three of those steps are new and are the ones worth reading. `read ui://unsay/echo` is the Echo
 Show card fetched **through MCP** as an MCP Apps resource rather than off a static HTTP route.
@@ -309,10 +315,10 @@ store → notification → authorized re-read → the client holds the new value
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.7ms      1.3ms      4.8ms
-notification → re-read            0.8ms      1.7ms      3.2ms
+signed write → notification       0.8ms      2.0ms      5.1ms
+notification → re-read            0.9ms      2.2ms      3.6ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.5ms      3.0ms      8.0ms
+END-TO-END (write → value)        1.7ms      3.3ms      8.6ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
@@ -449,7 +455,7 @@ npm test
 npm run typecheck
 ```
 
-**279 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
+**295 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
 the retraction wording, and the documents themselves), `web/**` (the three pages — including a run
 of `echo.html`'s own hand-rolled MCP client, sliced out of the page and executed against a live
 server), and `packages/live-resources/test/**` (the extracted package, imported through its public

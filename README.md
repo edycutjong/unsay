@@ -44,8 +44,9 @@ rather than claimed.
 
 ## 📸 See it in Action
 
-`npm start` runs one process on one origin and prints three links that already carry a minted
-token. There is no build step and no account.
+`npm start` runs one process on one origin and prints three links, two of which already carry a
+minted token — the landing page carries none because it needs none, and it hands out its own.
+There is no build step and no account.
 
 | Screen | What it is | Where |
 |---|---|---|
@@ -164,36 +165,40 @@ HTTP server `npm start` runs — real Bearer token, cursor-paginated listing, a 
 the MCP Apps card read over the protocol, the physio's correction arriving through the signed
 write path, and the retraction rendered server-side:
 
+<!-- e2e:begin — written by `npm run e2e`, from the run that wrote the receipt. Do not edit by hand. -->
 ```
   protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 33625 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html+skybridge · 35146 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.46 ms
+  notifications/resources/updated  1.39 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
         operated leg.” Sarah Okafor, physio changed it just now: “Full
-        weight-bearing as tolerated.” …
+        weight-bearing as tolerated.” In plain terms, full weight-bearing
+        as tolerated means you can put as much weight through that leg as
+        is comfortable.
   _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script
   v3.prevHash === v2.versionHash  YES — the retraction is auditable
 
-  logging/setLevel          notice suppressed at level emergency — 0 log message(s) after the write
   fallback whats_changed    1 revision(s) — exercised, not just built
+  logging/setLevel          notice suppressed at level emergency — 0 log message(s) after the write
 
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.46 ms` will differ on your machine and between two runs on this one; it is the only figure
-in that block that moves, and it is not the headline number — [the bench](#the-number) is.
+The `1.39 ms` will differ on your machine and between two runs on this one;
+it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
+<!-- e2e:end -->
 
 **The safety properties pass** — `npm run verify` asserts the reads and writes that MUST fail,
-do. Thirty-three assertions: fifteen in process, eighteen against a real HTTP server.
+do. Thirty-four assertions: fifteen in process, nineteen against a real HTTP server.
 
 ```
 1. audience partition          ✓ care-internal://ray/{risk,adherence} unreachable with care.read.user
@@ -213,6 +218,7 @@ do. Thirty-three assertions: fifteen in process, eighteen against a real HTTP se
                                ✓ every refusal left an audit row, and none carries a credential
 9. the live entrypoint         ✓ no resource reports a negative age on the default clock
                                ✓ the anticoagulant record is past its review date on the default clock
+                               ✓ the record's own text names a stop date that has already passed
 
 PASS — 0 failing assertion(s)
 receipt → docs/proof/verify.json
@@ -261,10 +267,10 @@ out of the same run that writes [`docs/proof/bench.txt`](docs/proof/bench.txt):
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.7ms      1.3ms      4.8ms
-notification → re-read            0.8ms      1.7ms      3.2ms
+signed write → notification       0.8ms      2.0ms      5.1ms
+notification → re-read            0.9ms      2.2ms      3.6ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.5ms      3.0ms      8.0ms
+END-TO-END (write → value)        1.7ms      3.3ms      8.6ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
@@ -304,7 +310,7 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**279 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**295 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 29 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and

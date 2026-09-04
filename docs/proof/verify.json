@@ -1,9 +1,9 @@
 {
-  "ranAt": "2026-09-04T12:23:00.186Z",
-  "assertions": 33,
+  "ranAt": "2026-09-04T13:04:56.629Z",
+  "assertions": 34,
   "failing": 0,
   "inProcess": 15,
-  "overHttp": 18,
+  "overHttp": 19,
   "checks": [
     {
       "section": 1,
@@ -196,6 +196,12 @@
       "name": "the anticoagulant record is past its review date on the default clock",
       "ok": true,
       "detail": "[STALE — last changed 9 days ago by Dr Mensah, GP; say this age aloud]"
+    },
+    {
+      "section": 9,
+      "name": "the record's own text names a stop date that has already passed",
+      "ok": true,
+      "detail": "the stop date in the value is 4 days behind the default clock"
     },
     {
       "section": 9,

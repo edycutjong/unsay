@@ -540,9 +540,32 @@ export async function createHttpServer(
    * (LESSONS R13). A deployment that mounts its own store gets the bare links back.
    */
   const demoSeed = opts.store === undefined
-  const demoLinkToken = demoSeed
-    ? mintToken({ sub: 'echo-show', scopes: [SCOPE.user], audience: resourceUrl, secret: secrets.token })
-    : null
+  /**
+   * Twelve hours, not the one-hour `mintToken` default. The realistic path through
+   * this repo is `npm start`, read the README, run the suite, `verify`, `bench` and
+   * DEMO.md — and only then click the links. That routinely passes an hour, and a
+   * one-hour token turned the landing page's own call to action back into the "not
+   * connected" dead end the substitution exists to remove, silently and with the
+   * page blaming the server for it.
+   */
+  const DEMO_LINK_TTL_SECONDS = 12 * 3600
+  /**
+   * Minted PER REQUEST, not once per process. A token minted at startup and served
+   * out of a permanent cache hands every later visitor the credential minted for
+   * the first one, and keeps handing it out long after it has expired — so a
+   * reload, the one recovery a reader would try, returned the same dead link.
+   */
+  const demoLinkToken = () =>
+    demoSeed
+      ? mintToken({
+          sub: 'echo-show',
+          scopes: [SCOPE.user],
+          audience: resourceUrl,
+          secret: secrets.token,
+          ttlSeconds: DEMO_LINK_TTL_SECONDS,
+          now: now(),
+        })
+      : null
   // The write key is a secret. It is put in a link only when it is the dev key,
   // which is printed in this file and in DEMO.md and protects nothing.
   const demoWriteKey = secrets.write === DEV_WRITE_SECRET ? DEV_WRITE_SECRET : null
@@ -557,11 +580,12 @@ export async function createHttpServer(
       /(<meta (?:property|name)="(?:og:(?:image|url)|twitter:image)" content=")(\/[^"]*)"/g,
       (_m, head: string, path: string) => `${head}${baseUrl}${path}"`,
     )
-    if (file === 'index.html' && demoLinkToken) {
-      const q = new URLSearchParams({ token: demoLinkToken })
+    const link = file === 'index.html' ? demoLinkToken() : null
+    if (link) {
+      const q = new URLSearchParams({ token: link })
       out = out.replaceAll('href="echo.html"', `href="echo.html?${q}"`)
       const cq = new URLSearchParams(
-        demoWriteKey ? { token: demoLinkToken, key: demoWriteKey } : { token: demoLinkToken },
+        demoWriteKey ? { token: link, key: demoWriteKey } : { token: link },
       )
       out = out.replaceAll('href="clinician.html"', `href="clinician.html?${cq}"`)
     }
@@ -569,7 +593,10 @@ export async function createHttpServer(
   }
 
   function sendPage(res: ServerResponse, file: string, headOnly: boolean) {
-    let body = dressedPages.get(file)
+    // The landing page carries a freshly minted credential, so it is never cached;
+    // the other two are static bytes and are.
+    const cacheable = !(file === 'index.html' && demoSeed)
+    let body = cacheable ? dressedPages.get(file) : undefined
     if (!body) {
       let raw: Buffer
       try {
@@ -578,7 +605,7 @@ export async function createHttpServer(
         return json(res, 404, { error: 'not_found' })
       }
       body = Buffer.from(dressPage(file, raw.toString('utf8')), 'utf8')
-      dressedPages.set(file, body)
+      if (cacheable) dressedPages.set(file, body)
     }
     sendBuffer(res, body, 'text/html; charset=utf-8', headOnly)
   }

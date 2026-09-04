@@ -20,9 +20,15 @@ const HOST = process.env.HOST ?? '127.0.0.1'
 
 const srv = await createHttpServer({ port: PORT, host: HOST })
 
-/** One hour, the mintToken default. Long enough for a demo, short enough to be a token. */
+/**
+ * Twelve hours, matching the token the landing page hands its own links. One hour
+ * — the mintToken default — is shorter than the path a reader actually takes
+ * through this repo before clicking anything, and an expired link fails silently.
+ * Still short enough to be a token rather than a key.
+ */
+const LINK_TTL_SECONDS = 12 * 3600
 const token = (sub: string, scopes: string[]) =>
-  mintToken({ sub, scopes, audience: srv.resourceUrl })
+  mintToken({ sub, scopes, audience: srv.resourceUrl, ttlSeconds: LINK_TTL_SECONDS })
 
 const rayToken = token('echo-show', ['care.read.user'])
 const hostToken = token('alexa-host', ['care.read.user', 'care.read.assistant'])

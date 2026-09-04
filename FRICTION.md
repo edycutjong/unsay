@@ -172,7 +172,7 @@ ship believing the annotation is delivered.
 
 **Workaround.** Three, all in this repo. Authorization was already server-side (**F-002**), so
 nothing leaked. But `lastModified` was going to carry the staleness signal, and it cannot — so
-(a) the age is written into the **text body**, as a `[STALE — last changed 4 days ago by Dr Mensah,
+(a) the age is written into the **text body**, as a `[STALE — last changed 9 days ago by Dr Mensah,
 GP; say this age aloud]` header prepended to the value in the `resources/read` handler
 (`src/server.ts`); (b) the machine-readable copy moved to `_meta`, which `ResourceContents` *does*
 define — `unsay/version`, `unsay/versionHash`, `unsay/prevHash`, `unsay/audience`,

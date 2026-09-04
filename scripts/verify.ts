@@ -421,6 +421,12 @@ const headerOf = async (uri: string) => {
   return (r.contents[0] as { text: string }).text.split('\n')[0]!
 }
 
+/** The instruction itself — everything after the spoken-age header line. */
+const bodyOf = async (uri: string) => {
+  const r = await liveClient.readResource({ uri })
+  return (r.contents[0] as { text: string }).text.split('\n').slice(1).join('\n')
+}
+
 const liveHeaders: string[] = []
 for (const domain of ['weight_bearing', 'anticoagulant', 'exercise', 'contact']) {
   liveHeaders.push(await headerOf(uriFor(RAY, domain, 'user')))
@@ -435,6 +441,27 @@ check(
 const antiLive = await headerOf(uriFor(RAY, 'anticoagulant', 'user'))
 check('the anticoagulant record is past its review date on the default clock',
   antiLive.startsWith('[STALE'), antiLive)
+
+/**
+ * The header and the sentence underneath it have to agree. `staleAfter` was made
+ * relative to the injected clock and the record's own words were left pinned to
+ * "Stop date: 4 October 2026", so on every day but one the live server flagged a
+ * record as past its review date while its text named a stop date still in the
+ * future. Nothing above this line could see it: the flag was right, the sentence
+ * was wrong, and no assertion read the sentence.
+ */
+const antiBody = await bodyOf(uriFor(RAY, 'anticoagulant', 'user'))
+const stopDate = /Stop date: ([^.]+)\./.exec(antiBody)?.[1] ?? ''
+// Read as UTC, because the seed writes the date from UTC parts: parsing it as
+// local midnight would put the overshoot a day either side depending on where
+// the machine is, and this line is quoted in README.md and DEMO.md.
+const stopAt = Date.parse(`${stopDate} UTC`)
+const overshootDays = Math.floor((Date.now() - stopAt) / 86_400_000)
+check("the record's own text names a stop date that has already passed",
+  Number.isFinite(stopAt) && stopAt < Date.now(),
+  Number.isFinite(stopAt)
+    ? `the stop date in the value is ${overshootDays} days behind the default clock`
+    : `no parsable stop date in "${antiBody.slice(0, 60)}"`)
 
 const exLive = await headerOf(uriFor(RAY, 'exercise', 'user'))
 check('a fresh record is NOT flagged stale on the default clock',
