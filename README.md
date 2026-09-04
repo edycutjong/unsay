@@ -75,10 +75,12 @@ the database and simply moves the bytes.
 revision while the SSE stream is down and asserts it is replayed on `Last-Event-ID`:
 
 ```
-  offline window              804 ms
-  write → replayed at client  805 ms
+  offline window              810 ms
+  write → replayed at client  815 ms
   VERDICT: PASS   (6/6 checks)
 ```
+
+The two timings move run to run; the six checks do not.
 
 **The number**, from `npm run bench -- --n 200` — signed write → HMAC verified → store →
 notification → authorized re-read, 200 times:

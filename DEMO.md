@@ -218,14 +218,16 @@ notification is replayed.
   PASS  replay arrived on the resumed stream, not the old one
   PASS  chain advanced by exactly two versions
 
-  offline window              804 ms
-  write → replayed at client  805 ms
+  offline window              810 ms
+  write → replayed at client  815 ms
 
   VERDICT: PASS
 ```
 
-Exit code 0. Receipt: `docs/proof/resume.json`. The replay is checked against the **server-side**
-timestamp of the resume request, so a live send cannot be mistaken for a replay.
+Exit code 0. Receipt: `docs/proof/resume.json`. The two timings vary run to run — the client's
+reconnection delay is pinned at 800 ms so the probe stays quick — but the six checks do not. The
+replay is checked against the **server-side** timestamp of the resume request, so a live send
+cannot be mistaken for a replay.
 
 ---
 
