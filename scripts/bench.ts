@@ -168,6 +168,42 @@ writeFileSync(
   ) + '\n',
 )
 /**
+ * The two human-facing documents quote this table, and they used to transcribe it
+ * by hand — so the block in README.md and DEMO.md matched neither docs/proof/bench.txt
+ * nor any run that could be reproduced, while both documents asserted "that is the
+ * committed run". Writing them from here closes it structurally: the same run
+ * produces the receipt and the quote, and `test/docs.test.ts` fails if either is
+ * edited afterwards.
+ */
+const docBlock = [
+  `${'segment'.padEnd(30)}${'p50'.padStart(9)}${'p95'.padStart(11)}${'max'.padStart(11)}`,
+  row('signed write → notification', writeToNotify),
+  row('notification → re-read', notifyToRead),
+  '─'.repeat(61),
+  row('END-TO-END (write → value)', endToEnd),
+  '',
+  `retraction lands mid-sentence in ${midSentence}/${N} runs (${((midSentence / N) * 100).toFixed(0)}%)`,
+  `a host was subscribed for every run: ${subscribedEvery ? 'yes' : 'NO — the timings mean nothing'}`,
+].join('\n')
+
+/** Replaces the fenced block between the two bench markers, and nothing else. */
+function writeDocBlock(rel: string) {
+  const file = new URL(`../${rel}`, import.meta.url)
+  const body = readFileSync(file, 'utf8')
+  const marked = body.replace(
+    /(<!-- bench:begin[^>]*-->\n```\n)[\s\S]*?(\n```\n<!-- bench:end -->)/,
+    (_m, head: string, tail: string) => `${head}${docBlock}${tail}`,
+  )
+  if (marked === body) {
+    console.error(`bench: no bench:begin/bench:end block found in ${rel} — not updated`)
+    return
+  }
+  writeFileSync(file, marked)
+}
+writeDocBlock('README.md')
+writeDocBlock('DEMO.md')
+
+/**
  * The landing page prints these figures, and `file://` cannot fetch a sibling file,
  * so they have to live in the page. Writing them here rather than by hand is what
  * makes that safe: the page cannot drift from the receipt because the same run
@@ -193,7 +229,9 @@ const html = readFileSync(page, 'utf8')
   .replace(/(<span data-bench="n">)[^<]*/, `$1${shown.n}`)
 writeFileSync(page, html)
 
-console.log('\nreceipts → docs/proof/bench.txt · docs/proof/bench.json · web/index.html')
+console.log(
+  '\nreceipts → docs/proof/bench.txt · docs/proof/bench.json · web/index.html · README.md · DEMO.md',
+)
 
 await client.close()
 await srv.close()

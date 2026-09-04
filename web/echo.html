@@ -6,11 +6,22 @@
 <title>Unsay — Echo Show card</title>
 <meta name="description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#0B0D0E">
+<meta name="theme-color" content="#EDF0F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Unsay">
+<meta property="og:title" content="Unsay — Echo Show card">
+<meta property="og:description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
+<meta property="og:image" content="/og.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Unsay — Echo Show card">
+<meta name="twitter:description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
+<meta name="twitter:image" content="/og.svg">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 :root{
   --page:#0B0D0E; --panel:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
-  --ink:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --ink:#F2F4F5; --muted:#9BA3A8; --dim:#838C91;
   --amber:#F2A93B; --amber-ink:#F2A93B;
   --red:#D9564A; --red-ink:#E4695E;
   --green:#3F9E63; --green-ink:#5CB77E;
@@ -20,7 +31,7 @@
 @media (prefers-color-scheme: light){
   :root{
     --page:#EDF0F2; --panel:#FFFFFF; --raise:#F6F8F9; --line:#DDE2E5; --line-soft:#E7EBEE;
-    --ink:#0B0D0E; --muted:#4F5A60; --dim:#727E85;
+    --ink:#0B0D0E; --muted:#4F5A60; --dim:#5C686E;
     --amber:#DE8F13; --amber-ink:#845005;
     --red:#C0392B; --red-ink:#96291E;
     --green:#2C7A4B; --green-ink:#1D5734;
@@ -142,6 +153,16 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
 .note + .note{margin-top:10px}
 .chips{display:flex; gap:8px; flex-wrap:wrap; margin:18px 0 0}
 .chips .btn{font-size:13.5px}
+.disclaimer{margin:34px 0 0; padding:18px 0 0; border-top:1px solid var(--line-soft)}
+.disclaimer p{margin:0; color:var(--muted); font-size:14.5px; line-height:1.65; max-width:78ch}
+.disclaimer b{color:var(--ink); font-weight:600}
+.present-note{display:none}
+body.present .present-note{display:block; position:fixed; left:50%; top:14px; transform:translateX(-50%);
+  color:#5A6165; font-size:13px; letter-spacing:.05em; text-align:center}
+/* The system's own line, never a clinician's. Marked as such on screen, at a size
+   a person reads before they act on it. */
+.s-advice .src{display:block; font-size:20px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--s-dim); margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -215,10 +236,20 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
   <p class="note">Press <b>F</b> for presentation mode — the page chrome disappears and the device fills
     the display, which is what the demo video films. <a href="clinician.html">Open the clinician
     screen</a> in another window and publish a revision to watch this one retract.</p>
+  <footer class="disclaimer">
+    <p><b>Unsay relays what a clinician wrote. It does not generate clinical guidance and is not a
+      medical device.</b> Ray Dunn, Sarah Okafor and this care plan are a scenario; the seed record
+      is committed at <code>src/seed.ts</code>. The one line on this screen that no clinician wrote
+      is the review-date prompt, and it is labelled as the system speaking.</p>
+  </footer>
 </div>
 
 <div class="present-stage" id="presentStage"></div>
 <span class="exit-hint" id="exitHint" hidden>press F or Escape to leave presentation mode</span>
+<!-- Presentation mode hides the whole shell, and presentation mode is what the demo
+     video films. The disclaimer has to survive it or it is not on the artifact a
+     judge actually sees. -->
+<span class="present-note" id="presentNote" hidden>Unsay relays what a clinician wrote · not a medical device</span>
 
 <script>
 (() => {
@@ -274,6 +305,14 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
   $('forget').addEventListener('click', () => { tokenIn.value = ''; S.del('sessionStorage', 'unsay.token'); connect() })
 
   // ── a minimal MCP client over Streamable HTTP ────────────────────────────
+  /* MCP-CLIENT-CORE:begin
+     Everything between these two markers is lifted out VERBATIM by web/web.test.ts
+     and executed in Node against a live createHttpServer() — initialize, the SSE
+     framing, the session headers, a signed write, and the resulting
+     notifications/resources/updated. It is the second transport implementation in
+     this repo (npm run e2e drives the SDK's), it is the one the demo video films,
+     and it was the only one nothing ran. The test runs THESE bytes, not a copy.
+     Nothing in here may close over anything but base(), token() and PROTOCOL. */
   const mcp = { sid: null, proto: PROTOCOL, id: 0, lastEventId: null, streaming: false }
 
   function mcpHeaders(extra) {
@@ -344,6 +383,7 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
     method: 'POST', headers: mcpHeaders(),
     body: JSON.stringify({ jsonrpc: '2.0', method, params: params || {} }),
   })
+  /* MCP-CLIENT-CORE:end */
 
   // ── state ────────────────────────────────────────────────────────────────
   let live = false
@@ -549,8 +589,20 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
 
     const advice = $('sAdvice')
     if (current.stale) {
+      /**
+       * The ONE sentence on this screen that no clinician wrote. It used to read
+       * an unsourced instruction about the patient's medication, at 28px, which no
+       * record contained — on the most patient-facing surface in the product,
+       * on the page that carried no disclaimer. It is now framed as the system
+       * speaking about the RECORD rather than about the patient's medication, and
+       * it is labelled so on screen.
+       */
       advice.hidden = false
-      advice.textContent = 'Check with the ward before your next dose.'
+      advice.textContent = ''
+      advice.appendChild(el('span', 'src', 'unsay'))
+      advice.appendChild(document.createTextNode(
+        'This instruction is past its review date. Ask the ward to confirm it before you act on it.',
+      ))
     } else { advice.hidden = true; advice.textContent = '' }
   }
 
@@ -611,6 +663,7 @@ body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:transla
     const want = on === undefined ? !document.body.classList.contains('present') : on
     document.body.classList.toggle('present', want)
     $('exitHint').hidden = !want
+    $('presentNote').hidden = !want
     $('present').setAttribute('aria-pressed', String(want));
     (want ? stage : fit).appendChild(device)
     resize()

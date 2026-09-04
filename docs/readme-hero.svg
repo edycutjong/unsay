@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 480" width="1200" height="480" role="img"
+     aria-label="Alexa retracts mid-sentence: the old instruction struck through, the new one beneath it, and the protocol frames that caused it.">
+  <title>Unsay — the assistant that can be corrected</title>
+  <defs>
+    <style>
+      .b { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .m { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    </style>
+  </defs>
+  <rect width="1200" height="480" fill="#0B0D0E"/>
+  <rect x="40" y="40" width="700" height="400" rx="18" fill="#16191B" stroke="#262B2E"/>
+  <rect x="772" y="40" width="388" height="400" rx="18" fill="#16191B" stroke="#262B2E"/>
+
+  <!-- left: what Ray hears -->
+  <text class="b" x="76" y="86" font-size="13" letter-spacing="2.2" fill="#6E777C">RAY, FIVE DAYS AFTER A HIP REPLACEMENT</text>
+  <text class="b" x="76" y="124" font-size="21" fill="#9BA3A8">“Can I put weight on it yet?”</text>
+
+  <text class="b" x="76" y="188" font-size="25" fill="#6E777C">You can put about half your weight on it—</text>
+  <line x1="76" y1="180" x2="642" y2="180" stroke="#F2A93B" stroke-width="2.5" stroke-linecap="round"/>
+
+  <text class="b" x="76" y="252" font-size="34" font-weight="600" fill="#F2F4F5">Wait — don’t do that.</text>
+  <text class="b" x="76" y="298" font-size="27" fill="#F2F4F5">What I just told you is out of date.</text>
+  <text class="b" x="76" y="340" font-size="27" fill="#F2F4F5">Sarah Okafor, physio changed it just now:</text>
+  <text class="b" x="76" y="380" font-size="27" fill="#F2F4F5">full weight-bearing as tolerated.</text>
+
+  <circle cx="84" cy="410" r="7" fill="#F2A93B"/>
+  <text class="b" x="102" y="416" font-size="16" fill="#F2A93B">changed just now · care://ray/weight_bearing v3</text>
+
+  <!-- right: the protocol that caused it -->
+  <text class="b" x="806" y="86" font-size="13" letter-spacing="2.2" fill="#6E777C">THE FRAMES BEHIND IT</text>
+
+  <text class="m" x="806" y="140" font-size="14" fill="#6E777C">+0.00 ms</text>
+  <text class="m" x="806" y="164" font-size="15" fill="#F2F4F5">resources/subscribe</text>
+
+  <text class="m" x="806" y="212" font-size="14" fill="#6E777C">+0.00 ms</text>
+  <text class="m" x="806" y="236" font-size="15" fill="#F2A93B">notifications/resources/updated</text>
+
+  <text class="m" x="806" y="284" font-size="14" fill="#6E777C">p50, loopback</text>
+  <text class="m" x="806" y="308" font-size="15" fill="#F2F4F5">notification received by host</text>
+
+  <text class="m" x="806" y="356" font-size="14" fill="#6E777C">p50, end-to-end</text>
+  <text class="m" x="806" y="380" font-size="15" fill="#F2F4F5">resources/read → new value</text>
+
+  <line x1="806" y1="404" x2="1126" y2="404" stroke="#262B2E"/>
+  <text class="b" x="806" y="430" font-size="14" fill="#6E777C">Illustration of the mechanism · figures in docs/proof/bench.txt</text>
+</svg>

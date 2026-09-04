@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img"
+     aria-label="Unsay — an MCP server whose resources can be corrected mid-sentence.">
+  <title>Unsay — the assistant that can be corrected</title>
+  <defs>
+    <style>.b{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}</style>
+  </defs>
+  <rect width="1200" height="630" fill="#0B0D0E"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#F2A93B"/>
+
+  <g transform="translate(88,84)">
+    <text class="b" font-size="34" font-weight="640" letter-spacing="-1" fill="#F2F4F5">unsay</text>
+    <circle cx="112" cy="-10" r="7" fill="#F2A93B"/>
+  </g>
+
+  <text class="b" x="88" y="252" font-size="62" font-weight="660" letter-spacing="-2" fill="#F2F4F5">The assistant that can be corrected.</text>
+
+  <text class="b" x="88" y="330" font-size="30" fill="#9BA3A8">An MCP server whose resources can be revised mid-sentence — so an</text>
+  <text class="b" x="88" y="374" font-size="30" fill="#9BA3A8">assistant can stop, retract what it just said, and name what changed,</text>
+  <text class="b" x="88" y="418" font-size="30" fill="#9BA3A8">who changed it, and how long ago.</text>
+
+  <text class="b" x="88" y="502" font-size="27" fill="#838C91">You can put about half your weight on it—</text>
+  <line x1="88" y1="493" x2="628" y2="493" stroke="#F2A93B" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="96" cy="546" r="8" fill="#F2A93B"/>
+  <text class="b" x="118" y="554" font-size="24" fill="#F2A93B">Wait — don’t do that. Sarah Okafor, physio changed it just now.</text>
+
+  <text class="b" x="1112" y="554" font-size="20" text-anchor="end" fill="#838C91">Alexa+ · MCP 2025-11-25</text>
+</svg>

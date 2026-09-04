@@ -41,6 +41,17 @@ export interface NotifierOptions {
    */
   onRevision?: (uri: string) => void
   /**
+   * Re-authorization at SEND time, for the URI about to be named. Returning false
+   * drops the `updated` notification silently.
+   *
+   * A subscription is authorized once, when it is created; the principal behind the
+   * session can change afterwards. Delivering the URI to a principal that can no
+   * longer read it would confirm the resource exists — the one thing a `NotFound`
+   * read refuses to confirm. Defaults to "always allowed", which is correct for a
+   * server whose principals never narrow.
+   */
+  canNotify?: (uri: string) => boolean
+  /**
    * Failures that are not "nobody is connected". Defaults to `console.error`; pass
    * a no-op to stay silent, never to hide the fact that a host missed a correction.
    */
@@ -58,6 +69,7 @@ export class ResourceNotifier {
   readonly subscriptions = new Set<string>()
 
   #target: NotificationTarget
+  #canNotify: (uri: string) => boolean
   #onError: (error: unknown, uri: string | null) => void
   #offUpdated: Unsubscribe
   #offListChanged: Unsubscribe
@@ -65,12 +77,13 @@ export class ResourceNotifier {
 
   constructor(opts: NotifierOptions) {
     this.#target = opts.target
+    this.#canNotify = opts.canNotify ?? (() => true)
     this.#onError =
       opts.onError ??
       ((error, uri) => console.error(`[live-resources] notification failed${uri ? ` for ${uri}` : ''}:`, error))
 
     this.#offUpdated = opts.store.onUpdated((uri) => {
-      if (this.subscriptions.has(uri)) {
+      if (this.subscriptions.has(uri) && this.#canNotify(uri)) {
         this.#send(this.#target.sendResourceUpdated({ uri }), uri)
       }
       opts.onRevision?.(uri)

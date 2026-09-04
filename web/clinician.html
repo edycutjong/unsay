@@ -6,13 +6,24 @@
 <title>Unsay — clinician write screen</title>
 <meta name="description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#0B0D0E">
+<meta name="theme-color" content="#F3F5F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Unsay">
+<meta property="og:title" content="Unsay — clinician write screen">
+<meta property="og:description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
+<meta property="og:image" content="/og.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Unsay — clinician write screen">
+<meta name="twitter:description" content="One tap, one confirm. The physio revises Ray's plan and a subscribed assistant is corrected mid-sentence.">
+<meta name="twitter:image" content="/og.svg">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 :root{
   --bg:#0B0D0E; --surface:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
-  --text:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --text:#F2F4F5; --muted:#9BA3A8; --dim:#838C91;
   --amber:#F2A93B; --amber-ink:#F2A93B; --amber-wash:rgba(242,169,59,.10);
-  --red:#D9564A; --red-ink:#E4695E; --red-wash:rgba(217,86,74,.10);
+  --red:#D9564A; --red-ink:#F08074; --red-wash:rgba(217,86,74,.10);
   --green:#3F9E63; --green-ink:#5CB77E; --green-wash:rgba(63,158,99,.10);
   --accent:#5B8DEF; --accent-ink:#7FA6F3; --focus:#7FA6F3;
   --field:#101314;
@@ -20,7 +31,7 @@
 @media (prefers-color-scheme: light){
   :root{
     --bg:#F3F5F6; --surface:#FFFFFF; --raise:#F7F9FA; --line:#DDE2E5; --line-soft:#E7EBEE;
-    --text:#0B0D0E; --muted:#4F5A60; --dim:#727E85;
+    --text:#0B0D0E; --muted:#4F5A60; --dim:#5C686E;
     --amber:#DE8F13; --amber-ink:#845005; --amber-wash:rgba(222,143,19,.12);
     --red:#C0392B; --red-ink:#96291E; --red-wash:rgba(192,57,43,.09);
     --green:#2C7A4B; --green-ink:#1D5734; --green-wash:rgba(44,122,75,.10);
@@ -54,6 +65,14 @@ a:hover{border-bottom-color:var(--accent)}
 .status.down .led{background:var(--red)}
 .status.busy .led{background:var(--amber); animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* The only infinite animation on this page, and the only one of the three pages
+   with no reduced-motion path until now. */
+@media (prefers-reduced-motion: reduce){
+  .status.busy .led{animation:none; opacity:1}
+  summary::after{transition:none}
+  input,textarea,button{transition:none}
+}
 
 details.setup{margin:18px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:12px}
 details.setup[open]{border-color:var(--muted)}
@@ -228,8 +247,10 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
       it from its own clock. A writer that could set it could backdate a correction, and “how old is
       this instruction” is something the assistant says out loud.</p>
     <p>See the mechanism on the <a href="index.html">landing page</a>, or watch the correction land on
-      the <a href="echo.html">Echo Show screen</a>. Unsay relays what a clinician wrote; it does not
-      generate clinical guidance.</p>
+      the <a href="echo.html">Echo Show screen</a>.</p>
+    <p><b>Unsay relays what a clinician wrote. It does not generate clinical guidance and is not a
+      medical device.</b> Ray Dunn, Sarah Okafor and this care plan are a scenario; the seed record
+      is committed at <code>src/seed.ts</code>.</p>
   </div>
 </main>
 
@@ -520,6 +541,17 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
   }
 
   let openUri = null
+  /**
+   * The last write failure, held OUTSIDE the panel that renders it.
+   *
+   * The network-failure branch below builds the honest error receipt and then calls
+   * connect(), which re-renders the fact list and throws the receipt away in the
+   * same tick — so the one failure a judge is most likely to induce (kill the
+   * server, press Publish) was reported to nobody. The page had the right words
+   * written and destroyed them. Now render() re-emits this, so the message outlives
+   * the repaint that used to eat it.
+   */
+  let lastError = null    // { uri, head, sub }
 
   function banner() {
     const b = $('banner'); b.textContent = ''
@@ -581,7 +613,11 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
         tap.appendChild(head)
         tap.appendChild(el('p', 'val', f.text))
         tap.appendChild(meta)
-        tap.addEventListener('click', () => { openUri = openUri === f.uri ? null : f.uri; render() })
+        tap.addEventListener('click', () => {
+          openUri = openUri === f.uri ? null : f.uri
+          if (openUri !== f.uri) lastError = null
+          render()
+        })
         li.appendChild(tap)
         if (openUri === f.uri) li.appendChild(revisionPanel(f))
       } else {
@@ -635,16 +671,18 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
     const go = el('button', 'btn-primary'); go.type = 'button'
     go.textContent = state.live ? 'Publish revision' : 'Sign it anyway'
     const cancel = el('button', 'btn-ghost', 'Cancel'); cancel.type = 'button'
-    cancel.addEventListener('click', () => { openUri = null; render() })
+    cancel.addEventListener('click', () => { openUri = null; lastError = null; render() })
     const sig = el('span', 'sig')
     actions.append(go, cancel, sig)
     wrap.appendChild(actions)
 
     const out = el('div')
     wrap.appendChild(out)
+    if (lastError && lastError.uri === fact.uri) out.appendChild(bad(lastError.head, lastError.sub))
 
     go.addEventListener('click', async () => {
       out.textContent = ''
+      lastError = null
       if (!value.trim()) return out.appendChild(bad('Nothing to publish', 'The revised instruction is empty.'))
       if (value.trim() === fact.text.trim()) {
         return out.appendChild(bad('Unchanged',
@@ -700,8 +738,14 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
         text = await res.text()
       } catch (e) {
         go.disabled = false; go.textContent = label
-        out.appendChild(bad('The request never completed', String(e.message || e) +
-          '. If this page and the server are on different origins the browser needs CORS on /write, with X-Unsay-Signature and X-Unsay-Timestamp allowed on the preflight.'))
+        // Recorded before connect(), which repaints — see `lastError` above.
+        lastError = {
+          uri: fact.uri,
+          head: 'The request never completed',
+          sub: String(e.message || e) +
+            '. If this page and the server are on different origins the browser needs CORS on /write, with X-Unsay-Signature and X-Unsay-Timestamp allowed on the preflight.',
+        }
+        out.appendChild(bad(lastError.head, lastError.sub))
         connect(); return
       }
       const roundTrip = performance.now() - t0

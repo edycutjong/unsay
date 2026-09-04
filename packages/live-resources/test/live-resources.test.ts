@@ -418,6 +418,40 @@ describe('ResourceNotifier', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(Error), 'incident://inc-402/customer_note')
   })
 
+  it('re-checks authorization at SEND time, not only at subscribe time', () => {
+    /**
+     * A subscription is authorized once, when it is created — and the principal
+     * behind a session can narrow afterwards. Delivering the URI of a resource the
+     * caller can no longer read confirms that it EXISTS, which is what read()
+     * answers NotFound rather than confirm. The guard has to live at the send, or
+     * the existence-hiding property is applied inconsistently by accident.
+     */
+    const store = seeded()
+    const target = fakeServer()
+    let mayHearInternal = true
+    const notifier = new ResourceNotifier({
+      store,
+      target: target as NotificationTarget,
+      canNotify: (uri) => mayHearInternal || !uri.startsWith('incident-internal://'),
+    })
+    notifier.subscribe('incident-internal://inc-402/blast_radius')
+    notifier.subscribe('incident://inc-402/status')
+
+    store.publish(revision({ topic: 'blast_radius', audience: 'assistant', value: 'Expired signing key; rotation started.', writtenAt: at(13) }))
+    expect(target.updated).toEqual(['incident-internal://inc-402/blast_radius'])
+
+    mayHearInternal = false
+    store.publish(revision({ topic: 'blast_radius', audience: 'assistant', value: 'Expired signing key; rotation complete.', writtenAt: at(14) }))
+    expect(target.updated).toHaveLength(1) // nothing new — the URI was withheld
+
+    // …and the lane the caller CAN still read keeps working, or this is a mute button.
+    store.publish(revision({ value: 'Mitigated.', writtenAt: at(15) }))
+    expect(target.updated).toEqual([
+      'incident-internal://inc-402/blast_radius',
+      'incident://inc-402/status',
+    ])
+  })
+
   it('detaches from the store on dispose', () => {
     const store = seeded()
     const target = fakeServer()

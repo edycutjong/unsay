@@ -11,9 +11,13 @@
  * Sequence, all over real sockets with a real MCP client:
  *   1. subscribe, write revision A, receive it live      → the client now holds an event id
  *   2. drop the standalone SSE stream, as a proxy timeout would
- *   3. write revision B through POST /write while nothing is listening
+ *   3. write revisions B, C and D through POST /write while nothing is listening
  *   4. the client reconnects with Last-Event-ID
- *   5. ASSERT the missed notifications/resources/updated is replayed
+ *   5. ASSERT all three missed notifications/resources/updated are replayed, in order
+ *
+ * Three and not one: a replay that delivers the LAST missed notification and drops
+ * the ones before it would pass a single-revision probe and lose the middle of a
+ * clinician's correction sequence in the field.
  *
  * LESSONS R10: an unexercised seam is a missing feature.
  *
@@ -92,7 +96,7 @@ const token = mintToken({
 
 const checks: [string, boolean][] = []
 const timing = { offlineWindowMs: -1, writeToReplayedAtClientMs: -1 }
-let revisions: { live: number; missed: number } | null = null
+let revisions: { live: number; missed: number[]; missedCount: number } | null = null
 let error: string | null = null
 
 try {
@@ -128,15 +132,27 @@ try {
   const droppedAt = Date.now()
   log('  SSE stream dropped          (as a proxy or a domestic wifi blip would)')
 
-  // ── 3. the physio writes into the dark ─────────────────────────────────────
-  const revB = await write('Full weight-bearing as tolerated.')
+  // ── 3. the physio writes into the dark, three times ────────────────────────
+  const dark = []
+  for (const value of [
+    'Full weight-bearing as tolerated.',
+    'Full weight-bearing as tolerated. Use one stick outdoors.',
+    'Full weight-bearing as tolerated. Use one stick outdoors, and none indoors.',
+  ]) {
+    dark.push(await write(value))
+  }
   const wroteAt = Date.now()
-  revisions = { live: revA.version, missed: revB.version }
+  const last = dark.at(-1)!
+  revisions = {
+    live: revA.version,
+    missed: dark.map((r) => r.version),
+    missedCount: dark.length,
+  }
   checks.push([
-    'revision B written while the stream was down',
+    `${dark.length} revisions written while the stream was down`,
     srv.stats.sseResumes === resumesBefore && updates.length === 1,
   ])
-  log(`  revision B                  v${revB.version} · written with nothing listening`)
+  log(`  revisions B–D               v${dark[0]!.version}–v${last.version} · written with nothing listening`)
 
   // ── 4 & 5. the client comes back with Last-Event-ID ────────────────────────
   const resumed = await waitFor(() => srv.stats.sseResumes > resumesBefore, 10_000)
@@ -144,12 +160,19 @@ try {
   // Server-side timestamp of the resume request itself. Polling for it here would
   // read later than it happened and could make a genuine replay look like a live send.
   const resumedAt = srv.stats.lastResumeAt
-  const replayed = await waitFor(() => updates.length >= 2, 10_000)
-  const replayedAt = updates[1]?.at ?? 0
+  const want = 1 + dark.length
+  const replayed = await waitFor(() => updates.length >= want, 10_000)
+  const replayedAt = updates.at(-1)?.at ?? 0
 
-  checks.push(['missed notifications/resources/updated replayed', replayed && updates[1]?.uri === WB])
+  checks.push([
+    `all ${dark.length} missed notifications/resources/updated replayed`,
+    replayed && updates.slice(1).every((u) => u.uri === WB),
+  ])
   checks.push(['replay arrived on the resumed stream, not the old one', replayed && replayedAt >= resumedAt])
-  checks.push(['chain advanced by exactly two versions', revB.version === revA.version + 1])
+  checks.push([
+    `chain advanced by exactly ${dark.length + 1} versions`,
+    last.version === revA.version + dark.length,
+  ])
 
   timing.offlineWindowMs = resumedAt - droppedAt
   timing.writeToReplayedAtClientMs = replayedAt - wroteAt
@@ -166,7 +189,10 @@ if (timing.offlineWindowMs >= 0) {
   log(`\n  offline window              ${timing.offlineWindowMs} ms`)
   log(`  write → replayed at client  ${timing.writeToReplayedAtClientMs} ms`)
 }
-log(`\n  VERDICT: ${pass ? 'PASS' : 'FAIL'}`)
+// The count is printed by the script so a document can quote it truthfully. It
+// used to be added by hand in README.md, which is a fabricated line inside a fenced
+// block a judge is invited to reproduce.
+log(`\n  VERDICT: ${pass ? 'PASS' : 'FAIL'}   (${checks.filter(([, ok]) => ok).length}/${checks.length} checks)`)
 
 mkdirSync('docs/proof', { recursive: true })
 writeFileSync(

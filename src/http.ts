@@ -15,6 +15,7 @@
  *   GET  /verify                                      public  — replay the hash chain
  *   GET  /health                                      public
  *   GET  / · /index.html · /clinician.html · /echo.html   public — the three surfaces
+ *   GET  /README.md · /DEMO.md · /FRICTION.md · /docs/proof/*  public — what the pages cite
  *   OPTIONS *                                         public  — CORS preflight
  *
  * The three pages in `web/` are served from this process on purpose. They are real
@@ -318,12 +319,22 @@ export async function createHttpServer(
   // be sealed afterwards, and a KMS provider that cannot reach AWS must stop the
   // process here rather than quietly serve unencrypted records.
   const envelope = opts.envelope !== undefined ? opts.envelope : await envelopeFromEnv()
-  const store = opts.store ?? seedDemo(new LiveResourceStore({ envelope: envelope ?? undefined }))
+  /**
+   * The clock is resolved BEFORE the store, and the store is seeded from it.
+   *
+   * It used to be the other way round: `seedDemo()` stamped every record at the
+   * pinned DEMO_NOW while the server read the wall clock, so `npm start` — the one
+   * command DEMO.md sends a judge to — served `[changed -32d ago by …]` and the
+   * self-announcing-staleness feature was silently dead on the live process. Every
+   * gate passed, because verify/e2e/bench all pass an explicit clock and the
+   * entrypoint's own was the only one nobody exercised. LESSONS R11.
+   */
+  const now = opts.now ?? (() => new Date())
+  const store = opts.store ?? seedDemo(new LiveResourceStore({ envelope: envelope ?? undefined }), { now: now() })
   // Read back off the store, not off `envelope`: a caller that passed its own
   // pre-sealed store must not be described by an option it never used.
   const atRest = startupLine(store.envelope)
   const audit = opts.audit ?? new AuditLog({ sink: process.env.UNSAY_AUDIT_LOG })
-  const now = opts.now ?? (() => new Date())
   const secrets = { token: opts.tokenSecret ?? tokenSecret(), write: opts.writeSecret ?? writeSecret() }
   const events = new MemoryEventStore()
   const serveWeb = opts.serveWeb !== false
@@ -380,6 +391,8 @@ export async function createHttpServer(
     if (serveWeb && (req.method === 'GET' || req.method === 'HEAD')) {
       const page = STATIC_PAGES[path === '/' ? '/index.html' : path]
       if (page) return sendPage(res, page, req.method === 'HEAD')
+      const repoFile = REPO_FILES[path]
+      if (repoFile) return sendFile(res, repoFile, REPO_FILE_TYPE(repoFile), req.method === 'HEAD')
     }
 
     if (path === '/.well-known/oauth-protected-resource' ||
@@ -464,6 +477,11 @@ export async function createHttpServer(
     const built = buildServer({
       store,
       principal: () => currentPrincipal.getStore() ?? session.principal,
+      // The SDK files a `logging/setLevel` under the transport session id and
+      // filters outgoing log messages with the same id. Assigned in
+      // `onsessioninitialized` above, so it is empty only before initialize —
+      // when there is no level to honour yet either.
+      sessionId: () => session.id || undefined,
       now,
     })
 
@@ -614,6 +632,17 @@ export async function createHttpServer(
     if (!patient || !domain || !value || !authorId || !authorLabel) {
       return rejectWrite(res, 'invalid_fields', via, actor)
     }
+    /**
+     * A path segment cannot contain the path separator, and `|` is the AAD
+     * separator the envelope reserves. Without this check `patient: "ray/evil"`
+     * publishes a record at `care://ray/evil/d` that `parseUri()` then reads as a
+     * malformed version segment and refuses forever: append-only, unreadable,
+     * uncorrectable, and still occupying a cursor page. A write nobody can ever
+     * revise is the opposite of this product.
+     */
+    if (/[/|]/.test(patient) || /[/|]/.test(domain)) {
+      return rejectWrite(res, 'invalid_fields', via, actor)
+    }
 
     try {
       // writtenAt is the SERVER clock. A writer that could set it could backdate
@@ -630,7 +659,20 @@ export async function createHttpServer(
         priority: typeof body.priority === 'number' ? body.priority : undefined,
       })
       const uri = `${audience === 'assistant' ? 'care-internal://' : 'care://'}${patient}/${domain}`
-      audit.append({ outcome: 'accepted', reason: 'ok', via, actor: authorId, uri })
+      /**
+       * The audit actor is the VERIFIED principal wherever one exists, never the
+       * body's `authorId`.
+       *
+       * This used to log `authorId`, which on the bearer path silently discarded
+       * `p.sub` — so a `care.write` holder could name any clinician as the author
+       * and the trail recorded the impersonated name while the real principal
+       * appeared in no row at all. SPEC I-14 promises every write attempt is
+       * attributable; that promise was false on exactly the path where an identity
+       * had been proved. The claimed author still reaches the record and the hash
+       * chain (T-4: one shared write secret means `authorId` is claimed, not
+       * proven) — but the row now says who actually presented a credential.
+       */
+      audit.append({ outcome: 'accepted', reason: 'ok', via, actor: actor ?? authorId, uri })
       stats.writesAccepted++
       // Counted, not asserted. This used to be a constant `true`, which says a
       // notification was DISPATCHED — a clinician receipt that renders "a host was
@@ -648,7 +690,7 @@ export async function createHttpServer(
       })
     } catch {
       // The store refuses an audience flip on an existing chain (store.publish).
-      audit.append({ outcome: 'rejected', reason: 'store_rejected', via, actor: authorId })
+      audit.append({ outcome: 'rejected', reason: 'store_rejected', via, actor: actor ?? authorId })
       stats.writesRejected++
       return json(res, 409, { error: 'conflict' })
     }
@@ -760,9 +802,9 @@ export async function createHttpServer(
 // ── the three surfaces, served from this process ─────────────────────────────
 
 /**
- * An allowlist, not a directory walk. Three files are the whole surface, so there
- * is nothing for `..` to reach and no code path that maps a request path onto the
- * filesystem — the classic static-server traversal bug cannot be written here.
+ * An allowlist, not a directory walk. Every servable path is a literal key here, so
+ * there is nothing for `..` to reach and no code path that maps a request path onto
+ * the filesystem — the classic static-server traversal bug cannot be written here.
  */
 const STATIC_PAGES: Record<string, string> = {
   '/index.html': 'index.html',
@@ -770,26 +812,70 @@ const STATIC_PAGES: Record<string, string> = {
   '/echo.html': 'echo.html',
 }
 
+/**
+ * The documents and receipts the landing page CITES, served from the same origin.
+ *
+ * Without these the flagship "Proof" section rendered four amber lines reading
+ * "Not reachable from this deployment" under `npm start` — the exact command
+ * DEMO.md sends a judge to — and every link in the footer answered
+ * `{"error":"not_found"}`. The artifacts were on disk the whole time; the server
+ * simply had no route to them. Read-only, still an allowlist, still no path
+ * arithmetic.
+ */
+const REPO_FILES: Record<string, string> = {
+  '/README.md': 'README.md',
+  '/DEMO.md': 'DEMO.md',
+  '/ARCHITECTURE.md': 'ARCHITECTURE.md',
+  '/FRICTION.md': 'FRICTION.md',
+  '/LICENSE': 'LICENSE',
+  '/docs/SPEC.md': 'docs/SPEC.md',
+  '/docs/proof/bench.txt': 'docs/proof/bench.txt',
+  '/docs/proof/verify.json': 'docs/proof/verify.json',
+  '/docs/proof/bench.json': 'docs/proof/bench.json',
+  '/docs/proof/live_run.jsonl': 'docs/proof/live_run.jsonl',
+  '/docs/proof/probe_subscribe.json': 'docs/proof/probe_subscribe.json',
+  '/docs/proof/resume.json': 'docs/proof/resume.json',
+  '/skill/SKILL.md': 'skill/SKILL.md',
+  '/icon.svg': 'docs/icon.svg',
+  '/og.svg': 'docs/og.svg',
+  '/packages/live-resources/src/store.ts': 'packages/live-resources/src/store.ts',
+  '/src/server.ts': 'src/server.ts',
+  '/src/http.ts': 'src/http.ts',
+}
+
+/**
+ * Served as text, deliberately, including the `.ts` files: a judge following a
+ * link from the page wants to READ the enforcement point, not download it.
+ */
+const REPO_FILE_TYPE = (file: string) =>
+  file.endsWith('.json') ? 'application/json; charset=utf-8'
+    : file.endsWith('.svg') ? 'image/svg+xml; charset=utf-8'
+    : 'text/plain; charset=utf-8'
+
 const pageCache = new Map<string, Buffer>()
 
-function sendPage(res: ServerResponse, file: string, headOnly: boolean) {
-  let body = pageCache.get(file)
+function sendFile(res: ServerResponse, rel: string, contentType: string, headOnly: boolean) {
+  let body = pageCache.get(rel)
   if (!body) {
     try {
-      body = readFileSync(new URL(`../web/${file}`, import.meta.url))
+      body = readFileSync(new URL(`../${rel}`, import.meta.url))
     } catch {
       return json(res, 404, { error: 'not_found' })
     }
-    pageCache.set(file, body)
+    pageCache.set(rel, body)
   }
   res.writeHead(200, {
-    'content-type': 'text/html; charset=utf-8',
+    'content-type': contentType,
     'content-length': body.length,
     // The pages are the demo surface and change with every deploy; a cached copy
     // pointing at a stale bench number is worse than a re-fetch of 30 kB.
     'cache-control': 'no-cache',
   })
   headOnly ? res.end() : res.end(body)
+}
+
+function sendPage(res: ServerResponse, file: string, headOnly: boolean) {
+  sendFile(res, `web/${file}`, 'text/html; charset=utf-8', headOnly)
 }
 
 // ── small helpers ───────────────────────────────────────────────────────────

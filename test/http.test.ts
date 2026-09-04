@@ -9,7 +9,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { ResourceUpdatedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
+import {
+  LoggingMessageNotificationSchema,
+  ResourceUpdatedNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js'
 
 import { AuditLog } from '../src/audit.ts'
 import { Envelope, LocalKeyProvider } from '../src/envelope.ts'
@@ -23,6 +26,7 @@ import {
 import type { UnsayHttpServer } from '../src/http.ts'
 import { LiveResourceStore, uriFor } from '../src/store.ts'
 import { RAY, seedDemo } from '../src/seed.ts'
+import { SCOPE } from '../src/types.ts'
 
 const TOKEN_SECRET = 'test-token-secret'
 const WRITE_SECRET = 'test-write-secret'
@@ -456,10 +460,37 @@ describe('the three pages are served from this process', () => {
     }
   })
 
+  it('serves the documents the landing page cites, so no proof link is a dead end', async () => {
+    // Under `npm start` these used to 404, and the page's own probe then rendered
+    // four amber "Not reachable from this deployment" lines under the section whose
+    // job is to prove rigour. The artifacts were on disk the whole time.
+    for (const [path, needle] of [
+      ['/README.md', 'Unsay'],
+      ['/DEMO.md', 'npm run verify'],
+      ['/FRICTION.md', 'F-002'],
+      ['/LICENSE', 'MIT'],
+      ['/skill/SKILL.md', 'unsay-care-plan'],
+      ['/docs/proof/bench.txt', 'lands mid-sentence'],
+      ['/packages/live-resources/src/store.ts', 'read('],
+    ] as const) {
+      const res = await fetch(`${srv.baseUrl}${path}`)
+      expect(res.status, path).toBe(200)
+      expect(await res.text(), path).toContain(needle)
+    }
+  })
+
   it('maps no request path onto the filesystem', async () => {
-    // The router serves an allowlist of three names, so there is nothing for a
-    // traversal to reach — asserted rather than assumed.
-    for (const path of ['/../package.json', '/..%2fpackage.json', '/src/http.ts', '/.env']) {
+    // Both allowlists are literal key tables, so there is nothing for a traversal to
+    // reach and no sibling of a listed file comes with it — asserted, not assumed.
+    for (const path of [
+      '/../package.json',
+      '/..%2fpackage.json',
+      '/package.json',
+      '/.env',
+      '/src/envelope.ts',        // a sibling of the two source files that ARE listed
+      '/docs/proof/../../package.json',
+      '/web/index.html',         // the page is at /index.html; the path is not a directory
+    ]) {
       const res = await fetch(`${srv.baseUrl}${path}`)
       expect(res.status, path).not.toBe(200)
     }
@@ -590,5 +621,217 @@ describe('/verify carries an at-rest receipt read from the stored bytes', () => 
     const text = await res.text()
     expect(text).not.toContain('Rivaroxaban')
     expect(text).not.toContain('Fall risk')
+  })
+})
+
+describe('logging/setLevel is honoured, not merely served', () => {
+  /**
+   * Declaring the `logging` capability makes the SDK answer `logging/setLevel` with
+   * `{}` — a success result — whether or not anything filters. This server used to
+   * return that success and then deliver every notice regardless, because
+   * `sendLoggingMessage()` was called with no session id and the SDK's per-session
+   * level filter therefore looked up `undefined` and missed every time.
+   *
+   * ARCHITECTURE.md told a judge "a host can turn the revision log down". This is
+   * the test that makes that sentence true, and R10 in one line: a declared
+   * capability nothing exercises is a capability that is not there.
+   */
+  let own: UnsayHttpServer
+  beforeAll(async () => {
+    own = await createHttpServer({
+      store: seedDemo(new LiveResourceStore()),
+      tokenSecret: TOKEN_SECRET,
+      writeSecret: WRITE_SECRET,
+      announce: false,
+    })
+  })
+  afterAll(async () => {
+    await own.close()
+  })
+
+  async function attach() {
+    const client = new Client({ name: 'unsay-log-test', version: '0.0.0' }, { capabilities: {} })
+    const logs: string[] = []
+    const updates: string[] = []
+    client.setNotificationHandler(LoggingMessageNotificationSchema, (n) => {
+      logs.push(n.params.level)
+    })
+    client.setNotificationHandler(ResourceUpdatedNotificationSchema, (n) => {
+      updates.push(n.params.uri)
+    })
+    const before = own.stats.sseOpens
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${own.baseUrl}/mcp`), {
+        requestInit: {
+          headers: {
+            Authorization: `Bearer ${mintToken({
+              sub: 'log-host',
+              scopes: ['care.read.user', 'care.read.assistant'],
+              audience: own.resourceUrl,
+              secret: TOKEN_SECRET,
+            })}`,
+          },
+        },
+      }),
+    )
+    while (own.stats.sseOpens <= before) await sleep(10)
+    await sleep(60)
+    await client.subscribeResource({ uri: WB })
+    return { client, logs, updates }
+  }
+
+  const revise = (value: string) =>
+    own.store.publish({
+      subject: RAY,
+      topic: 'weight_bearing',
+      audience: 'user',
+      value,
+      authorId: 'okafor',
+      authorLabel: 'Sarah Okafor, physio',
+      writtenAt: new Date().toISOString(),
+    })
+
+  it('delivers the revision notice at the default level', async () => {
+    const { client, logs } = await attach()
+    try {
+      revise('Full weight-bearing as tolerated. (default level)')
+      await waitFor(() => logs.length > 0)
+      expect(logs).toContain('notice')
+    } finally {
+      await client.close()
+    }
+  })
+
+  it('suppresses it at emergency, and still delivers resources/updated', async () => {
+    const { client, logs, updates } = await attach()
+    try {
+      await client.setLoggingLevel('emergency')
+      const logsBefore = logs.length
+      const updatesBefore = updates.length
+      revise('Full weight-bearing as tolerated. (emergency level)')
+      await waitFor(() => updates.length > updatesBefore)
+      await sleep(120) // give a stray log message time to arrive and fail this
+      expect(logs.length, 'a notice survived level:emergency').toBe(logsBefore)
+      // The correction itself must NOT be suppressed with it: a host that turned
+      // the log channel down still has to be able to retract.
+      expect(updates.at(-1)).toBe(WB)
+    } finally {
+      await client.close()
+    }
+  })
+
+  it('does not let one session mute another', async () => {
+    // The level is filed per transport session id. A server that stored one global
+    // level would let a logging sidecar silence the device screen's channel.
+    const quiet = await attach()
+    const loud = await attach()
+    try {
+      await quiet.client.setLoggingLevel('emergency')
+      const quietBefore = quiet.logs.length
+      revise('Full weight-bearing as tolerated. (two sessions)')
+      await waitFor(() => loud.logs.length > 0)
+      await sleep(120)
+      expect(quiet.logs.length).toBe(quietBefore)
+      expect(loud.logs.length).toBeGreaterThan(0)
+    } finally {
+      await quiet.client.close()
+      await loud.client.close()
+    }
+  })
+})
+
+describe('/write attributes to the principal it verified', () => {
+  let own: UnsayHttpServer
+  let ownAudit: AuditLog
+  beforeAll(async () => {
+    ownAudit = new AuditLog()
+    own = await createHttpServer({
+      store: seedDemo(new LiveResourceStore()),
+      audit: ownAudit,
+      tokenSecret: TOKEN_SECRET,
+      writeSecret: WRITE_SECRET,
+      announce: false,
+    })
+  })
+  afterAll(async () => {
+    await own.close()
+  })
+
+  const bearerWrite = (body: Record<string, unknown>, sub: string) =>
+    fetch(`${own.baseUrl}/write`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${mintToken({
+          sub,
+          scopes: ['care.write'],
+          audience: own.resourceUrl,
+          secret: TOKEN_SECRET,
+        })}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+  it('records the verified token subject, not the authorId in the body', async () => {
+    /**
+     * The forgery this closes: a `care.write` holder posts `authorId: "adeyemi"`,
+     * the write is accepted, and the audit row names Mr Adeyemi while the principal
+     * that actually presented a credential appears in no row at all. SPEC I-14
+     * promises every write attempt is attributable — on the one path where an
+     * identity HAD been proved, the proof was being thrown away.
+     */
+    const res = await bearerWrite(
+      {
+        patient: RAY,
+        domain: 'weight_bearing',
+        audience: 'user',
+        value: 'Full weight-bearing as tolerated. (impersonation attempt)',
+        authorId: 'adeyemi',
+        authorLabel: 'Mr Adeyemi, surgical team',
+      },
+      'mallory',
+    )
+    expect(res.status).toBe(200)
+    const row = ownAudit.last()!
+    expect(row.via).toBe('bearer')
+    expect(row.actor).toBe('mallory')
+    expect(row.actor).not.toBe('adeyemi')
+  })
+
+  it('still lets the claimed author reach the record, which the chain then freezes', async () => {
+    // T-4, unchanged and still disclosed: with one shared write secret `authorId`
+    // is CLAIMED. What changed is that the claim no longer erases the verified
+    // identity from the trail.
+    const latest = own.store.versions(RAY, 'weight_bearing').at(-1)!
+    expect(latest.authorLabel).toBe('Mr Adeyemi, surgical team')
+  })
+
+  it('refuses a patient or domain carrying a path separator', async () => {
+    /**
+     * `patient: "ray/evil"` used to publish `care://ray/evil/d`, which parseUri()
+     * then reads as a malformed version segment and refuses forever — an
+     * append-only record nobody can read or supersede, still occupying a cursor
+     * page. `|` was already refused because the envelope reserves it as the AAD
+     * separator; `/` was not.
+     */
+    for (const body of [
+      { patient: 'ray/evil', domain: 'weight_bearing' },
+      { patient: RAY, domain: 'weight_bearing/v99' },
+    ]) {
+      const res = await bearerWrite(
+        {
+          ...body,
+          audience: 'user',
+          value: 'Full weight-bearing as tolerated.',
+          authorId: 'okafor',
+          authorLabel: 'Sarah Okafor, physio',
+        },
+        'okafor',
+      )
+      expect(res.status, JSON.stringify(body)).toBe(401)
+      expect(ownAudit.last()!.reason).toBe('invalid_fields')
+    }
+    const uris = own.store.list({ sub: 't', scopes: [SCOPE.user] }).map((x) => x.uri)
+    expect(uris.some((u) => u.includes('evil') || u.includes('v99'))).toBe(false)
   })
 })

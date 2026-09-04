@@ -15,16 +15,27 @@
  * Run: npm run e2e
  * Encrypted at rest: UNSAY_KEY_PROVIDER=local UNSAY_MASTER_KEY=$(npm run -s keygen) npm run e2e
  */
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { ResourceUpdatedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
+import {
+  LoggingMessageNotificationSchema,
+  ResourceUpdatedNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js'
 
 import { DEV_WRITE_SECRET, createHttpServer, mintToken, signWriteBody } from '../src/http.ts'
 import { LiveResourceStore, uriFor } from '../src/store.ts'
 import { envelopeFromEnv } from '../src/envelope.ts'
 import { DEMO_NOW, RAY, STAGED_REVISION, seedDemo } from '../src/seed.ts'
+import { UI_ECHO_URI, UI_MIME_TYPE } from '../src/ui_resource.ts'
+
+/**
+ * The Alexa+ track's one hard eligibility requirement, asserted rather than
+ * inferred from a caret range in package.json: "a self-hosted MCP server,
+ * implementing MCP spec version 2025-11-25 (minimum) over Streamable HTTP".
+ */
+const REQUIRED_PROTOCOL = '2025-11-25'
 
 const WB = uriFor(RAY, 'weight_bearing', 'user')
 const RISK = uriFor(RAY, 'risk', 'assistant')
@@ -50,7 +61,62 @@ const rec = (event: string, data: Record<string, unknown>) => {
   frames.push({ t: new Date().toISOString(), event, ...data })
 }
 
+/** The Agent Skill shipped alongside the server — the other Alexa+ deliverable. */
+const skillBytes = readFileSync(new URL('../skill/SKILL.md', import.meta.url)).length
+
 const say = (s: string) => console.log(s)
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Polls a predicate to a deadline. A timeout returns false; it never throws. */
+async function waitFor(pred: () => boolean, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (!pred()) {
+    if (Date.now() > deadline) return false
+    await sleep(10)
+  }
+  return true
+}
+
+/** A correctly signed POST /write for the weight-bearing chain. */
+function signedRevision(value: string): RequestInit {
+  const raw = Buffer.from(
+    JSON.stringify({
+      patient: RAY,
+      domain: STAGED_REVISION.topic,
+      audience: STAGED_REVISION.audience,
+      value,
+      authorId: STAGED_REVISION.authorId,
+      authorLabel: STAGED_REVISION.authorLabel,
+      priority: STAGED_REVISION.priority,
+    }),
+    'utf8',
+  )
+  const ts = now().toISOString()
+  return {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-unsay-timestamp': ts,
+      'x-unsay-signature': signWriteBody(WRITE_SECRET, ts, raw),
+    },
+    body: raw,
+  }
+}
+
+/** Soft-wrap a spoken sentence so the transcript stays readable in a terminal. */
+function wrap(text: string, width: number): string[] {
+  const out: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    if (line && line.length + word.length + 1 > width) {
+      out.push(line)
+      line = word
+    } else line = line ? `${line} ${word}` : word
+  }
+  if (line) out.push(line)
+  return out
+}
 say('unsay · end-to-end · the demo as code\n')
 say(`  ${srv.atRest}`)
 
@@ -78,20 +144,28 @@ let resolveNotified: () => void
 const notified = new Promise<void>((r) => {
   resolveNotified = r
 })
+let updates = 0
 client.setNotificationHandler(ResourceUpdatedNotificationSchema, () => {
+  updates++
   notifiedAt = performance.now()
   resolveNotified()
 })
-await client.connect(
-  new StreamableHTTPClientTransport(new URL(`${srv.baseUrl}/mcp`), {
-    requestInit: { headers: { Authorization: `Bearer ${hostToken}` } },
-  }),
-)
+let logMessages = 0
+client.setNotificationHandler(LoggingMessageNotificationSchema, () => {
+  logMessages++
+})
+const transport = new StreamableHTTPClientTransport(new URL(`${srv.baseUrl}/mcp`), {
+  requestInit: { headers: { Authorization: `Bearer ${hostToken}` } },
+})
+await client.connect(transport)
 
-// 1 — capability negotiation
+// 1 — capability negotiation, and the eligibility requirement
 const caps = client.getServerCapabilities()
-rec('initialize', { capabilities: caps })
-say(`\n  capabilities.resources    ${JSON.stringify(caps?.resources)}`)
+const negotiated = transport.protocolVersion ?? ''
+const specOk = negotiated >= REQUIRED_PROTOCOL
+rec('initialize', { capabilities: caps, protocolVersion: negotiated })
+say(`\n  protocolVersion           ${negotiated}${specOk ? ` ≥ ${REQUIRED_PROTOCOL} — Alexa+ track minimum` : ` — BELOW the ${REQUIRED_PROTOCOL} minimum`}`)
+say(`  capabilities.resources    ${JSON.stringify(caps?.resources)}`)
 say(`  completions · prompts     ${caps?.completions ? 'declared' : 'absent'} · ${caps?.prompts ? 'declared' : 'absent'}`)
 say(`  logging                   ${caps?.logging ? 'declared' : 'absent'}`)
 say(`  instructions              ${client.getInstructions() ? 'present' : 'absent'}`)
@@ -112,6 +186,14 @@ do {
 } while (cursor)
 rec('resources/list', { pages, uris: listed })
 say(`  resources/list            ${listed.length} resources over ${pages} cursor page(s)`)
+
+// 2b — the Alexa+ card, delivered THROUGH MCP rather than by a static HTTP route
+const card = await client.readResource({ uri: UI_ECHO_URI })
+const cardPart = card.contents[0] as { mimeType?: string; text?: string }
+const uiOk = cardPart?.mimeType === UI_MIME_TYPE && (cardPart.text ?? '').includes('<!doctype html>')
+rec('resources/read', { uri: UI_ECHO_URI, mimeType: cardPart?.mimeType, bytes: (cardPart.text ?? '').length })
+say(`  read  ${UI_ECHO_URI}   ← ${cardPart?.mimeType} · ${(cardPart.text ?? '').length} bytes · MCP Apps card`)
+say(`  agent skill               skill/SKILL.md — ${skillBytes} bytes, the same two rules as instructions`)
 
 // 3 — completion using context.arguments (the near-unused surface)
 const comp = await client.complete({
@@ -234,12 +316,29 @@ const corrected = afterText.includes(STAGED_REVISION.value)
 const chained = afterMeta['unsay/prevHash'] === beforeMeta['unsay/versionHash']
 rec('resources/read', { uri: WB, afterCorrection: true, value: STAGED_REVISION.value, chained })
 
+/**
+ * The retraction is READ OFF THE SERVER, not typed into this script. It used to be
+ * a string literal here, a different literal in DEMO.md and a third in
+ * web/index.html — three wordings of the one artifact the product is named for,
+ * generated by nothing. src/retraction.ts owns it now and this line prints it.
+ */
+const spoken = String(afterMeta['unsay/retraction'] ?? '')
+const withdrawn = beforeText.split('\n')[1]!.replace(/\.$/, '')
+const retractionOk =
+  // withdraws before it explains, names the sentence being dropped, names the one
+  // that replaced it, and names who changed it — the four things a retraction is
+  spoken.startsWith('Wait') &&
+  spoken.includes(withdrawn) &&
+  spoken.includes(STAGED_REVISION.value.replace(/\.$/, '')) &&
+  spoken.includes(STAGED_REVISION.authorLabel)
+rec('unsay/retraction', { uri: WB, rendered: spoken, from: 'src/retraction.ts' })
+
 say(`\n  POST /write               HTTP ${writeRes.status} · v${written.version} · ${written.subscribers} subscribed host(s)`)
 say(`  notifications/resources/updated  ${latencyMs.toFixed(2)} ms`)
 say(`  ALEXA "You can put about half your weight on it—"`)
-say(`        "—actually, stop. That changed just now."`)
-say(`        "${STAGED_REVISION.authorLabel} has moved you to full weight-bearing as tolerated."`)
+for (const line of wrap(spoken, 66)) say(`        ${line}`)
 say(`        "Take it slowly the first time, and have someone nearby."   ← from ${RISK}, reason never spoken`)
+say(`  _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script`)
 say(`  v${afterMeta['unsay/version']}.prevHash === v${beforeMeta['unsay/version']}.versionHash  ${chained ? 'YES — the retraction is auditable' : 'NO'}`)
 
 // 8 — the stale fact announces its own age
@@ -262,9 +361,43 @@ const tool = await client.callTool({
   name: 'whats_changed',
   arguments: { since: new Date(DEMO_NOW.getTime() - 3600_000).toISOString() },
 })
-const changed = (tool.structuredContent as { changed: unknown[] }).changed
-rec('tools/call', { tool: 'whats_changed', changedCount: changed.length })
+const changed = (tool.structuredContent as {
+  changed: { uri: string; value: string; previousValue?: string; retraction?: string }[]
+}).changed
+// A host on this path never read v1. Without `previousValue` it can state the new
+// fact and cannot RETRACT the old one — which is the whole product. Asserted here
+// because e2e is the only place the fallback runs against a real revision.
+const fallbackRetracts = changed.every((c) => typeof c.previousValue === 'string' && !!c.retraction)
+rec('tools/call', { tool: 'whats_changed', changedCount: changed.length, carriesPreviousValue: fallbackRetracts })
 say(`  fallback whats_changed    ${changed.length} revision(s) — exercised, not just built`)
+say(`        previousValue       ${fallbackRetracts ? `"${changed[0]!.previousValue}"  ← the fallback can retract, not only restate` : 'MISSING — this path can only restate'}`)
+
+// 10b — logging/setLevel, honoured rather than merely served
+// The `logging` capability makes the SDK answer logging/setLevel with `{}`. That
+// result is a success even when nothing filters, which is exactly how this server
+// used to behave: sendLoggingMessage() was called with no session id, the SDK's
+// per-session level filter looked up `undefined`, missed, and delivered every
+// notice at every level. R10 — a seam nothing exercises is a seam that is not there.
+// The channel has to be ALIVE before suppressing it proves anything: a check that
+// counts zero before and zero after passes on a log channel that never worked.
+const loggingDelivered = await waitFor(() => logMessages > 0, 5000)
+const logsAfterFirstWrite = logMessages
+await client.setLoggingLevel('emergency')
+const quietBody = signedRevision('Full weight-bearing as tolerated, reviewed at the door.')
+const quietRes = await fetch(`${srv.baseUrl}/write`, quietBody)
+const updatesBeforeQuiet = updates
+await waitFor(() => updates > updatesBeforeQuiet, 5000)
+const loggingHonoured = quietRes.status === 200 && logMessages === logsAfterFirstWrite
+const stillNotified = updates > updatesBeforeQuiet
+rec('logging/setLevel', {
+  level: 'emergency',
+  logsBefore: logsAfterFirstWrite,
+  logsAfter: logMessages,
+  resourceUpdatedStillDelivered: stillNotified,
+})
+say(`\n  notifications/message     ${logsAfterFirstWrite} revision notice(s) delivered on the log channel`)
+say(`  logging/setLevel          notice suppressed at level emergency — ${logMessages - logsAfterFirstWrite} log message(s) after the write`)
+say(`                            notifications/resources/updated still delivered: ${stillNotified ? 'YES' : 'NO'}`)
 
 // 11 — the public verification route a judge can click
 const verifyRes = await fetch(`${srv.baseUrl}/verify`, { headers: { accept: 'application/json' } })
@@ -282,6 +415,13 @@ say(`\n  GET /verify (no token)    ${verdict.chains.length} chains · ${verdict.
 const midSentence = latencyMs < SPEECH_WINDOW_MS
 const ok =
   doorLocked &&
+  specOk &&
+  uiOk &&
+  retractionOk &&
+  loggingDelivered &&
+  loggingHonoured &&
+  stillNotified &&
+  fallbackRetracts &&
   partitionHeld &&
   rayLeak.length === 0 &&
   blobBytes > 0 &&
@@ -302,7 +442,14 @@ appendFileSync(
     t: new Date().toISOString(),
     event: 'summary',
     atRest: srv.atRest,
+    protocolVersion: negotiated,
+    protocolVersionMeetsTrackMinimum: specOk,
     unauthenticatedRefused: doorLocked,
+    mcpAppsCardServed: uiOk,
+    retractionRenderedServerSide: retractionOk,
+    loggingChannelDelivered: loggingDelivered,
+    loggingSetLevelHonoured: loggingHonoured,
+    fallbackCarriesPreviousValue: fallbackRetracts,
     audiencePartitionHeld: partitionHeld && rayLeak.length === 0,
     blobBytes,
     tamperedWriteRefused: tamperRefused,
@@ -320,7 +467,7 @@ appendFileSync(
   }) + '\n',
 )
 
-say(`\n  ${ok ? 'PASS' : 'FAIL'} — receipt → docs/proof/live_run.jsonl (${frames.length + 1} frames)`)
+say(`\n  ${ok ? 'PASS' : 'FAIL'} — receipt → docs/proof/live_run.jsonl (${frames.length} frames + summary)`)
 
 await client.close()
 await srv.close()

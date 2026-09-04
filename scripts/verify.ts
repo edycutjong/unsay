@@ -9,13 +9,17 @@
  * So this script does not check that reads work. It checks that the reads which
  * MUST fail, fail — and it exits non-zero if any of them succeed.
  *
- * Sections 1-5 assert the store's own guarantees in process. Sections 6-8 assert
- * the three that only exist once the code is deployed behind a socket: the OAuth
- * scope boundary over real HTTP, the AAD binding that survives an attacker with
- * write access to storage, and the signed clinician write path.
+ * Sections 1-5 and 7 assert guarantees that hold inside one process: the audience
+ * partition, the hash chain, staleness, and the AAD binding that survives an
+ * attacker with write access to storage. Sections 6, 8 and 9 assert the ones that
+ * only exist once the code is behind a socket: the OAuth scope boundary over real
+ * HTTP, the signed clinician write path, and the clock the entrypoint itself runs
+ * on with no injected store and no injected `now`.
  *
  * Run: npm run verify
  */
+import { mkdirSync, writeFileSync } from 'node:fs'
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 
@@ -31,8 +35,26 @@ import { LiveResourceStore, NotFoundError, uriFor } from '../src/store.ts'
 import { seed, seedDemo, RAY, DEMO_NOW } from '../src/seed.ts'
 
 let failures = 0
+/**
+ * Every assertion is recorded as well as printed. The landing page quotes the
+ * COUNT, and a count typed into a page beside a script that produces it is a count
+ * that goes stale — this one drifted from eleven to twenty-nine unnoticed. The
+ * receipt is what web/web.test.ts compares the page against, the same way it
+ * compares the latency figures against docs/proof/bench.json.
+ */
+const asserted: { section: number; name: string; ok: boolean; detail: string }[] = []
+
+/** Sections that only exist once the code is behind a socket. See the file header. */
+const OVER_HTTP = new Set([6, 8, 9])
+let section = 0
+const heading = (n: number, title: string) => {
+  section = n
+  console.log(`${n === 1 ? '' : '\n'}${n}. ${title}`)
+}
+
 const check = (name: string, ok: boolean, detail = '') => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
+  asserted.push({ section, name, ok, detail })
   if (!ok) failures++
 }
 
@@ -47,7 +69,7 @@ const userOnly = { sub: 'alexa-host', scopes: ['care.read.user'] }
 const both = { sub: 'reasoner', scopes: ['care.read.user', 'care.read.assistant'] }
 
 // ── 1. every assistant-only URI must be unreachable with a user-scoped token ──
-console.log('1. audience partition')
+heading(1, 'audience partition')
 const internalDomains = ['risk', 'adherence']
 for (const domain of internalDomains) {
   const uri = uriFor(RAY, domain, 'assistant')
@@ -76,7 +98,7 @@ for (const domain of internalDomains) {
 }
 
 // ── 2. list() must not even reveal that internal records EXIST ────────────────
-console.log('\n2. existence is not leaked')
+heading(2, 'existence is not leaked')
 const listed = store.list(userOnly).map((x) => x.uri)
 const anyInternal = listed.some((u) => u.startsWith('care-internal://'))
 check('list() with user scope returns no care-internal:// URI', !anyInternal,
@@ -91,7 +113,7 @@ try {
 check('care:// URI cannot reach an assistant-only record', !crossed)
 
 // ── 3. version chain integrity ───────────────────────────────────────────────
-console.log('\n3. version chain')
+heading(3, 'version chain')
 const wb = store.verify(RAY, 'weight_bearing')
 check(`weight_bearing chain intact (${wb.versions} versions)`, wb.intact)
 
@@ -101,7 +123,7 @@ check('tampering v1 breaks the chain and is located', !tampered.intact && tamper
   tampered.intact ? 'NOT DETECTED' : `broken at v${tampered.brokenAt}`)
 
 // ── 4. staleness is computed, not claimed ────────────────────────────────────
-console.log('\n4. self-announcing staleness')
+heading(4, 'self-announcing staleness')
 const fresh = new LiveResourceStore()
 seed(fresh)
 const anti = fresh.staleness(uriFor(RAY, 'anticoagulant', 'user'), userOnly, DEMO_NOW)
@@ -113,7 +135,7 @@ check('exercise (fresh) is NOT flagged stale', !ex.stale,
   `age ${(ex.ageMs / 86_400_000).toFixed(1)}d`)
 
 // ── 5. an audience flip must be refused ──────────────────────────────────────
-console.log('\n5. audience cannot be changed by a later write')
+heading(5, 'audience cannot be changed by a later write')
 let flipped = false
 try {
   fresh.publish({
@@ -128,13 +150,22 @@ check('publishing risk as audience:user is refused', !flipped)
 // ── 6. the scope boundary, over a real socket ────────────────────────────────
 // Sections 1-5 hold inside one process. None of them is worth anything if the
 // HTTP face lets a client name its own scopes, or answers at all without a token.
-console.log('\n6. OAuth scope boundary over HTTP')
+heading(6, 'OAuth scope boundary over HTTP')
 
 const srv = await createHttpServer({ store: seedDemo(new LiveResourceStore()), announce: false })
 const token = (sub: string, scopes: string[]) =>
   mintToken({ sub, scopes, audience: srv.resourceUrl })
 
 const RISK_URI = uriFor(RAY, 'risk', 'assistant')
+
+/**
+ * The Alexa+ track's one hard eligibility requirement, verbatim from the rules:
+ * "a self-hosted MCP server, implementing MCP spec version 2025-11-25 (minimum)
+ * over Streamable HTTP". It is satisfied — but it was satisfied invisibly, asserted
+ * by nothing and stated in no document a judge reads, so it had to be inferred from
+ * a caret range in package.json. Now it fails loudly if the floor ever drops.
+ */
+const REQUIRED_PROTOCOL = '2025-11-25'
 
 const noToken = await fetch(`${srv.baseUrl}/mcp`, {
   method: 'POST',
@@ -163,13 +194,14 @@ const forgedRes = await fetch(`${srv.baseUrl}/mcp`, {
 })
 check('a token with an escalated scope claim is refused', forgedRes.status === 401, `HTTP ${forgedRes.status}`)
 
-async function connect(scopes: string[], sub: string) {
+let negotiated = ''
+async function connect(scopes: string[], sub: string, base = srv.baseUrl) {
   const c = new Client({ name: 'unsay-verify', version: '0.1.0' }, { capabilities: {} })
-  await c.connect(
-    new StreamableHTTPClientTransport(new URL(`${srv.baseUrl}/mcp`), {
-      requestInit: { headers: { Authorization: `Bearer ${token(sub, scopes)}` } },
-    }),
-  )
+  const transport = new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+    requestInit: { headers: { Authorization: `Bearer ${token(sub, scopes)}` } },
+  })
+  await c.connect(transport)
+  negotiated = transport.protocolVersion ?? ''
   return c
 }
 
@@ -196,7 +228,7 @@ do {
 check(
   'resources/list over HTTP returns no care-internal:// URI, on any page',
   !rayListed.some((u) => u.startsWith('care-internal://')),
-  `${rayListed.length} user URIs over every cursor page`,
+  `${rayListed.filter((u) => u.startsWith('care://')).length} care:// URIs + the ui:// card, over every cursor page`,
 )
 
 const reasoner = await connect(['care.read.user', 'care.read.assistant'], 'alexa-host')
@@ -207,6 +239,12 @@ try {
   readWithScope = false
 }
 check(`${RISK_URI} readable over HTTP with care.read.assistant`, readWithScope)
+
+check(
+  `the negotiated protocol version is at least ${REQUIRED_PROTOCOL}`,
+  negotiated >= REQUIRED_PROTOCOL,
+  negotiated || 'nothing negotiated',
+)
 
 // The public route must not enumerate what the partition hides. An open port that
 // confirms `care-internal://ray/risk` EXISTS has already leaked the thing.
@@ -223,7 +261,7 @@ await rayHost.close()
 await reasoner.close()
 
 // ── 7. the AAD binding — the partition survives losing the database ──────────
-console.log('\n7. encryption at rest binds a ciphertext to its slot')
+heading(7, 'encryption at rest binds a ciphertext to its slot')
 
 const envelope = await Envelope.create(
   new LocalKeyProvider(Buffer.from('c'.repeat(64), 'hex')),
@@ -265,7 +303,7 @@ try {
 check('the same bytes still open under their own identity', opensInPlace)
 
 // ── 8. the signed clinician write ────────────────────────────────────────────
-console.log('\n8. the write path refuses what it cannot verify')
+heading(8, 'the write path refuses what it cannot verify')
 
 const writeSecret = process.env.UNSAY_WRITE_SECRET ?? DEV_WRITE_SECRET
 const body = Buffer.from(
@@ -348,5 +386,84 @@ check('every refusal returns the same body, naming no cause', shapes.size === 1,
 
 await srv.close()
 
+// ── 9. the clock the ENTRYPOINT actually runs on ─────────────────────────────
+/**
+ * Every gate above passes an explicit clock, which is exactly how a clock defect
+ * hides: `npm start` builds its own store and its own `now`, and nothing exercised
+ * that pair. It seeded at the pinned DEMO_NOW and read the wall clock, so the one
+ * command DEMO.md sends a judge to served `[changed -32d ago by …]` and the
+ * self-announcing-staleness feature was dead on the live process. LESSONS R11: a
+ * green suite over a product that misbehaves for a stranger.
+ *
+ * So this section takes NO store and NO clock — the defaults `scripts/serve.ts`
+ * uses — and reads the headers a judge would see.
+ */
+heading(9, 'the live entrypoint serves an honest age')
+
+const liveSrv = await createHttpServer({ announce: false })
+const liveClient = new Client({ name: 'unsay-verify-live', version: '0.1.0' }, { capabilities: {} })
+await liveClient.connect(
+  new StreamableHTTPClientTransport(new URL(`${liveSrv.baseUrl}/mcp`), {
+    requestInit: {
+      headers: {
+        Authorization: `Bearer ${mintToken({
+          sub: 'echo-show',
+          scopes: ['care.read.user'],
+          audience: liveSrv.resourceUrl,
+        })}`,
+      },
+    },
+  }),
+)
+
+const headerOf = async (uri: string) => {
+  const r = await liveClient.readResource({ uri })
+  return (r.contents[0] as { text: string }).text.split('\n')[0]!
+}
+
+const liveHeaders: string[] = []
+for (const domain of ['weight_bearing', 'anticoagulant', 'exercise', 'contact']) {
+  liveHeaders.push(await headerOf(uriFor(RAY, domain, 'user')))
+}
+const negative = liveHeaders.filter((h) => /-\d+\s*d(ay)? ago/.test(h))
+check(
+  'no resource reports a negative age on the default clock',
+  negative.length === 0,
+  negative.length ? negative.join(' | ') : `${liveHeaders.length} headers, all forward in time`,
+)
+
+const antiLive = await headerOf(uriFor(RAY, 'anticoagulant', 'user'))
+check('the anticoagulant record is past its review date on the default clock',
+  antiLive.startsWith('[STALE'), antiLive)
+
+const exLive = await headerOf(uriFor(RAY, 'exercise', 'user'))
+check('a fresh record is NOT flagged stale on the default clock',
+  exLive.startsWith('[changed'), exLive)
+
+await liveClient.close()
+await liveSrv.close()
+
 console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'} — ${failures} failing assertion(s)`)
+
+mkdirSync('docs/proof', { recursive: true })
+writeFileSync(
+  'docs/proof/verify.json',
+  JSON.stringify(
+    {
+      ranAt: new Date().toISOString(),
+      assertions: asserted.length,
+      failing: failures,
+      // Named so a reader can see the shape of the split the README quotes: the
+      // guarantees that hold in one process, and the ones that only exist behind
+      // a socket.
+      inProcess: asserted.filter((a) => !OVER_HTTP.has(a.section)).length,
+      overHttp: asserted.filter((a) => OVER_HTTP.has(a.section)).length,
+      checks: asserted,
+      verdict: failures === 0 ? 'PASS' : 'FAIL',
+    },
+    null,
+    2,
+  ) + '\n',
+)
+console.log('receipt → docs/proof/verify.json')
 process.exit(failures === 0 ? 0 : 1)

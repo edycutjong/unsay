@@ -1,11 +1,24 @@
 <div align="center">
 
+<img src="docs/icon.svg" alt="" width="144" height="144">
+
 # Unsay
 
 **The assistant that can be corrected.**
 
 An MCP server whose resources can be revised mid-sentence — so an assistant can stop,
 retract what it just said, and name what changed, who changed it, and how long ago.
+
+<img src="docs/readme-hero.svg" alt="Alexa is told a care-plan fact, the physio changes it mid-answer, and the assistant retracts: the old instruction struck through, the new one beneath it, and the protocol frames that caused it." width="900">
+
+![MCP 2025-11-25](https://img.shields.io/badge/MCP-2025--11--25-5B8DEF)
+![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6)
+![Node 22](https://img.shields.io/badge/Node-22-339933)
+![tests 246 passing](https://img.shields.io/badge/tests-246%20passing-3F9E63)
+![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B)
+
+[**Run it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec &amp; threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
 
 </div>
 
@@ -14,9 +27,51 @@ retract what it just said, and name what changed, who changed it, and how long a
 > **Ray Dunn is 68, five days home after a hip replacement, and he is about to put his full
 > weight on a leg his physio changed the instructions for thirty seconds ago.**
 
-Built for the **Alexa+** track of the Amazon Developer Hackathon (Build, Ship, Shape).
+Built for the **Alexa+** track of the Amazon Developer Hackathon (Build, Ship, Shape):
+a **self-hosted MCP server implementing spec `2025-11-25` over Streamable HTTP**, plus an
+**Agent Skill** ([`skill/SKILL.md`](skill/SKILL.md)) and an **MCP Apps** card served as a
+resource at `ui://unsay/echo`. `npm run e2e` and `npm run verify` both assert the negotiated
+protocol version and exit non-zero below that floor, so the eligibility requirement is checked
+rather than claimed.
 
-## Status — day 6
+## 📸 See it in Action
+
+`npm start` runs one process on one origin and prints three links that already carry a minted
+token. There is no build step and no account.
+
+| Screen | What it is | Where |
+|---|---|---|
+| **Ray's Echo Show** | 1280×800 device card. The retracted line strikes through, the new instruction replaces it, and the provenance line names the physio and the age. Also served over MCP as `ui://unsay/echo`. | [`web/echo.html`](web/echo.html) · `/echo.html` |
+| **The physio's screen** | One tap, one confirm. Signs the body with HMAC-SHA256 **in the browser** and posts it; with no server reachable it signs anyway and hands you the `curl` to replay, and never claims to have published. | [`web/clinician.html`](web/clinician.html) · `/clinician.html` |
+| **The landing page** | The mechanism, the safety property, the latency with its caveat attached, and every proof command. | [`web/index.html`](web/index.html) · `/index.html` |
+
+Open the Echo Show link and the clinician link side by side, type a new instruction and publish
+it: the device screen strikes the old line through, the receipt underneath the write reports the
+round trip it measured, and the assistant has what it needs to retract.
+
+The image above is an **illustration of the mechanism**, drawn from the committed seed record —
+not a screenshot. There is no demo video yet and no hosted URL; see
+[What is not here](#what-is-not-here).
+
+## 🚀 Run it
+
+```bash
+npm install
+npm start          # → http://127.0.0.1:39500  (landing · Echo Show · clinician)
+```
+
+Reproduce every claim below instead of taking it:
+
+```bash
+npm run verify     # the reads and writes that MUST fail, do
+npm run e2e        # the whole demo, as code, over the real server
+npm run probe:resume
+npm run bench -- --n 200
+```
+
+Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
+
+## Status — day 7
 
 🚧 In development. Deadline 2026-10-23. Nothing is deployed; `npm start` runs the whole thing
 locally, [`DEMO.md`](DEMO.md) reproduces every claim below from an empty clone, and
@@ -24,27 +79,39 @@ locally, [`DEMO.md`](DEMO.md) reproduces every claim below from an empty clone, 
 
 **The mechanism is proven, not assumed.** `npm run e2e` runs the demo as code against the same
 HTTP server `npm start` runs — real Bearer token, cursor-paginated listing, a real audio blob,
-the physio's correction arriving through the signed write path:
+the MCP Apps card read over the protocol, the physio's correction arriving through the signed
+write path, and the retraction rendered server-side:
 
 ```
-  no token                  HTTP 401 · Bearer realm="unsay"
-  resources/list            8 resources over 3 cursor page(s)
-  completion {version}      ["v2","v1"]  ← resolved via context.arguments
-  read  care://ray/exercise_clip   ← audio/wav · 24044 bytes
+  protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
+  resources/list            9 resources over 3 cursor page(s)
+  read  ui://unsay/echo   ← text/html+skybridge · 33625 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.40 ms
+  notifications/resources/updated  1.55 ms
+  ALEXA "You can put about half your weight on it—"
+        Wait — don’t do that. What I just told you is out of date. I said
+        “Partial weight-bearing, about half your body weight through the
+        operated leg.” Sarah Okafor, physio changed it just now: “Full
+        weight-bearing as tolerated.” …
+  _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script
   v3.prevHash === v2.versionHash  YES — the retraction is auditable
 
-  PASS — receipt → docs/proof/live_run.jsonl (18 frames)
+  logging/setLevel          notice suppressed at level emergency — 0 log message(s) after the write
+  fallback whats_changed    1 revision(s) — exercised, not just built
+
+  PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
+The `1.55 ms` will differ on your machine and between two runs on this one; it is the only figure
+in that block that moves, and it is not the headline number — [the bench](#the-number) is.
+
 **The safety properties pass** — `npm run verify` asserts the reads and writes that MUST fail,
-do. Twenty-nine assertions, eleven in process and eighteen against a real HTTP server:
+do. Thirty-three assertions: fifteen in process, eighteen against a real HTTP server.
 
 ```
 1. audience partition          ✓ care-internal://ray/{risk,adherence} unreachable with care.read.user
@@ -56,14 +123,25 @@ do. Twenty-nine assertions, eleven in process and eighteen against a real HTTP s
 5. audience flip               ✓ publishing an assistant-only record as audience:user is refused
 6. OAuth over HTTP             ✓ no token → 401 · ✓ an edited scope claim → 401
                                ✓ care-internal:// unreachable with care.read.user, on any cursor page
+                               ✓ the negotiated protocol version is at least 2025-11-25
                                ✓ GET /verify without a token lists no care-internal:// chain
 7. encryption at rest          ✓ a ciphertext pasted from care-internal://ray/risk fails to decrypt
                                ✓ and the chain reports it broken at that exact version
 8. the signed write path       ✓ unsigned · mutated body · wrong key · stale timestamp → all 401
                                ✓ every refusal left an audit row, and none carries a credential
+9. the live entrypoint         ✓ no resource reports a negative age on the default clock
+                               ✓ the anticoagulant record is past its review date on the default clock
 
 PASS — 0 failing assertion(s)
+receipt → docs/proof/verify.json
 ```
+
+Section 9 exists because of a defect that every other gate was structurally unable to see: the
+entrypoint seeded its store on a pinned clock and read the wall clock, so `npm start` — the one
+command this file sends you to — served `[changed -32d ago by …]` while the whole suite, 184 of
+them at the time, stayed green.
+It now takes no injected store and no injected clock, which is the only way to test the thing a
+stranger runs.
 
 The partition is enforced **server-side by two URI schemes behind two verified OAuth scopes**,
 not by trusting `annotations.audience` — because the spec places no obligation on a client to
@@ -71,44 +149,115 @@ honour it. See [`FRICTION.md`](FRICTION.md) F-002. Section 7 goes one layer furt
 whose AAD is `patient|domain|version|audience`, so the partition survives an attacker who owns
 the database and simply moves the bytes.
 
-**A correction survives the network dropping under it** — `npm run probe:resume` writes a
-revision while the SSE stream is down and asserts it is replayed on `Last-Event-ID`:
+**A correction survives the network dropping under it** — `npm run probe:resume` writes three
+revisions while the SSE stream is down and asserts all three are replayed on `Last-Event-ID`:
 
 ```
-  offline window              810 ms
-  write → replayed at client  815 ms
+  revision A                  v3 · delivered live
+  SSE stream dropped          (as a proxy or a domestic wifi blip would)
+  revisions B–D               v4–v6 · written with nothing listening
+
+  PASS  all 3 missed notifications/resources/updated replayed
+  PASS  replay arrived on the resumed stream, not the old one
+
+  offline window              803 ms
+  write → replayed at client  801 ms
+
   VERDICT: PASS   (6/6 checks)
 ```
 
-The two timings move run to run; the six checks do not.
+Three and not one on purpose: a replay that delivered only the last missed notification would
+pass a single-revision probe and lose the middle of a correction sequence in the field. The two
+timings move run to run; the six checks do not.
+
+<a id="the-number"></a>
 
 **The number**, from `npm run bench -- --n 200` — signed write → HMAC verified → store →
-notification → authorized re-read, 200 times:
+notification → authorized re-read, 200 times. This block is written by the bench script itself,
+out of the same run that writes [`docs/proof/bench.txt`](docs/proof/bench.txt):
 
+<!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
-signed write → notification       0.8ms      1.6ms     10.0ms
-notification → re-read            0.9ms      2.5ms      3.3ms
-END-TO-END (write → value)        1.8ms      3.4ms     12.9ms      (p50 · p95 · max)
+segment                             p50        p95        max
+signed write → notification       0.7ms      1.6ms      3.2ms
+notification → re-read            0.7ms      1.8ms      3.8ms
+─────────────────────────────────────────────────────────────
+END-TO-END (write → value)        1.3ms      2.7ms      6.6ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
 ```
+<!-- bench:end -->
 
-That is the committed run in [`docs/proof/bench.txt`](docs/proof/bench.txt); the milliseconds
-move on every machine and every re-run. The two lines underneath do not, and `npm run bench`
-exits non-zero if either of them ever does.
+The milliseconds move on every machine and every re-run. The two lines underneath do not, and
+`npm run bench` exits non-zero if either of them ever does.
 
 Loopback figures, and the 3,400 ms speech window is an assumed speech rate rather than a
 measurement of Alexa+ TTS. Neither is ever quoted as a production number.
 
 Receipts, all committed and all regenerated by the commands above:
+[`verify.json`](docs/proof/verify.json) ·
 [`probe_subscribe.json`](docs/proof/probe_subscribe.json) ·
 [`live_run.jsonl`](docs/proof/live_run.jsonl) ·
 [`resume.json`](docs/proof/resume.json) ·
 [`bench.txt`](docs/proof/bench.txt)
 
-Reproduce everything: `npm install && npm run verify && npm run e2e` — full walkthrough in
-[`DEMO.md`](DEMO.md).
+## Who this is for
+
+**The moment.** A weight-bearing instruction after hip or knee arthroplasty is a *status*, and it
+changes: non-weight-bearing, then partial, then full as tolerated, on a schedule that moves when
+the surgeon or the physio sees how the patient is doing. The patient is at home. The instruction
+that reaches them travels by phone call to a landline, or on a printed sheet written on the day
+of discharge, or in a letter. When the status changes on a Tuesday, the sheet on the fridge still
+says Monday's. The person acting on it is post-operative, often alone, and has no way to tell
+that the sentence they are reading has been superseded.
+
+**What Unsay replaces.** Not the clinician, and not the record system. The *delivery* of a
+changed instruction to the place the patient actually asks the question — which today is a call
+that has to be answered and a sheet that has to be reprinted. Unsay makes the fact itself
+correctable: the assistant that already answered "about half your weight" is told, in the same
+breath, that it was wrong, and by whom, and how long ago.
+
+**Who buys it.** A discharge or therapy team inside a hospital, not a consumer. They already own
+the plan and already carry the risk of a superseded instruction being followed. What they get is
+a channel with a receipt: every change signed, attributable, hash-chained, and replayable at
+`GET /verify` by someone holding the audit log and no key.
+
+**No numbers, on purpose.** This repository does not quote a figure it did not measure, and that
+rule does not get suspended for the market-size paragraph. The numbers in this README are the
+ones the scripts produced. An arthroplasty volume, or a readmission rate attributable to
+instruction error, would have to come from a source — the National Joint Registry's annual
+report, NHS England discharge statistics, HCUP in the United States — and be quoted with its year
+and its denominator. That work has not been done here, and inventing it would falsify the one
+claim the project actually makes.
+
+**Beyond healthcare, shown rather than asserted.** The mechanism is domain-free and it already
+runs somewhere else: [`packages/live-resources`](packages/live-resources) ships a standalone suite
+of 29 whose scenario is an **incident channel** — a status page an on-call engineer reads while the root
+cause is still being written, with a `incident-internal://` lane for the half that is under legal
+review. The same shape fits an on-call runbook that changes mid-incident, and a price or
+inventory an agent is quoting while it moves. Each would need its own two schemes and two scopes;
+nothing else changes.
+
+**After 2026-10-23.** Publish `@unsay/live-resources` to npm. File F-002 and F-003 to the MCP
+specification repository by **2026-09-20** — the send-by date is in `FRICTION.md`, because a
+draft with no send date is a loss in progress. Put the fresh-clone demo in front of five
+clinicians who did not build it.
+
+## Built for Alexa+
+
+Three things in this repo exist only because the track is Alexa+, and each is exercised on the
+judged path rather than described:
+
+| Artifact | What it is | Exercised by |
+|---|---|---|
+| [`skill/SKILL.md`](skill/SKILL.md) | An **Agent Skill**: the two-rule retraction protocol, the retraction's required shape, the never-speak rule, and the `whats_changed` fallback. The same contract the server sends in `initialize`. | `npm run e2e` reads it and prints its size; `test/server.test.ts` asserts it has not drifted from `SERVER_INSTRUCTIONS` |
+| `ui://unsay/echo` | An **MCP Apps** resource: the 1280×800 device card, served *through* the protocol as `text/html+skybridge` and bound to the `whats_changed` result. Same bytes as `/echo.html` — one file, two doors. | `npm run e2e` reads it over Streamable HTTP; `test/server.test.ts` asserts the mime type, the listing and the tool binding |
+| MCP `2025-11-25` | The track's one hard eligibility requirement, over Streamable HTTP with `Last-Event-ID` resume. | asserted at runtime by `npm run e2e` and `npm run verify` §6 |
+
+The `_meta` binding that tells a host to render a tool result *into* the card is **shaped and
+unexercised** — no host we can reach implements the extension. That is F-013, and it is disclosed
+here for the same reason the KMS provider is.
 
 ## The reusable half
 
@@ -123,30 +272,41 @@ host ignores `annotations.audience`. Any MCP server publishing mutable state nee
 same four things.
 
 `src/store.ts` is now ~115 lines that bind that package to `care://` URIs and adapt
-this repo's KMS envelope onto its codec seam. Nothing is duplicated between them, and
-nothing is published to npm — the package is consumed from source by relative import.
+this repo's KMS envelope onto its codec seam. The enforcement point a judge should read is
+[`packages/live-resources/src/store.ts`](packages/live-resources/src/store.ts) `read()`, about
+fifteen lines. Nothing is duplicated between the two, and nothing is published to npm — the
+package is consumed from source by relative import.
 
 ## Tests
 
-**184 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
-28 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
-public entry point, so they prove that half stands up without the rest of this repo.
+**246 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+29 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
+public entry point, so they prove that half stands up without the rest of this repo. Another
+group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and
+executed against a live server — because the transport the demo video films was the one transport
+nothing ran.
+
 Coverage is deliberately not headlined — see [`DEMO.md`](DEMO.md#the-tests) for why, and
 `./scripts/fresh_clone_check.sh` for the gate that actually catches what a suite misses.
 
 ## What is not here
 
-No deployment, no hosted URL, no demo video, no external users, and nothing published to npm —
-`packages/live-resources` is extracted and consumed from source, not released. The AWS
-KMS provider is SigV4-signed and shaped but has **never been executed against a live key**. The
-full inventory is at the end of [`FRICTION.md`](FRICTION.md) under *What this build does NOT do*,
-and the generated [`ARCHITECTURE.md`](ARCHITECTURE.md) closes with the same list.
+No deployment, no hosted URL, no demo video, no screenshots of the running screens, no external
+users, and nothing published to npm — `packages/live-resources` is extracted and consumed from
+source, not released. The AWS KMS provider is SigV4-signed and shaped but has **never been
+executed against a live key**. The MCP Apps `_meta` template binding has never been rendered by a
+host. No OAuth authorization server is shipped; Unsay is a protected resource only. The gating
+question — whether Alexa+ itself declares `capabilities.resources.subscribe` — has not been
+answered, which is exactly why the `whats_changed` fallback is built and exercised.
+
+The full inventory is at the end of [`FRICTION.md`](FRICTION.md) under *What this build does NOT
+do*, and the generated [`ARCHITECTURE.md`](ARCHITECTURE.md) closes with the same list.
 
 ## Friction log
 
-[`FRICTION.md`](FRICTION.md) — twelve entries, proposing changes to both the MCP specification
-and its reference TypeScript SDK. Every one was found by building against them, and each names
-the file or the measurement it came from.
+[`FRICTION.md`](FRICTION.md) — thirteen entries, proposing changes to the MCP specification, to
+one of its extensions, and to the reference TypeScript SDK. Every one was found by building
+against them, and each names the file or the measurement it came from.
 
 ## Licence
 

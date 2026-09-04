@@ -6,6 +6,10 @@
  * Bias is toward the cases that MUST FAIL: a wrong-scope read of a clip, a cursor
  * the server never issued, a prompt that could leak reasoning-only text.
  */
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -17,9 +21,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 
 import { EXERCISE_CLIP, GAIT_NOTE, blobFor } from '../src/blobs.ts'
-import { BRIEF_CARER, RESOURCE_PAGE_SIZE, buildServer } from '../src/server.ts'
+import { BRIEF_CARER, RESOURCE_PAGE_SIZE, SERVER_INSTRUCTIONS, buildServer } from '../src/server.ts'
 import { DEMO_NOW, RAY, STAGED_REVISION, seed, seedDemo } from '../src/seed.ts'
 import { LiveResourceStore, uriFor } from '../src/store.ts'
+import { UI_ECHO_URI, UI_MIME_TYPE, UI_TEMPLATE_META, uiHtml } from '../src/ui_resource.ts'
 import { SCOPE } from '../src/types.ts'
 
 const BOTH = [SCOPE.user, SCOPE.assistant]
@@ -100,7 +105,9 @@ describe('capabilities', () => {
 describe('resources/list — cursor pagination', () => {
   it('pages at RESOURCE_PAGE_SIZE and the cursor round-trips to the rest', async () => {
     const { client, store } = await harness()
-    const total = store.list({ sub: 't', scopes: BOTH }).length
+    // +1: the MCP Apps card (`ui://unsay/echo`) is listed alongside the facts, so a
+    // host discovers renderable HTML the same way it discovers everything else.
+    const total = store.list({ sub: 't', scopes: BOTH }).length + 1
     expect(total).toBeGreaterThan(RESOURCE_PAGE_SIZE * 2) // or the cursor is never exercised
 
     const first = await client.listResources({})
@@ -375,7 +382,7 @@ describe('notifications', () => {
     expect(wired.listChanged.count).toBe(0)
 
     // Suppression, not absence: the seeded resources really are there.
-    const all = store.list({ sub: 't', scopes: BOTH }).length
+    const all = store.list({ sub: 't', scopes: BOTH }).length + 1 // + the ui:// card
     expect((await walk(wired.client)).uris).toHaveLength(all)
 
     // The GP adds wound care — the host is holding a list now, and it is wrong.
@@ -506,5 +513,196 @@ describe('seed determinism', () => {
   it('leaves the staged revision unapplied so the demo notification is real', () => {
     expect(a.versions(RAY, 'weight_bearing')).toHaveLength(2)
     expect(a.versions(RAY, 'weight_bearing').at(-1)!.value).not.toBe(STAGED_REVISION.value)
+  })
+})
+
+describe('the MCP Apps card', () => {
+  /**
+   * The Alexa+ rules call "a basic MCP wrapper around an existing API" the obvious
+   * idea and name "media support (cards, carousels), MCP Apps, Agent Skills" as the
+   * creative bar. The device card was already built — it was simply being served by
+   * an HTTP static route, which is not an MCP surface at all. It is a resource now.
+   */
+  it('is listed alongside the facts, so a host discovers it the usual way', async () => {
+    const { client } = await harness()
+    const { uris } = await walk(client)
+    expect(uris).toContain(UI_ECHO_URI)
+  })
+
+  it('is visible to a patient-scoped host — it is a template, not patient content', async () => {
+    const { client } = await harness(USER_ONLY)
+    const { uris } = await walk(client)
+    expect(uris).toContain(UI_ECHO_URI)
+    expect(uris.some((u) => u.startsWith('care-internal://'))).toBe(false)
+  })
+
+  it('reads back as renderable HTML under the extension mime type', async () => {
+    const { client } = await harness()
+    const read = await client.readResource({ uri: UI_ECHO_URI })
+    const part = read.contents[0] as { mimeType?: string; text?: string }
+    expect(part.mimeType).toBe(UI_MIME_TYPE)
+    expect(part.text).toContain('<!doctype html>')
+    // Same bytes the HTTP route serves — one file, two doors, nothing to drift.
+    expect(part.text).toBe(uiHtml())
+  })
+
+  it('carries no assistant-audience content, because Ray can see the card', async () => {
+    for (const secret of ['Fall risk', 'disputes the discharge plan', 'care-internal://']) {
+      expect(uiHtml()).not.toContain(secret)
+    }
+  })
+
+  it('binds the fallback tool to the template, so a host knows what to render', async () => {
+    const { client } = await harness()
+    const tools = await client.listTools()
+    const tool = tools.tools.find((t) => t.name === 'whats_changed')!
+    expect((tool._meta as Record<string, unknown>)?.[UI_TEMPLATE_META]).toBe(UI_ECHO_URI)
+  })
+})
+
+describe('the fallback path can retract, not only restate', () => {
+  /**
+   * A host that cannot subscribe never read v1. Given only the new value it can
+   * state a fact and cannot withdraw the one it just said — which is the entire
+   * product. `previousValue` is what makes a retraction possible on this path.
+   */
+  it('returns the superseded value and the rendered retraction', async () => {
+    const store = seedDemo()
+    const { client } = await harness(BOTH, store)
+    store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+
+    const out = await client.callTool({
+      name: 'whats_changed',
+      arguments: { since: new Date(DEMO_NOW.getTime() - 3600_000).toISOString() },
+    })
+    const changed = (out.structuredContent as {
+      changed: { uri: string; value: string; previousValue?: string; previousVersion?: number; retraction?: string }[]
+    }).changed
+    const wb = changed.find((c) => c.uri === WB)!
+    expect(wb.value).toBe(STAGED_REVISION.value)
+    expect(wb.previousVersion).toBe(2)
+    expect(wb.previousValue).toContain('about half your body weight')
+    expect(wb.retraction).toContain('Wait — don’t do that')
+  })
+
+  it('omits both on a resource that has only ever had one version', async () => {
+    const store = seedDemo()
+    const { client } = await harness(BOTH, store)
+    store.publish({
+      subject: RAY,
+      topic: 'wound_care',
+      audience: 'user',
+      value: 'Dressing stays on until day seven.',
+      authorId: 'gp.mensah',
+      authorLabel: 'Dr Mensah, GP',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    const out = await client.callTool({
+      name: 'whats_changed',
+      arguments: { since: new Date(DEMO_NOW.getTime() - 3600_000).toISOString() },
+    })
+    const changed = (out.structuredContent as { changed: { uri: string; previousValue?: string }[] }).changed
+    const created = changed.find((c) => c.uri.endsWith('/wound_care'))!
+    expect(created.previousValue).toBeUndefined()
+  })
+})
+
+describe('a notification is re-authorized at send time', () => {
+  /**
+   * A subscription is authorized once, when it is created. The principal on the
+   * session can narrow afterwards. Delivering `care-internal://ray/risk` to a
+   * now-user-scoped host confirms the resource EXISTS — the one thing read()
+   * answers -32002 rather than confirm (I-2, I-9). The revision LOG already
+   * re-checked; the primary channel did not, so the guard was inconsistent by
+   * accident rather than by design.
+   */
+  it('does not deliver an internal updated to a downgraded session', async () => {
+    const store = seedDemo()
+    let scopes = [...BOTH]
+    const built = buildServer({
+      store,
+      principal: () => ({ sub: 'same-host', scopes }),
+      now: () => DEMO_NOW,
+    })
+    const wired = await attach(built)
+
+    await wired.client.subscribeResource({ uri: RISK })
+    await wired.client.subscribeResource({ uri: WB })
+
+    // The same host comes back holding only the patient-facing scope.
+    scopes = [...USER_ONLY]
+
+    store.publish({
+      subject: RAY,
+      topic: 'risk',
+      audience: 'assistant',
+      value: 'Fall risk: HIGH. Now also refusing the frame.',
+      authorId: 'adeyemi',
+      authorLabel: 'Mr Adeyemi, surgical team',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+
+    expect(wired.updated).not.toContain(RISK)
+    // …and the speakable one still arrives, or the guard is just a mute button.
+    expect(wired.updated).toContain(WB)
+    expect(wired.logs.some((l) => JSON.stringify(l.data).includes('risk'))).toBe(false)
+  })
+})
+
+describe('the Agent Skill and the server say the same thing', () => {
+  /**
+   * `skill/SKILL.md` is the Alexa+ track's other first-class deliverable, and it is
+   * a SECOND copy of the contract the server already sends in `instructions`. Two
+   * copies of a contract drift; this is what stops them. Not a byte comparison —
+   * one is a Markdown skill with front matter, the other is a paragraph in an
+   * `initialize` result — but every load-bearing claim in one has to be in the other.
+   */
+  const skill = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../skill/SKILL.md'), 'utf8')
+
+  it('declares the front matter a skill needs to be loaded at all', () => {
+    expect(skill.startsWith('---\n')).toBe(true)
+    for (const field of ['name: unsay-care-plan', 'description:', 'trigger:']) {
+      expect(skill, field).toContain(field)
+    }
+  })
+
+  it('carries every rule SERVER_INSTRUCTIONS states', () => {
+    const claims: [string, RegExp][] = [
+      // rule 1 — stop and correct yourself when updated arrives
+      ['subscribe and retract', /notifications\/resources\/updated/],
+      ['name what changed, who and when', /who changed it|its author and its age/i],
+      // rule 2 — the fallback
+      ['the whats_changed fallback', /whats_changed/],
+      // the never-speak rule
+      ['audience:assistant is never spoken', /audience:\s*\["?assistant"?\]|`care-internal:\/\/`/],
+      ['never speak it', /never be spoken|Never speak/i],
+      // staleness
+      ['say the age of a stale fact', /past its review date|say the age|STALE/i],
+    ]
+    for (const [what, pattern] of claims) {
+      expect(pattern.test(skill), `skill/SKILL.md drops: ${what}`).toBe(true)
+      expect(
+        pattern.test(SERVER_INSTRUCTIONS) || /never be spoken|say its age aloud/i.test(SERVER_INSTRUCTIONS),
+        `SERVER_INSTRUCTIONS drops: ${what}`,
+      ).toBe(true)
+    }
+  })
+
+  it('names every surface it tells a host to call, and each one is registered', async () => {
+    const { client } = await harness()
+    const tools = await client.listTools()
+    const prompts = await client.listPrompts()
+    expect(skill).toContain('tools/call whats_changed')
+    expect(tools.tools.map((t) => t.name)).toContain('whats_changed')
+    expect(skill).toContain('prompts/get brief_carer')
+    expect(prompts.prompts.map((p) => p.name)).toContain(BRIEF_CARER)
+    expect(skill).toContain(UI_ECHO_URI)
+  })
+
+  it('states the protocol revision the track requires', () => {
+    expect(skill).toContain('2025-11-25')
+    expect(skill).toContain('Streamable HTTP')
   })
 })

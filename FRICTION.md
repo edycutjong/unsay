@@ -502,15 +502,50 @@ exactly one when a new domain appears.
 makes the suppression window uniform across implementations and, more importantly, makes it
 observable — which is the difference between a guard and a comment.
 
+## F-013 · MCP Apps extension · the tool→template binding key is vendor-namespaced, with no registry
+
+**Date:** 2026-09-04 · **Severity:** Medium (3 h) · **Tool:** MCP Apps extension (`apps.extensions.modelcontextprotocol.io`)
+
+**Task attempted.** Publish Ray's Echo Show card as an MCP resource rather than as an HTTP static
+route, so a host renders the card *through* the protocol — the "media support (cards, carousels),
+MCP Apps" bar the Alexa+ track names — and bind it to the `whats_changed` tool result.
+
+**Steps taken.** Served the card at `ui://unsay/echo` with mime type `text/html+skybridge`, put the
+preferred frame size in `_meta` under the extension's `mcpui.dev/` namespace, and named the template
+on the tool descriptor's `_meta`.
+
+**Expected vs actual.** Expected one normative key for "render this result into that template", in
+the `mcp/` namespace the rest of the protocol uses. Found `openai/outputTemplate` — a key carrying
+one vendor's prefix, inherited from the Apps SDK the extension grew out of, sitting next to a frame
+hint under a *second*, different third-party namespace (`mcpui.dev/`). Two vendor namespaces and no
+registry means a server cannot tell, by reading, whether a host will look for its template at all.
+There is also no capability a host declares for this, so there is nothing to negotiate against and
+nothing to probe: the binding either works in a given host or is silently ignored.
+
+**Workaround.** Ship both doors. The card is an MCP resource *and* an HTTP route (`/echo.html`), read
+from one file so the two cannot drift, and the extension `_meta` keys are named once in
+`src/ui_resource.ts` so the day they are settled is a one-line change. `npm run e2e` asserts the
+resource itself is served and readable over Streamable HTTP; it cannot assert that a host honours the
+binding, because we have no host that implements the extension. **Read the binding as shaped, not
+exercised** — the same posture as the KMS provider under F-004, and disclosed in the same places.
+
+**Actionable suggestion.** Register the binding key under `mcp/` — `_meta["mcp/outputTemplate"]` —
+keep the vendor key as an alias for one revision, and add a `capabilities.experimental.apps` (or
+equivalent) a host declares, so a server can negotiate instead of guessing. A rendering contract that
+cannot be probed is a rendering contract a server ships blind.
+
 ---
 
 *Filed to the submission's product-feedback field, and F-002/F-003 additionally to the MCP
 specification repository. Send-by date for upstream filing: **2026-09-20** — a draft with no send
 date is a loss in progress.*
 
-*F-005 through F-012 were found by building against the spec and the reference SDK, not by reading
-about them; each names the file or the measurement it came from. F-005, F-007, F-008 and F-012 are
-specification asks, F-006, F-009, F-010 and F-011 are SDK asks, and all carry the same send-by date.*
+*Thirteen entries. **Seven** ask for a change to the MCP specification or one of its extensions —
+F-002, F-003, F-005, F-007, F-008, F-012, F-013. **Five** ask for a change to the reference
+TypeScript SDK — F-001, F-006, F-009, F-010, F-011. F-005 asks both, and is counted in the seven.
+**One**, F-004, is Amazon account onboarding. 7 + 5 + 1 = 13. F-005 through F-013 were found by
+building against the spec and the reference SDK, not by reading about them; each names the file or
+the measurement it came from, and all carry the same send-by date.*
 
 ---
 
@@ -644,10 +679,17 @@ Each item names where to look, so none of it has to be taken on trust.
   out to be measuring run-to-run variance rather than staleness — it went red on an honest re-run.
 - Each page carries its own copy of the ~40-line MCP-over-`fetch` client and the SSE framer.
   The single-file-per-page constraint requires it; a fourth surface should become a shared
-  `web/mcp.js` instead.
-- The pages were validated by structure parse, `node --check` on every page script, and a Node
-  replay of their own request sequence and SSE parser against a live server. **Rendering,
-  animation timing and the 1280×800 device fit are not visually verified.**
+  `web/mcp.js` instead. `echo.html`'s copy is marked with `MCP-CLIENT-CORE` sentinels and
+  `web/web.test.ts` slices it out **verbatim** and executes it against a live server —
+  initialize, cursor pagination, subscribe, the SSE framer, a signed write, the resulting
+  `notifications/resources/updated`, and the corrected re-read. The bytes the browser runs are
+  the bytes the suite runs. `clinician.html`'s copy is still covered only by its signature tests.
+- **Rendering is not verified.** Layout, animation timing, the 1280×800 device fit and the
+  contrast tokens were checked by eye and by hand-computed WCAG ratios, not by a headless
+  browser. There are no committed screenshots of the running screens, and the README says so.
+- **The landing page's `og:image` is an SVG.** `docs/og.svg` is a real 1200×630 card, but most
+  link-preview scrapers will not rasterise SVG, so a shared link degrades to a text-only preview
+  until a PNG exists. Named here rather than left to be discovered in a Slack channel.
 
 ### The number
 
@@ -658,8 +700,26 @@ Each item names where to look, so none of it has to be taken on trust.
   twelve words at roughly 150 wpm, a constant in `scripts/bench.ts`. It is not a measurement of
   Alexa+ text-to-speech.
 
+### The Alexa+ surfaces
+
+- **The MCP Apps `_meta` binding is shaped, not exercised.** `ui://unsay/echo` is a real MCP
+  resource: listed, read over Streamable HTTP by `npm run e2e`, asserted by `test/server.test.ts`.
+  What has never happened is a host *rendering a tool result into it*, because no host we can
+  reach implements the extension. See **F-013**, which is also where the two vendor-prefixed
+  `_meta` keys we had to choose are argued about. Read the binding exactly as the KMS provider is
+  read: correctly shaped, never executed.
+- **The gating probe has not been run.** Whether Alexa+ itself declares
+  `capabilities.resources.subscribe` is unknown to us, and it decides which of the two paths in
+  `skill/SKILL.md` a real host takes. That is why the `whats_changed` fallback is built, carries
+  `previousValue` so a retraction is possible on it, and is exercised by `npm run e2e` — not
+  because we know the fallback is needed, but because we cannot yet know that it is not.
+- **`skill/SKILL.md` has not been installed in a host.** It is a file with front matter and the
+  correct contract; nobody has watched Alexa+ load it.
+
 ### Not started
 
-No demo video. No published npm package. No external users. No deployment URL. None of these
-is claimed anywhere else in this repository, and this line exists so that absence is explicit
-rather than merely unmentioned.
+No demo video. No screenshots of the running screens. No published npm package. No external
+users. No deployment URL. No sourced epidemiology behind the impact case — the README says so in
+the section that would otherwise carry it, because a market-size figure this repo did not measure
+is exactly the kind of number it refuses to print. None of these is claimed anywhere else in this
+repository, and this line exists so that absence is explicit rather than merely unmentioned.

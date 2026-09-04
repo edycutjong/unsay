@@ -66,8 +66,12 @@ export function seed(store: LiveResourceStore, opts: SeedOptions = {}) {
     authorId: 'gp.mensah',
     authorLabel: 'Dr Mensah, GP',
     writtenAt: daysBefore(9),
-    // already passed at DEMO_NOW — this record must announce its own age
-    staleAfter: '2026-10-04T00:00:00Z',
+    // Relative to the injected clock, not a pinned date. An absolute stop date is
+    // only "already passed" on one particular day; every other day — including any
+    // day a judge runs `npm start` — this record quietly stops being stale and the
+    // one feature it exists to demonstrate goes dark. Four days back from now is
+    // 2026-10-04 at DEMO_NOW, so the pinned receipts are unchanged.
+    staleAfter: daysBefore(4),
     priority: 0.85,
   })
 

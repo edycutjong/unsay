@@ -12,7 +12,8 @@ npm install
 ```
 
 Everything below runs against that clone with no further setup. Five commands prove the
-product; the sixth opens it in a browser.
+product, the sixth opens it in a browser, and the seventh is the two artifacts that exist only
+because the track is Alexa+.
 
 ---
 
@@ -46,10 +47,12 @@ Exit code 0. Receipt: `docs/proof/probe_subscribe.json`.
 npm run verify
 ```
 
-This asserts the reads that **must fail**, fail. It is not a happy-path check. Sections 1–5 run
-in process; sections 6–8 stand up a real HTTP server and attack it.
+This asserts the reads that **must fail**, fail. It is not a happy-path check. Sections 1–5 and 7
+run in process; sections 6, 8 and 9 stand up a real HTTP server and attack it. Section 9 is the
+one that takes **no injected store and no injected clock** — the defaults `npm start` uses — because
+a defect in the entrypoint's own pairing of those two is invisible to every gate that supplies both.
 
-**Expected — 29 assertions, all ✓:**
+**Expected — 33 assertions, all ✓:**
 
 ```
 1. audience partition
@@ -67,7 +70,7 @@ in process; sections 6–8 stand up a real HTTP server and attack it.
   ✓ tampering v1 breaks the chain and is located — broken at v1
 
 4. self-announcing staleness
-  ✓ anticoagulant is past its stale_after — stale_after 2026-10-04T00:00:00Z, age 9.0d
+  ✓ anticoagulant is past its stale_after — stale_after 2026-10-04T09:14:00.000Z, age 9.0d
   ✓ exercise (fresh) is NOT flagged stale — age 1.0d
 
 5. audience cannot be changed by a later write
@@ -77,8 +80,9 @@ in process; sections 6–8 stand up a real HTTP server and attack it.
   ✓ POST /mcp with no token is refused — HTTP 401
   ✓ a token with an escalated scope claim is refused — HTTP 401
   ✓ care-internal://ray/risk unreachable over HTTP with care.read.user
-  ✓ resources/list over HTTP returns no care-internal:// URI, on any page — 5 user URIs over every cursor page
+  ✓ resources/list over HTTP returns no care-internal:// URI, on any page — 5 care:// URIs + the ui:// card, over every cursor page
   ✓ care-internal://ray/risk readable over HTTP with care.read.assistant
+  ✓ the negotiated protocol version is at least 2025-11-25 — 2025-11-25
   ✓ GET /verify without a token lists no care-internal:// chain — 5 public chains
 
 7. encryption at rest binds a ciphertext to its slot
@@ -97,7 +101,13 @@ in process; sections 6–8 stand up a real HTTP server and attack it.
   ✓ no audit row carries a credential, a MAC or a bearer token
   ✓ every refusal returns the same body, naming no cause — {"error":"unauthorized"}
 
+9. the live entrypoint serves an honest age
+  ✓ no resource reports a negative age on the default clock — 4 headers, all forward in time
+  ✓ the anticoagulant record is past its review date on the default clock — [STALE — last changed 9 days ago by Dr Mensah, GP; say this age aloud]
+  ✓ a fresh record is NOT flagged stale on the default clock — [changed 1d ago by Sarah Okafor, physio]
+
 PASS — 0 failing assertion(s)
+receipt → docs/proof/verify.json
 ```
 
 Exit code 0. **If any assertion fails, the clinical-safety claim is false** and the build should
@@ -107,6 +117,15 @@ Section 7 is the one worth pausing on: it pastes the ciphertext of `care-interna
 into `care://ray/weight_bearing`, which is what an attacker who owns the database does and what
 no scope check can see. The AES-256-GCM AAD binds every record to
 `patient|domain|version|audience`, so the bytes refuse to decrypt in the wrong slot.
+
+Section 9 is the one that exists because of a defect. The server used to seed its store on the
+pinned demo clock and then read the wall clock, so `npm start` served `[changed -32d ago by …]`
+and the self-announcing-staleness feature was dead on the live process — while 184 tests, and
+every other section above, stayed green, because they all pass an explicit clock. This section
+takes the defaults and reads the headers a judge would see.
+
+Receipt: `docs/proof/verify.json`, which carries every assertion, the in-process/over-HTTP split,
+and the verdict. `web/web.test.ts` compares the landing page's assertion count against it.
 
 ---
 
@@ -129,13 +148,16 @@ unsay · end-to-end · the demo as code
   at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)
   no token                  HTTP 401 · Bearer realm="unsay"
 
+  protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   capabilities.resources    {"subscribe":true,"listChanged":true}
   completions · prompts     declared · declared
   logging                   declared
   instructions              present
 
   templates                 care://{patient}/{domain}/{version}, care-internal://{patient}/{domain}/{version}
-  resources/list            8 resources over 3 cursor page(s)
+  resources/list            9 resources over 3 cursor page(s)
+  read  ui://unsay/echo   ← text/html+skybridge · 33625 bytes · MCP Apps card
+  agent skill               skill/SKILL.md — 4571 bytes, the same two rules as instructions
   completion {version}      ["v2","v1"]  ← resolved via context.arguments
 
   RAY   "Can I put weight on it yet?"
@@ -152,25 +174,43 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.40 ms
+  notifications/resources/updated  1.55 ms
   ALEXA "You can put about half your weight on it—"
-        "—actually, stop. That changed just now."
-        "Sarah Okafor, physio has moved you to full weight-bearing as tolerated."
+        Wait — don’t do that. What I just told you is out of date. I said
+        “Partial weight-bearing, about half your body weight through the
+        operated leg.” Sarah Okafor, physio changed it just now: “Full
+        weight-bearing as tolerated.” In plain terms, full weight-bearing
+        as tolerated means you can put as much weight through that leg as
+        is comfortable.
         "Take it slowly the first time, and have someone nearby."   ← from care-internal://ray/risk, reason never spoken
+  _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script
   v3.prevHash === v2.versionHash  YES — the retraction is auditable
 
   stale fact                announces its own age
         [STALE — last changed 9 days ago by Dr Mensah, GP; say this age aloud]
   prompts/get brief_carer   speakable only · 873 chars
   fallback whats_changed    1 revision(s) — exercised, not just built
+        previousValue       "Partial weight-bearing, about half your body weight through the operated leg."  ← the fallback can retract, not only restate
 
-  GET /verify (no token)    5 chains · 7 versions · intact true · 0/5 sealed at rest
+  notifications/message     1 revision notice(s) delivered on the log channel
+  logging/setLevel          notice suppressed at level emergency — 0 log message(s) after the write
+                            notifications/resources/updated still delivered: YES
 
-  PASS — receipt → docs/proof/live_run.jsonl (18 frames)
+  GET /verify (no token)    5 chains · 8 versions · intact true · 0/5 sealed at rest
+
+  PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-Exit code 0. Receipt: `docs/proof/live_run.jsonl` — 18 frames of the real protocol exchange plus
-a summary line. The `1.40 ms` will differ on your machine; nothing else should.
+Exit code 0. Receipt: `docs/proof/live_run.jsonl` — 21 lines: 20 frames of the real protocol
+exchange and a summary line. The `1.55 ms` will differ on your machine; nothing else should.
+
+Three of those steps are new and are the ones worth reading. `read ui://unsay/echo` is the Echo
+Show card fetched **through MCP** as an MCP Apps resource rather than off a static HTTP route.
+`_meta unsay/retraction` is the spoken sentence, rendered by `src/retraction.ts` from the two
+record versions — this script prints the server's output and does not contain the wording.
+`logging/setLevel` is the eleventh method: the run sets the level to `emergency`, writes again,
+and asserts the revision notice is suppressed while `notifications/resources/updated` still
+arrives.
 
 **The same run, encrypted at rest:**
 
@@ -199,9 +239,13 @@ npm run probe:resume
 An Echo Show on domestic wifi loses its SSE stream constantly, and a correction that is only
 ever *pushed* is a correction that can be silently lost — the failure mode is a 68-year-old
 confidently told the old instruction. This subscribes, receives a live revision, drops the
-stream the way a proxy timeout does, writes a second revision through the signed `POST /write`
-while **nothing is listening**, reconnects with `Last-Event-ID`, and asserts the missed
-notification is replayed.
+stream the way a proxy timeout does, writes **three** further revisions through the signed
+`POST /write` while **nothing is listening**, reconnects with `Last-Event-ID`, and asserts all
+three missed notifications are replayed in order.
+
+Three and not one on purpose: a replay that delivered only the LAST missed notification would
+pass a single-revision probe and lose the middle of a clinician's correction sequence in the
+field.
 
 **Expected:**
 
@@ -209,19 +253,20 @@ notification is replayed.
   subscribed                  care://ray/weight_bearing
   revision A                  v3 · delivered live
   SSE stream dropped          (as a proxy or a domestic wifi blip would)
-  revision B                  v4 · written with nothing listening
+  revisions B–D               v4–v6 · written with nothing listening
 
   PASS  revision A delivered on the live stream
-  PASS  revision B written while the stream was down
+  PASS  3 revisions written while the stream was down
   PASS  client reconnected with Last-Event-ID
-  PASS  missed notifications/resources/updated replayed
+  PASS  all 3 missed notifications/resources/updated replayed
   PASS  replay arrived on the resumed stream, not the old one
-  PASS  chain advanced by exactly two versions
+  PASS  chain advanced by exactly 4 versions
 
-  offline window              810 ms
-  write → replayed at client  815 ms
+  offline window              803 ms
+  write → replayed at client  801 ms
 
-  VERDICT: PASS
+  VERDICT: PASS   (6/6 checks)
+  receipt → docs/proof/resume.json
 ```
 
 Exit code 0. Receipt: `docs/proof/resume.json`. The two timings vary run to run — the client's
@@ -242,22 +287,25 @@ store → notification → authorized re-read → the client holds the new value
 
 **Expected:**
 
+<!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.8ms      1.6ms     10.0ms
-notification → re-read            0.9ms      2.5ms      3.3ms
+signed write → notification       0.7ms      1.6ms      3.2ms
+notification → re-read            0.7ms      1.8ms      3.8ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.8ms      3.4ms     12.9ms
+END-TO-END (write → value)        1.3ms      2.7ms      6.6ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes
 ```
+<!-- bench:end -->
 
-The milliseconds will differ on your machine and between two runs on this one — that block is
-the committed run in `docs/proof/bench.txt`. The last two lines are the ones that must not
-change, and the script exits non-zero if either does. `npm run bench` also rewrites the three numbers the
-landing page prints, rounding each **up** to one decimal — so the page can never quote a figure
-faster than the run that produced it, and `web/web.test.ts` fails if anyone edits one by hand.
+The milliseconds will differ on your machine and between two runs on this one. That block is
+**written by the bench script**, out of the same run that writes `docs/proof/bench.txt` — it is
+not transcribed, and `test/docs.test.ts` fails if a line in it is not in the receipt. The last two
+lines are the ones that must not change, and the script exits non-zero if either does. The same
+run rewrites the three numbers the landing page prints, rounding each **up** to one decimal, so
+the page can never quote a figure faster than the run that produced it.
 
 Exit code 0 only if **all 200** land inside the 3,400 ms speech window and a host was actually
 subscribed for every one of them. Receipts: `docs/proof/bench.txt`, `docs/proof/bench.json`.
@@ -381,9 +429,11 @@ npm test
 npm run typecheck
 ```
 
-**184 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face),
-`web/**` (the three pages), and `packages/live-resources/test/**` (the extracted package, imported
-through its public entry point only, against a scenario it was not extracted from).
+**246 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
+the retraction wording, and the documents themselves), `web/**` (the three pages — including a run
+of `echo.html`'s own hand-rolled MCP client, sliced out of the page and executed against a live
+server), and `packages/live-resources/test/**` (the extracted package, imported through its public
+entry point only, against a scenario it was not extracted from).
 
 Coverage is deliberately not headlined — two projects in this builder's history shipped 458 and
 404 passing tests at 100 % coverage over demos that were broken from a fresh clone. Which is why:
@@ -402,7 +452,12 @@ python3 scripts/check_submission_readiness.py
 
 Checks the claims in this repository against the repository: that the README's test count matches
 the suite, that no command here disables what is being judged, that `npm run verify` and
-`npm run e2e` still exit 0.
+`npm run e2e` still exit 0, and that `ARCHITECTURE.md` regenerates to the copy that is committed.
+
+`npm test` carries the other half of that: `test/docs.test.ts` asserts the bench table in this
+file and in the README is the run that produced `docs/proof/bench.txt`, that every test name
+`docs/SPEC.md` cites exists, that no invariant points at a file the code has moved out of, and
+that the counts in the documents are the counts.
 
 ---
 
@@ -417,10 +472,35 @@ the suite, that no command here disables what is being judged, that `npm run ver
 
 ---
 
+## 7 · The two artifacts that exist only because the track is Alexa+
+
+```bash
+cat skill/SKILL.md                              # the Agent Skill
+npm run e2e | grep -E 'ui://|agent skill'       # the MCP Apps card, over the protocol
+```
+
+`skill/SKILL.md` is an **Agent Skill**: the two-rule retraction protocol, the required shape of a
+retraction, the never-speak rule, and the `whats_changed` fallback — the same contract the server
+sends in its `initialize` result, which `test/server.test.ts` asserts has not drifted.
+
+`ui://unsay/echo` is an **MCP Apps** resource. It is the same 1280×800 Echo Show card
+`/echo.html` serves, read out of one file, and delivered *through* the protocol as
+`text/html+skybridge` rather than off a static HTTP route. `npm run e2e` reads it over Streamable
+HTTP and fails the run if the bytes are not HTML.
+
+What is **not** proven: the `_meta` binding that tells a host to render the `whats_changed` result
+into that card. No host we can reach implements the extension, so it is shaped and unexercised —
+`FRICTION.md` F-013, and disclosed for the same reason the KMS provider is.
+
+---
+
 ## What a judge should look at first
 
-1. `npm run verify` — the safety properties, asserted as failures, including the AAD paste
-2. `src/store.ts` `read()` — the enforcement point, ~15 lines
+1. `npm run verify` — the safety properties, asserted as failures, including the AAD paste and the
+   entrypoint's own clock
+2. `packages/live-resources/src/store.ts` `read()` — the enforcement point, ~15 lines.
+   `src/store.ts` is the ~115-line adapter that binds it to `care://` URIs
 3. `FRICTION.md` F-002 — why the annotation alone could not be the control — and
    **What this build does NOT do**, which is the honest inventory of everything above
-4. `docs/proof/live_run.jsonl` and `docs/proof/resume.json` — the real protocol frames
+4. `docs/proof/live_run.jsonl`, `docs/proof/resume.json` and `docs/proof/verify.json` — the real
+   protocol frames and the assertions, as the scripts wrote them

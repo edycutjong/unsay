@@ -1,0 +1,208 @@
+{
+  "ranAt": "2026-09-04T11:28:42.935Z",
+  "assertions": 33,
+  "failing": 0,
+  "inProcess": 15,
+  "overHttp": 18,
+  "checks": [
+    {
+      "section": 1,
+      "name": "care-internal://ray/risk unreachable with care.read.user",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 1,
+      "name": "care-internal://ray/adherence unreachable with care.read.user",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 1,
+      "name": "care-internal://ray/risk readable with care.read.assistant",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 1,
+      "name": "care-internal://ray/adherence readable with care.read.assistant",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 2,
+      "name": "list() with user scope returns no care-internal:// URI",
+      "ok": true,
+      "detail": "5 user URIs"
+    },
+    {
+      "section": 2,
+      "name": "care:// URI cannot reach an assistant-only record",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 3,
+      "name": "weight_bearing chain intact (2 versions)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 3,
+      "name": "tampering v1 breaks the chain and is located",
+      "ok": true,
+      "detail": "broken at v1"
+    },
+    {
+      "section": 4,
+      "name": "anticoagulant is past its stale_after",
+      "ok": true,
+      "detail": "stale_after 2026-10-04T09:14:00.000Z, age 9.0d"
+    },
+    {
+      "section": 4,
+      "name": "exercise (fresh) is NOT flagged stale",
+      "ok": true,
+      "detail": "age 1.0d"
+    },
+    {
+      "section": 5,
+      "name": "publishing risk as audience:user is refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 6,
+      "name": "POST /mcp with no token is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 6,
+      "name": "a token with an escalated scope claim is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 6,
+      "name": "care-internal://ray/risk unreachable over HTTP with care.read.user",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 6,
+      "name": "resources/list over HTTP returns no care-internal:// URI, on any page",
+      "ok": true,
+      "detail": "5 care:// URIs + the ui:// card, over every cursor page"
+    },
+    {
+      "section": 6,
+      "name": "care-internal://ray/risk readable over HTTP with care.read.assistant",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 6,
+      "name": "the negotiated protocol version is at least 2025-11-25",
+      "ok": true,
+      "detail": "2025-11-25"
+    },
+    {
+      "section": 6,
+      "name": "GET /verify without a token lists no care-internal:// chain",
+      "ok": true,
+      "detail": "5 public chains"
+    },
+    {
+      "section": 7,
+      "name": "the stored value is ciphertext, not the sentence",
+      "ok": true,
+      "detail": "203 bytes at rest"
+    },
+    {
+      "section": 7,
+      "name": "a ciphertext pasted from care-internal://ray/risk fails to decrypt",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 7,
+      "name": "and the chain reports it as broken at that exact version",
+      "ok": true,
+      "detail": "broken at v1"
+    },
+    {
+      "section": 7,
+      "name": "the same bytes still open under their own identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 8,
+      "name": "an unsigned write is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 8,
+      "name": "a body mutated after signing is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 8,
+      "name": "a signature under the wrong key is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 8,
+      "name": "a correctly signed but stale request is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 8,
+      "name": "a correctly signed write is accepted",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "section": 8,
+      "name": "every refusal left an audit row",
+      "ok": true,
+      "detail": "4 rows for 4 refusals"
+    },
+    {
+      "section": 8,
+      "name": "no audit row carries a credential, a MAC or a bearer token",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "section": 8,
+      "name": "every refusal returns the same body, naming no cause",
+      "ok": true,
+      "detail": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "section": 9,
+      "name": "no resource reports a negative age on the default clock",
+      "ok": true,
+      "detail": "4 headers, all forward in time"
+    },
+    {
+      "section": 9,
+      "name": "the anticoagulant record is past its review date on the default clock",
+      "ok": true,
+      "detail": "[STALE — last changed 9 days ago by Dr Mensah, GP; say this age aloud]"
+    },
+    {
+      "section": 9,
+      "name": "a fresh record is NOT flagged stale on the default clock",
+      "ok": true,
+      "detail": "[changed 1d ago by Sarah Okafor, physio]"
+    }
+  ],
+  "verdict": "PASS"
+}

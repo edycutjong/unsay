@@ -4,8 +4,15 @@ What Unsay guarantees, where each guarantee is enforced, and what asserts it.
 
 Every claim below was checked against the source before it was written. References are
 `file › function` rather than `file:line`, because line numbers drift and a stale line number is
-a lie with a plausible shape. If a claim here is not greppable in `src/`, it is a bug in this
-document — file it.
+a lie with a plausible shape. If a claim here is not greppable in the file it names, it is a bug
+in this document — file it.
+
+References span **two** trees, and that is the one thing this document got wrong for a day: the
+generic mechanism — the store, the chain, the partition, the notifier — was lifted into
+`packages/live-resources/` on day 7, and every `src/store.ts › …` reference here went on naming a
+file that had become a 116-line adapter. `src/` is now the care-specific half (`server.ts`,
+`http.ts`, `seed.ts`, `envelope.ts`, `retraction.ts`); `packages/live-resources/src/` is the half
+that knows nothing about hips. Both are named explicitly below.
 
 Two things this document does deliberately, because eight prior submissions in this builder's
 history lost points for documenting behaviour that was never built:
@@ -45,7 +52,7 @@ content of an `audience: "assistant"` record — text or blob — through no cod
 assistant's answer and must never reach Ray's ears. That is a safety boundary, not a rendering
 preference, so it cannot depend on the client behaving.
 
-**Where enforced.** `src/store.ts › read()` — two checks, deliberately redundant:
+**Where enforced.** `packages/live-resources/src/store.ts › read()` — two checks, deliberately redundant:
 
 1. the scope required by the **URI's scheme**, via `SCOPE[parsed.audience]`;
 2. the scope required by the **record's own** audience, after lookup.
@@ -79,17 +86,20 @@ indistinguishable in error code and in message shape.
 are an oracle: a patient-facing token could enumerate which clinical concerns exist for a patient
 without ever reading one. The list of a patient's problems is itself the disclosure.
 
-**Where enforced.** `src/store.ts › NotFoundError` — JSON-RPC `-32002`, message
-`Resource not found: ${uri}`, raised identically for a wrong scope, an unparseable URI, an absent
-chain, and an absent version. `src/store.ts › list()` filters by scope before building the array,
+**Where enforced.** `packages/live-resources/src/errors.ts › NotFoundError` — JSON-RPC `-32002`,
+message `Resource not found: ${uri}`, raised identically for a wrong scope, an unparseable URI, an
+absent chain, and an absent version. `packages/live-resources/src/store.ts › list()` filters by
+scope before building the array,
 so an unauthorized URI is never enumerated — which also means it can never appear in a
 pagination page or a cursor.
 
-The same rule is applied to the notification channel, which is the easy place to forget it: the
-revision log in `src/server.ts`'s `store.onUpdated` handler re-parses the URI and returns
-early unless the principal holds the scope for that audience. Announcing *"care-internal://ray/risk
-changed"* over `notifications/message` would confirm on one channel exactly what `read()` refuses
-to confirm on another.
+The same rule is applied to **both** notification channels, which is the easy place to forget it.
+`src/server.ts › logRevision()` re-parses the URI and returns early unless the principal holds the
+scope for that audience, before anything reaches `notifications/message`. The `updated` channel
+does the same at SEND time through the notifier's `canNotify` guard
+(`packages/live-resources/src/notifier.ts`), so a subscription authorized under a wider scope stops
+delivering the moment the session's principal narrows. Announcing *"care-internal://ray/risk
+changed"* on either channel would confirm exactly what `read()` refuses to confirm on a third.
 
 **Asserted by.** `test/store.test.ts` — *"reports NotFound rather than Forbidden, so existence is
 not confirmed"* substitutes the domain name out of both messages and requires them to be equal;
@@ -111,7 +121,7 @@ domain has the same audience, or the write is refused.
 patient-facing token can read. The boundary has to be a property of the fact, not of the most
 recent write to it.
 
-**Where enforced.** `src/store.ts › publish()` compares `prev.audience` with `input.audience` and
+**Where enforced.** `packages/live-resources/src/store.ts › publish()` compares `prev.audience` with `input.audience` and
 throws **before** any state is mutated — a refused write leaves no partial version behind. The
 HTTP write path does not re-implement the rule; `src/http.ts › handleWrite()` lets `publish()`
 throw, answers `409`, and appends an audit row with reason `store_rejected`.
@@ -144,9 +154,11 @@ load-bearing nowhere. The load-bearing copy on a read is `_meta` — `unsay/vers
 which `ResourceContents` does define and which therefore actually reaches the host.
 
 **Where enforced.** By absence, which is the only way to enforce a negative:
-`grep -rn "annotations" src/` returns the builder `store.ts › annotationsFor()`, the sites in
-`server.ts` that attach its output to a list entry and a read content, and comments. **None is a
-conditional.** No branch anywhere in `src/` has an outcome that depends on an annotation.
+`grep -rn "annotations" src/` returns two call sites in `server.ts` that attach the builder's
+output to a list entry and to a read content, the declaration on the `ui://` card
+(`src/ui_resource.ts`), a type re-export, and comments. The builder itself,
+`packages/live-resources/src/store.ts › annotationsFor()`, is one object literal. **None is a
+conditional.** No branch in either tree has an outcome that depends on an annotation.
 
 **Asserted by.** Every I-1 and I-2 assertion, structurally: they exercise `LiveResourceStore`,
 where annotations are produced and never consulted, and still fail closed. The grep is the direct
@@ -165,7 +177,8 @@ about to speak aloud to a patient. A claim a judge cannot recompute is marketing
 `authorId` into the hash means a substituted **author** breaks the chain too, not only a
 substituted value — the *who* is as load-bearing as the *what*.
 
-**Where enforced.** `src/store.ts › hashVersion()` and `src/store.ts › verify()`. `publish()`
+**Where enforced.** `packages/live-resources/src/chain.ts › hashVersion()` and
+`packages/live-resources/src/store.ts › verify()`. `publish()`
 computes each hash from the previous version's hash, so the chain is built at write time and
 never reconstructed from a mutable field.
 
@@ -204,7 +217,8 @@ adversary who owns the database.
 
 **Where enforced.** `src/envelope.ts › recordAad()` builds the AAD and **reserves `|`**, throwing
 rather than letting two distinct identities collide on a component containing the separator.
-`Envelope.encrypt/decrypt` set it as GCM AAD. `src/store.ts › #seal()/#open()` are the only paths
+`Envelope.encrypt/decrypt` set it as GCM AAD. `packages/live-resources/src/store.ts › #seal()/#open()`
+are the only paths
 in or out, and every accessor that hands out a record goes through `#open()`.
 
 Two providers, both real. `LocalKeyProvider` derives data keys with HKDF-SHA256 from
@@ -241,8 +255,9 @@ put the age only in `annotations.lastModified` would announce nothing. Putting i
 means the model cannot receive the fact without receiving its age. `_meta['unsay/stale']` carries
 the machine-readable copy alongside.
 
-**Where enforced.** `src/store.ts › staleness()` computes age and the boolean against an injected
-`now`; `src/server.ts`'s `resources/read` handler builds the header and prepends it to the value;
+**Where enforced.** `packages/live-resources/src/store.ts › staleness()` computes age and the
+boolean against an injected `now`; `src/server.ts`'s `resources/read` handler builds the header and
+prepends it to the value;
 the `brief_carer` prompt appends `— PAST ITS REVIEW DATE, say its age aloud` to any stale line.
 
 **Asserted by.** `test/store.test.ts` — *"flags a record past its stale_after"*, *"does not flag a
@@ -269,13 +284,21 @@ creation fired it, the assistant would retract a sentence it never said about a 
 had — the product's one dramatic moment spent on noise. A client subscribed to a URI that did not
 exist a moment ago also has nothing to re-read *against*.
 
-**Where enforced.** `src/store.ts › publish()` branches on whether a previous version exists.
-`src/server.ts` arms `list_changed` only after a `queueMicrotask`, so the records `seed()` writes
-at startup are silent.
+**Where enforced.** `packages/live-resources/src/store.ts › publish()` branches on whether a
+previous version exists. `src/server.ts` arms `list_changed` only after `resources/list` has
+actually been SERVED — `notifier.armListChanged()` in the list handler — so the records `seed()`
+writes at startup are silent.
 
-**Asserted by.** `test/store.test.ts` — *"does not fire updated for the first version"*, *"fires
-updated on a revision, with the unversioned uri"*, *"unsubscribes listeners"*, *"does not apply
-the staged revision"*.
+**History, because the old mechanism is still worth knowing.** An earlier draft of the paragraph
+above named a microtask flag. That mechanism is gone and the reason it went is **F-012**: a
+notification sent before any transport is attached fails silently, so the flag was untestable — the
+test written to prove it worked would have passed with the guard deleted. Arming on the first list
+actually served is the notification's own meaning, and unlike the flag it is observable.
+
+**Asserted by.** `test/store.test.ts` — *"fires updated only where seeding actually supersedes
+something"*, *"fires updated on a revision, with the unversioned uri"*, *"does not apply the staged
+revision"*; `test/server.test.ts` — *"stays silent about list changes until a list has actually been
+served"* at the package level, and the seeded-with-a-host-attached case in this repo's server suite.
 
 ---
 
@@ -289,9 +312,12 @@ time on a subscription created earlier, and a scope revoked in between would del
 principal no longer holds. Carrying only the URI means every byte of content passes through
 `read()` exactly once, under the caller's scopes at the moment it asks.
 
-**Where enforced.** `src/store.ts › publish()` calls listeners with a URI string; `src/server.ts`
-forwards to `server.sendResourceUpdated({ uri })` and only for URIs present in the `subscriptions`
-set, which the `resources/subscribe` handler can only add to after `store.read()` succeeds.
+**Where enforced.** `packages/live-resources/src/store.ts › publish()` calls listeners with a URI
+string; `packages/live-resources/src/notifier.ts › ResourceNotifier` forwards to
+`sendResourceUpdated({ uri })` and only for URIs present in the `subscriptions` set, which
+`src/server.ts`'s `resources/subscribe` handler can only add to after `store.read()` succeeds —
+**and** only when the `canNotify` guard, wired in `src/server.ts`, still finds the current principal
+holds the scope for that URI's audience.
 
 **Asserted by.** `test/server.test.ts` — *"refuses a subscription to a resource the principal
 cannot read"* (the authorization gate on the way in), *"delivers resources/updated to a subscriber
@@ -299,11 +325,19 @@ when the physio writes"*, *"stops delivering after unsubscribe"*, and *"does not
 revision to a user-scoped host"* — the last one covering the second channel, where a URI would
 otherwise escape the partition without any content escaping with it.
 
-**Residual, and it is real.** The *fact that something changed* is not re-authorized at send
-time. A principal whose scope was revoked mid-session would still receive the URI of a subscribed
-resource it can no longer read — a change-frequency side channel on a URI it once held. Scopes
-are fixed for a session's lifetime in this build, so the window does not exist today; the code
-does not close it and we do not pretend otherwise.
+**Residual, rewritten because it closed.** This used to read: *"the fact that something changed is
+not re-authorized at send time … the code does not close it and we do not pretend otherwise."* That
+was true and it was a real leak — a principal whose scope narrowed mid-session kept receiving the
+URI of a resource it could no longer read, which is a change-frequency side channel on a URI whose
+very existence `read()` refuses to confirm. It is closed: the notifier takes a `canNotify` guard and
+`src/server.ts` supplies one that re-checks the current principal's scope against the URI's audience
+at SEND time, mirroring what `logRevision()` already did on the second channel.
+
+What remains is narrower and is not closed. The guard reads the principal at the moment the
+notification is dispatched; a scope that narrows *between* dispatch and delivery is not re-checked,
+because there is nothing to re-check it against once the frame is on the wire. And a URI already
+replayed out of `MemoryEventStore` on a `Last-Event-ID` resume was authorized when it was stored,
+not when it is replayed.
 
 ---
 
@@ -342,9 +376,11 @@ the gap; a key cursor resumes correctly. Failing loudly on an unrecognised curso
 the alternative, resetting to page one, loops a client forever. MCP 2025-11-25 pins none of this:
 it defines the cursor as opaque and stops. `FRICTION.md` **F-007**.
 
-The page size is small on purpose. The demo store holds nine resources, so every client walks at
-least three pages and the cursor is exercised on the judged path rather than on a code path
-nobody reaches.
+The page size is small on purpose. The demo store holds **eight** records and `resources/list`
+serves **nine** entries — the eight plus the `ui://unsay/echo` card (I-16) — so every client walks
+three pages and the cursor is exercised on the judged path rather than on a code path nobody
+reaches. `test/store.test.ts` — *"seeds exactly eight records"* — pins the first number; the second
+is that number plus the one card, asserted in `test/server.test.ts`.
 
 **Where enforced.** `src/server.ts › encodeCursor()/decodeCursor()` and the
 `ListResourcesRequestSchema` handler. Authorization runs first — `store.list(principal)` — so a
@@ -410,7 +446,8 @@ points at resource_metadata"*.
 ### I-14 · Every write attempt is attributable, and no audit row can carry attacker bytes
 
 **Statement.** Accepted and rejected writes both append a row of
-`{ at, actor, uri, outcome, reason, via }`. `reason` is a closed union.
+`{ at, actor, uri, outcome, reason, via }`. `actor` is the **verified** principal wherever the
+request carried one — never a name taken from the body. `reason` is a closed union.
 
 **Why.** The rejected row is the one that matters — a stolen or malformed clinician key leaves a
 trail here and nowhere else. `reason` is a union rather than free text so that a row has **nowhere
@@ -421,8 +458,18 @@ stronger guarantee than remembering to redact.
 a row. `src/http.ts › handleWrite()` appends on every path including `body_too_large`, which fires
 before the body is even fully read.
 
-**Asserted by.** `test/http.test.ts` — *"never records a credential in an audit row"*, and the
-rejection paths above, each of which asserts the audit row it should have produced.
+On the bearer path the actor is `p.sub` from the verified token. It used to be `body.authorId`,
+which silently discarded the one identity the request had actually proved: a `care.write` holder
+could name any clinician as the author, and the row recorded the impersonated name while the real
+principal appeared in no row at all. That made this invariant false on precisely the path where it
+was strongest. The claimed author still reaches the *record* — see T-4, where one shared write
+secret means `authorId` is claimed rather than proven — but the *trail* now says who presented a
+credential.
+
+**Asserted by.** `test/http.test.ts` — *"never records a credential in an audit row"*, *"records the
+verified token subject, not the authorId in the body"*, *"still lets the claimed author reach the
+record, which the chain then freezes"*, and the rejection paths above, each of which asserts the
+audit row it should have produced.
 
 ---
 
@@ -446,6 +493,67 @@ for this working tree.
 
 ---
 
+### I-16 · The device card is served through the protocol, not beside it
+
+**Statement.** `ui://unsay/echo` is an MCP resource: it appears in `resources/list` for every
+authenticated principal and `resources/read` returns the Echo Show card as renderable HTML under
+the MCP Apps extension's mime type. It is the same bytes `GET /echo.html` serves.
+
+**Why.** The Alexa+ rules name "a basic MCP wrapper around an existing API" as the *obvious* idea
+and "media support (cards, carousels), MCP Apps, Agent Skills" as the creative bar. The card
+already existed and was reachable only over an HTTP static route — which is not an MCP surface at
+all, and would work identically if this were not an MCP server.
+
+**Where enforced.** `src/ui_resource.ts` holds the URI, the mime type, the `_meta` keys and the
+single `readFileSync` of `web/echo.html`; `src/server.ts` appends the descriptor in the
+`resources/list` handler and short-circuits `resources/read` before the store is consulted, because
+`ui://` is not a scheme the care partition issues. `src/http.ts` serves the same file at
+`/echo.html` from the same path, so there is one file and nothing to drift.
+
+**Asserted by.** `test/server.test.ts` — *"is listed alongside the facts, so a host discovers it the
+usual way"*, *"reads back as renderable HTML under the extension mime type"*, *"carries no
+assistant-audience content, because Ray can see the card"*, *"binds the fallback tool to the
+template, so a host knows what to render"*. `scripts/e2e.ts` reads it over Streamable HTTP and fails
+the run if the bytes are not HTML.
+
+**Limit, and it is the whole of F-013.** No host we can reach implements the extension, so the
+`_meta` template binding on `whats_changed` is **shaped and unexercised**. The resource is proven;
+the binding is not. Read it exactly as the KMS provider is read.
+
+---
+
+### I-17 · The retraction is a rendered artifact, not a string in a document
+
+**Statement.** The spoken retraction is produced by `renderRetraction()` from the two record
+versions, and is delivered to the host on `_meta['unsay/retraction']` of a `resources/read` and on
+each `whats_changed` entry. Nothing that quotes it writes it by hand.
+
+**Why.** For a voice device the interaction model IS the sentence, and this one existed as three
+different literals — in `DEMO.md`, in `web/index.html` and in `scripts/e2e.ts` — generated by
+nothing and covered by no test. A sentence that no code produces is a sentence that cannot be
+regression-tested, and the ordering inside it is a safety property: withdraw first, name what is
+being withdrawn, then the new value with its author and age, then a gloss of the clinical language.
+Leading with *"that changed thirty seconds ago"* buries the instruction a frightened person acts on.
+
+**Where enforced.** `src/retraction.ts › renderRetraction()`, built from record fields only, with a
+closed `GLOSSARY` whose entries restate the clinician and add no guidance. `src/server.ts` attaches
+it in the `resources/read` handler when a previous version exists, and to each `whats_changed` entry
+— which is why that tool also returns `previousValue` and `previousVersion`: a host on the fallback
+path never read v1, and without the superseded sentence it can state a fact but cannot withdraw one.
+
+**Asserted by.** `test/retraction.test.ts` — *"opens with the stop, not with the metadata"*, *"names
+the sentence being withdrawn, so there is one instruction to drop"*, *"glosses every jargon phrase
+the new value contains"*, *"adds no guidance of its own — every gloss restates the clinician"*.
+`test/server.test.ts` — *"returns the superseded value and the rendered retraction"*.
+`web/web.test.ts` — *"matches renderRetraction() for the seeded revision, word for word"*, which
+recomputes the landing page's copy and fails if the page and the server ever differ.
+`scripts/e2e.ts` prints the server's own output rather than a literal.
+
+**Limit.** Whether the host says it is the host's decision. MCP settles the notification's delivery
+and not its consequence (F-003, T-2). We can make the right words available and no more.
+
+---
+
 ### Coverage gaps
 
 Every invariant above now has at least one assertion behind it. These are the edges that do not,
@@ -460,11 +568,13 @@ time with `UNSAY_KEY_PROVIDER=local`.
 | Gap | What is missing |
 |---|---|
 | I-2 **timing** | Not measured, and no attempt is made to constant-time the path. `-32002` is constant in shape, not in duration. |
-| I-9 **residual** | No test exercises a scope revoked between `subscribe` and a revision, because scopes are fixed for a session's lifetime in this build. The residual is stated, not asserted. |
-| **Resumability** | `Last-Event-ID` replay is exercised by `scripts/probe_resume.ts` with a committed receipt (`docs/proof/resume.json`: stream dropped, one revision written into the dark, replayed on reconnect) — a script, not a test, so it is still outside `npm test`. It is now run by `scripts/fresh_clone_check.sh` and by `scripts/check_submission_readiness.py`, which also asserts the committed receipt's verdict. |
+| I-9 **residual** | Closed and asserted — `test/server.test.ts` *"does not deliver an internal updated to a downgraded session"* and the package's *"re-checks authorization at SEND time, not only at subscribe time"*. What is still unasserted is the narrower window inside a single dispatch, and a URI replayed out of `MemoryEventStore` after a resume, which was authorized when it was stored. |
+| **Resumability** | `Last-Event-ID` replay is exercised by `scripts/probe_resume.ts` with a committed receipt (`docs/proof/resume.json`: stream dropped, three revisions written into the dark, all three replayed in order on reconnect) — a script, not a test, so it is still outside `npm test`. It is now run by `scripts/fresh_clone_check.sh` and by `scripts/check_submission_readiness.py`, which also asserts the committed receipt's verdict. |
 | **Resumability, the gap under it** | A client that has received no event on the standalone SSE stream holds no `Last-Event-ID` and cannot resume at all — the SDK writes no priming event on that stream (FRICTION F-010). A correction published before the first event on a fresh stream is stored and not replayable. Unfixable from this side; disclosed rather than closed. |
 | **Key rotation** | `Envelope.openAsync()` unwraps whatever key the stored bytes name, and `test/envelope.test.ts` covers it at the provider level. No test rotates a live store's key and reads old records back through it. |
 | **KMS** | `KmsKeyProvider` has never been executed against a live CMK — the account is under the hold logged as F-004. Its SigV4 canonical request, signed-header list, endpoint and target are asserted; that AWS accepts them is not. |
+| **MCP Apps binding** | The `ui://unsay/echo` resource is served, listed and read over the wire by `npm run e2e`. The `_meta` template binding that tells a host to render a tool result INTO it has never been honoured by a host, because no host we can reach implements the extension. F-013. |
+| **The browser host** | `web/web.test.ts` now slices echo.html's own MCP client out of the page and runs it against a live server — initialize, pagination, subscribe, the SSE framer, the correction. What is still unverified is **rendering**: layout, animation timing and the 1280×800 device fit are checked by eye, not by a headless browser. |
 
 The suite is `test/store.test.ts`, `test/envelope.test.ts`, `test/server.test.ts` and
 `test/http.test.ts`. `npm test` prints the exact count and the README headlines it; this document
@@ -547,7 +657,9 @@ presented signature (I-14). The alternative writer path — a bearer token — m
 - **One shared write secret**, from `UNSAY_WRITE_SECRET`, not per-author keys. `authorId` is
   therefore *claimed in the body*, not proven by the signature: the signature proves *a* holder of
   the write secret wrote this, not *which clinician*. The hash chain then makes that claimed
-  authorship immutable — immutable, not authentic.
+  authorship immutable — immutable, not authentic. On the **bearer** path an identity IS proved, and
+  the audit row records it (I-14); the record still carries the claimed author, so the two can
+  disagree, and a row where they disagree is the row an investigator wants.
 - **Defaults exist.** `DEV_WRITE_SECRET` and `DEV_TOKEN_SECRET` are used when the environment
   variables are unset, and the server announces it at startup when it is running on the default
   token secret. A deployment that ignores that line is unauthenticated in practice.
@@ -679,9 +791,12 @@ position is T-2.
 
 `src/http.ts › MemoryEventStore` stores each notification whether or not a stream is attached and
 replays it on `Last-Event-ID`, so a correction survives the network dropping under an Echo Show
-mid-sentence. `scripts/probe_resume.ts` proves it end to end and commits the receipt: the stream is
-dropped, four revisions are written while it is down, the client reconnects with `Last-Event-ID`,
-and all four are replayed (`docs/proof/resume.json`). The store is in-memory and capacity-bounded
+mid-sentence. `scripts/probe_resume.ts` proves it end to end and commits the receipt: a revision is delivered
+live, the stream is dropped, **three** further revisions are written while it is down, the client
+reconnects with `Last-Event-ID`, and all three are replayed in order
+(`docs/proof/resume.json`). Three and not one on purpose — a replay that delivered only the LAST
+missed notification would pass a single-revision probe and lose the middle of a correction sequence
+in the field. The store is in-memory and capacity-bounded
 at 2048 events: a long enough outage, or a process restart, loses the replay.
 
 ### A scope is revoked between subscribe and revision

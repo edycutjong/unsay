@@ -6,13 +6,24 @@
 <title>Unsay — the assistant that can be corrected</title>
 <meta name="description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#0B0D0E">
+<meta name="theme-color" content="#F3F5F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Unsay">
+<meta property="og:title" content="Unsay — the assistant that can be corrected">
+<meta property="og:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
+<meta property="og:image" content="/og.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Unsay — the assistant that can be corrected">
+<meta name="twitter:description" content="An MCP server whose resources can be corrected mid-sentence, so an assistant can stop, retract what it just said, and name what changed, who changed it, and how long ago.">
+<meta name="twitter:image" content="/og.svg">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 /* Palette is the product's vocabulary, not decoration: amber = this changed,
    red = this is stale, green = this is current. Used nowhere else on the page. */
 :root{
   --bg:#0B0D0E; --surface:#16191B; --raise:#1D2124; --line:#262B2E; --line-soft:#1F2426;
-  --text:#F2F4F5; --muted:#9BA3A8; --dim:#6E777C;
+  --text:#F2F4F5; --muted:#9BA3A8; --dim:#838C91;
   --amber:#F2A93B; --amber-ink:#F2A93B; --amber-wash:rgba(242,169,59,.12);
   --red:#D9564A; --red-ink:#E4695E;
   --green:#3F9E63; --green-ink:#5CB77E;
@@ -23,7 +34,7 @@
 @media (prefers-color-scheme: light){
   :root{
     --bg:#F3F5F6; --surface:#FFFFFF; --raise:#F7F9FA; --line:#DDE2E5; --line-soft:#E7EBEE;
-    --text:#0B0D0E; --muted:#535E64; --dim:#78848A;
+    --text:#0B0D0E; --muted:#535E64; --dim:#5F6B71;
     --amber:#DE8F13; --amber-ink:#8A5405; --amber-wash:rgba(222,143,19,.13);
     --red:#C0392B; --red-ink:#9E2C20;
     --green:#2C7A4B; --green-ink:#1F5D38;
@@ -76,9 +87,19 @@ h1{font-size:clamp(38px,6.2vw,68px); font-weight:660; max-width:16ch}
   border-radius:14px; box-shadow:var(--shadow); overflow:hidden}
 .stage-head{display:flex; align-items:center; gap:12px; padding:12px 16px;
   border-bottom:1px solid var(--line-soft); background:var(--raise)}
+/* min-width:0 and the ellipsis are load-bearing: the chip is nowrap inside a flex
+   row inside an overflow:hidden stage, so without them it refuses to shrink and
+   pushes the Replay button — the hero's only control — off a 320px screen. */
 .chip{display:inline-flex; align-items:center; gap:7px; font-size:12px; letter-spacing:.06em;
   text-transform:uppercase; color:var(--muted); border:1px solid var(--line);
-  padding:4px 9px; border-radius:999px; white-space:nowrap}
+  padding:4px 9px; border-radius:999px; white-space:nowrap;
+  min-width:0; overflow:hidden; text-overflow:ellipsis}
+.chip::before{flex:none}
+@media (max-width:420px){
+  .stage-head{flex-wrap:wrap; row-gap:8px}
+  .stage-head .btn{margin-left:0}
+}
+.fric-row .sev{min-width:0}
 .chip::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--dim)}
 .chip.is-illus::before{background:var(--accent)}
 .btn{font:inherit; font-size:13px; color:var(--muted); background:transparent;
@@ -331,8 +352,8 @@ footer a{color:var(--muted)}
         record exists. It is never sent the content, so it cannot leak it.</p>
       <p>We do not rely on <code>annotations.audience</code>, because the 2025-11-25 spec places no
         obligation on a client to honour it. That gap is filed as
-        <a href="../FRICTION.md">FRICTION.md F-002</a>, with proposed spec language. The enforcement
-        point is about fifteen lines: <a href="../src/store.ts"><code>src/store.ts</code></a>
+        <a href="/FRICTION.md">FRICTION.md F-002</a>, with proposed spec language. The enforcement
+        point is about fifteen lines: <a href="/packages/live-resources/src/store.ts"><code>packages/live-resources/src/store.ts</code></a>
         <code>read()</code>. The reads that must fail are asserted as failures by
         <code>npm run verify</code>.</p>
     </div>
@@ -347,12 +368,12 @@ footer a{color:var(--muted)}
     <!-- Every figure below is WRITTEN HERE by `npm run bench`, from the same run that
          produces docs/proof/bench.json, rounded up to one decimal so it can never be
          faster than the measurement. web/web.test.ts fails if one is edited by hand. -->
-    <script type="application/json" id="bench" data-source="../docs/proof/bench.json">
-      {"endToEnd":{"p50":1.6,"p95":3},"writeToNotification":{"p50":0.8},"n":200,"midSentence":200}
+    <script type="application/json" id="bench" data-source="/docs/proof/bench.json">
+      {"endToEnd":{"p50":1.4,"p95":2.8},"writeToNotification":{"p50":0.7},"n":200,"midSentence":200}
     </script>
     <div class="stat">
-      <div><div class="v"><span data-bench="endToEnd.p50">1.6</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
-      <div><div class="v"><span data-bench="endToEnd.p95">3.0</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p50">1.4</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p50, end-to-end</div></div>
+      <div><div class="v"><span data-bench="endToEnd.p95">2.8</span><span style="font-size:.45em; color:var(--muted)"> ms</span></div><div class="k">p95, end-to-end</div></div>
       <div><div class="v"><span data-bench="midSentence">200</span>/<span data-bench="n">200</span></div><div class="k">landed mid-sentence</div></div>
     </div>
     <p class="caveat"><b>What this number is not.</b> These are loopback Streamable-HTTP figures over
@@ -369,14 +390,15 @@ footer a{color:var(--muted)}
       <code>--dry-run</code> anywhere in the reproduce path. If a flag could switch off the thing
       being judged, the submission would be worthless.</p>
     <div class="proof" id="proofGrid">
-      <a class="card" href="../DEMO.md" data-probe="../DEMO.md">
+      <a class="card" href="/DEMO.md" data-probe="/DEMO.md">
         <span class="cmd">npm run verify</span>
         <h3>The safety property, asserted as failures</h3>
-        <p>Eleven assertions. A user-scoped principal must fail to reach every internal URI, a
+        <p><span data-count="verify">33</span> assertions — fifteen in process, eighteen against a
+          real HTTP server. A user-scoped principal must fail to reach every internal URI, a
           tampered version must break the chain and be located exactly.</p>
         <span class="path">DEMO.md · scripts/verify.ts</span>
       </a>
-      <a class="card" href="../docs/proof/live_run.jsonl" data-probe="../docs/proof/live_run.jsonl">
+      <a class="card" href="/docs/proof/live_run.jsonl" data-probe="/docs/proof/live_run.jsonl">
         <span class="cmd">npm run e2e</span>
         <h3>The whole demo, as code</h3>
         <p>Capability negotiation, <code>completion/complete</code> resolved through
@@ -384,18 +406,19 @@ footer a{color:var(--muted)}
           fact announcing its age, and the fallback tool.</p>
         <span class="path">docs/proof/live_run.jsonl — the real protocol frames</span>
       </a>
-      <a class="card" href="../docs/proof/bench.txt" data-probe="../docs/proof/bench.txt">
+      <a class="card" href="/docs/proof/bench.txt" data-probe="/docs/proof/bench.txt">
         <span class="cmd">npm run bench -- --n 200</span>
         <h3>The latency, with its caveat attached</h3>
         <p>p50, p95 and max for each segment, plus the count of runs that landed inside the speech
           window. The caveat is printed by the script, not added afterwards.</p>
         <span class="path">docs/proof/bench.txt · docs/proof/bench.json</span>
       </a>
-      <a class="card" href="../FRICTION.md" data-probe="../FRICTION.md">
+      <a class="card" href="/FRICTION.md" data-probe="/FRICTION.md">
         <span class="cmd">FRICTION.md</span>
         <h3>What fought back</h3>
-        <p>Four entries written the day they were hit, including two proposed changes to the MCP
-          specification found by building against it.</p>
+        <p><span data-count="friction">13</span> entries written the day each was hit, including
+          <span data-count="frictionSpec">7</span> proposed changes to the MCP specification and its
+          extensions, found by building against them.</p>
         <span class="path">FRICTION.md — root level</span>
       </a>
       <!-- /verify is live only while a server is running; the link is enabled by probe,
@@ -421,9 +444,10 @@ footer a{color:var(--muted)}
 
   <section id="friction">
     <p class="sec-h">Friction log</p>
-    <h2>Two of these are proposed spec changes.</h2>
-    <p class="lede">Written the day each was hit, not assembled the week of the deadline.
-      <a href="../FRICTION.md">Read all four →</a></p>
+    <h2><span data-count="frictionSpec">7</span> of these propose changes to the spec.</h2>
+    <p class="lede">Written the day each was hit, not assembled the week of the deadline. Five of
+      <span data-count="friction">13</span> shown.
+      <a href="/FRICTION.md">Read all <span data-count="friction">13</span> →</a></p>
     <div class="fric">
       <div class="fric-row">
         <span class="id">F-002</span>
@@ -448,6 +472,13 @@ footer a{color:var(--muted)}
         <span class="sev med">Low</span>
       </div>
       <div class="fric-row">
+        <span class="id">F-013</span>
+        <span class="txt"><b>The MCP Apps tool→template binding key is vendor-namespaced</b>, with no
+          registry and no capability to negotiate against. A server cannot tell by reading whether a
+          host will look for its <code>ui://</code> template at all.</span>
+        <span class="sev med">Medium</span>
+      </div>
+      <div class="fric-row">
         <span class="id">F-004</span>
         <span class="txt"><b>An Amazon retail payment hold gated the developer console</b>, blocking
           the Ring and Fire TV tracks entirely. Alexa+ survived only because a self-hosted MCP
@@ -464,9 +495,9 @@ footer a{color:var(--muted)}
     <p><b>Unsay relays what a clinician wrote. It does not generate clinical guidance and is not a
       medical device.</b> Ray Dunn, Sarah Okafor and the care plan on this page are a scenario;
       the seed record is committed at <code>src/seed.ts</code>.</p>
-    <p>MIT licensed · <a href="../LICENSE">LICENSE</a> · <a href="../README.md">README</a> ·
-      <a href="../DEMO.md">DEMO</a> · <a href="../ARCHITECTURE.md">ARCHITECTURE</a> ·
-      <a href="../FRICTION.md">FRICTION</a></p>
+    <p>MIT licensed · <a href="/LICENSE">LICENSE</a> · <a href="/README.md">README</a> ·
+      <a href="/DEMO.md">DEMO</a> · <a href="/ARCHITECTURE.md">ARCHITECTURE</a> ·
+      <a href="/FRICTION.md">FRICTION</a></p>
   </div>
 </footer>
 
@@ -475,12 +506,18 @@ footer a{color:var(--muted)}
   'use strict'
 
   // ── the hero demonstration ───────────────────────────────────────────────
-  // Copy: seed value + the scripted retraction. Offsets: docs/proof/bench.json.
+  // Copy: seed value + the retraction. Offsets: docs/proof/bench.json.
+  //
+  // A2 is NOT written here. It is the output of renderRetraction() in
+  // src/retraction.ts for the seeded v2→v3 pair thirty seconds on, pasted because
+  // `file://` cannot fetch a sibling module — and web/web.test.ts recomputes it and
+  // fails if this line and the server's wording ever differ. It used to be one of
+  // three hand-written wordings of the sentence the product is named for.
   const RAY_Q = '“Can I put weight on it yet?”'
   const A1 = 'You can put about half your weight on it—'
-  const A2 = '—actually, stop. That changed thirty seconds ago. Sarah’s moved you to full weight-bearing as tolerated, from today. Take it slowly the first time, and have someone nearby.'
+  const A2 = 'Wait — don’t do that. What I just told you is out of date. I said “Partial weight-bearing, about half your body weight through the operated leg.” Sarah Okafor, physio changed it 30 seconds ago: “Full weight-bearing as tolerated.” In plain terms, full weight-bearing as tolerated means you can put as much weight through that leg as is comfortable.'
   const CUT_AT_WORD = 7          // fires while “on it—” is still being spoken
-  const WORD_A = 155, WORD_B = 108
+  const WORD_A = 155, WORD_B = 82
 
   // The offsets are read from the same bench island the headline stats use, so a
   // regenerated docs/proof/bench.json cannot leave a stale number on this page.
@@ -596,8 +633,9 @@ footer a{color:var(--muted)}
   start()
 
   // ── proof links: never render a link that goes nowhere ────────────────────
-  // Served from the repository root, the sibling files resolve. Served from
-  // web/ alone, or with no server running, they do not — so say so instead.
+  // The server serves each of these from a read-only allowlist (src/http.ts
+  // REPO_FILES), so under `npm start` they resolve. This probe is the safety net
+  // for the page opened some other way — say so rather than 404 silently.
   if (location.protocol === 'http:' || location.protocol === 'https:') {
     for (const card of document.querySelectorAll('[data-probe]')) {
       const target = card.getAttribute('data-probe')
