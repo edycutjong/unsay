@@ -16,56 +16,112 @@ retract what it just said, and name what changed, who changed it, and how long a
 
 Built for the **Alexa+** track of the Amazon Developer Hackathon (Build, Ship, Shape).
 
-## Status — day 1
+## Status — day 6
 
-🚧 In development. Deadline 2026-10-23.
+🚧 In development. Deadline 2026-10-23. Nothing is deployed; `npm start` runs the whole thing
+locally, [`DEMO.md`](DEMO.md) reproduces every claim below from an empty clone, and
+[`FRICTION.md`](FRICTION.md) ends with the full list of what this build does **not** do.
 
-**Day-1 probe passed** — the correction mechanism is proven, not assumed:
-
-```
-server capabilities.resources : {"subscribe":true,"listChanged":true}
-notifications/resources/updated RECEIVED
-  write → notification        : 0.74 ms   (in-process; real deployment TBD)
-  re-read returns new value   : YES
-VERDICT: correction lands mid-sentence (< 3400 ms): YES
-```
-
-Receipt: [`docs/proof/probe_subscribe.json`](docs/proof/probe_subscribe.json) ·
-Reproduce: `npm install && npm run probe`
-
-**Day-2 safety properties pass** — `npm run verify` asserts the reads that MUST fail, do:
+**The mechanism is proven, not assumed.** `npm run e2e` runs the demo as code against the same
+HTTP server `npm start` runs — real Bearer token, cursor-paginated listing, a real audio blob,
+the physio's correction arriving through the signed write path:
 
 ```
-1. audience partition
-  ✓ care-internal://ray/risk unreachable with care.read.user
-  ✓ care-internal://ray/adherence unreachable with care.read.user
-  ✓ both readable WITH care.read.assistant
-2. existence is not leaked
-  ✓ list() with user scope returns no care-internal:// URI  — 4 user URIs
-  ✓ care:// URI cannot reach an assistant-only record
-3. version chain
-  ✓ chain intact · ✓ tampering v1 breaks it and is located
-4. self-announcing staleness
-  ✓ anticoagulant past stale_after (9.0d) · ✓ exercise NOT flagged (1.0d)
-5. ✓ publishing an assistant-only record as audience:user is refused
+  no token                  HTTP 401 · Bearer realm="unsay"
+  resources/list            8 resources over 3 cursor page(s)
+  completion {version}      ["v2","v1"]  ← resolved via context.arguments
+  read  care://ray/exercise_clip   ← audio/wav · 24044 bytes
+
+  Ray's own host reads care-internal://ray/risk
+        -32002 Resource not found — same answer as for a URI that does not exist
+
+  tampered write            HTTP 401 · refused, and says nothing about why
+  POST /write               HTTP 200 · v3 · 1 subscribed host(s)
+  notifications/resources/updated  1.40 ms
+  v3.prevHash === v2.versionHash  YES — the retraction is auditable
+
+  PASS — receipt → docs/proof/live_run.jsonl (18 frames)
+```
+
+**The safety properties pass** — `npm run verify` asserts the reads and writes that MUST fail,
+do. Twenty-nine assertions, eleven in process and eighteen against a real HTTP server:
+
+```
+1. audience partition          ✓ care-internal://ray/{risk,adherence} unreachable with care.read.user
+                               ✓ both readable WITH care.read.assistant
+2. existence is not leaked     ✓ list() with user scope returns no care-internal:// URI — 5 user URIs
+                               ✓ a care:// URI cannot reach an assistant-only record
+3. version chain               ✓ chain intact · ✓ tampering v1 breaks it and is located
+4. self-announcing staleness   ✓ anticoagulant past stale_after (9.0d) · ✓ exercise NOT flagged (1.0d)
+5. audience flip               ✓ publishing an assistant-only record as audience:user is refused
+6. OAuth over HTTP             ✓ no token → 401 · ✓ an edited scope claim → 401
+                               ✓ care-internal:// unreachable with care.read.user, on any cursor page
+                               ✓ GET /verify without a token lists no care-internal:// chain
+7. encryption at rest          ✓ a ciphertext pasted from care-internal://ray/risk fails to decrypt
+                               ✓ and the chain reports it broken at that exact version
+8. the signed write path       ✓ unsigned · mutated body · wrong key · stale timestamp → all 401
+                               ✓ every refusal left an audit row, and none carries a credential
 
 PASS — 0 failing assertion(s)
 ```
 
-The partition is enforced **server-side by two URI schemes behind two OAuth scopes**, not by
-trusting `annotations.audience` — because the spec places no obligation on a client to honour
-it. See [`FRICTION.md`](FRICTION.md) F-002.
+The partition is enforced **server-side by two URI schemes behind two verified OAuth scopes**,
+not by trusting `annotations.audience` — because the spec places no obligation on a client to
+honour it. See [`FRICTION.md`](FRICTION.md) F-002. Section 7 goes one layer further: AES-256-GCM
+whose AAD is `patient|domain|version|audience`, so the partition survives an attacker who owns
+the database and simply moves the bytes.
+
+**A correction survives the network dropping under it** — `npm run probe:resume` writes a
+revision while the SSE stream is down and asserts it is replayed on `Last-Event-ID`:
+
+```
+  offline window              804 ms
+  write → replayed at client  805 ms
+  VERDICT: PASS   (6/6 checks)
+```
+
+**The number**, from `npm run bench -- --n 200` — signed write → HMAC verified → store →
+notification → authorized re-read, 200 times:
+
+```
+signed write → notification       0.8ms      2.0ms      3.7ms
+notification → re-read            0.9ms      1.8ms      3.7ms
+END-TO-END (write → value)        1.7ms      3.3ms      7.2ms      (p50 · p95 · max)
+
+retraction lands mid-sentence in 200/200 runs (100%)
+a host was subscribed for every run: yes
+```
+
+Loopback figures, and the 3,400 ms speech window is an assumed speech rate rather than a
+measurement of Alexa+ TTS. Neither is ever quoted as a production number.
+
+Receipts, all committed and all regenerated by the commands above:
+[`probe_subscribe.json`](docs/proof/probe_subscribe.json) ·
+[`live_run.jsonl`](docs/proof/live_run.jsonl) ·
+[`resume.json`](docs/proof/resume.json) ·
+[`bench.txt`](docs/proof/bench.txt)
+
+Reproduce everything: `npm install && npm run verify && npm run e2e` — full walkthrough in
+[`DEMO.md`](DEMO.md).
 
 ## Tests
 
-**27 tests**, all passing (`npm test`). Coverage is deliberately not headlined — see
-[`DEMO.md`](DEMO.md#the-tests) for why, and `./scripts/fresh_clone_check.sh` for the gate
-that actually catches what tests miss.
+**156 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+Coverage is deliberately not headlined — see [`DEMO.md`](DEMO.md#the-tests) for why, and
+`./scripts/fresh_clone_check.sh` for the gate that actually catches what a suite misses.
+
+## What is not here
+
+No deployment, no hosted URL, no demo video, no published package, no external users. The AWS
+KMS provider is SigV4-signed and shaped but has **never been executed against a live key**. The
+full inventory is at the end of [`FRICTION.md`](FRICTION.md) under *What this build does NOT do*,
+and the generated [`ARCHITECTURE.md`](ARCHITECTURE.md) closes with the same list.
 
 ## Friction log
 
-[`FRICTION.md`](FRICTION.md) — four entries so far, including two proposed changes to the
-MCP specification found by building against it.
+[`FRICTION.md`](FRICTION.md) — twelve entries, proposing changes to both the MCP specification
+and its reference TypeScript SDK. Every one was found by building against them, and each names
+the file or the measurement it came from.
 
 ## Licence
 
