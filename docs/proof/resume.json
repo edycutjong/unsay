@@ -1,6 +1,6 @@
 {
   "probe": "last_event_id_resumability",
-  "ranAt": "2026-09-28T08:34:21.967Z",
+  "ranAt": "2026-09-28T14:03:58.371Z",
   "sdk": "@modelcontextprotocol/sdk@1.30.0",
   "transport": "StreamableHTTP",
   "uri": "care://ray/weight_bearing",
@@ -13,8 +13,8 @@
     ],
     "missedCount": 3
   },
-  "offlineWindowMs": 803,
-  "writeToReplayedAtClientMs": 801,
+  "offlineWindowMs": 804,
+  "writeToReplayedAtClientMs": 802,
   "sseOpens": 1,
   "sseResumes": 1,
   "storedEvents": 12,

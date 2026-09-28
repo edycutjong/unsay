@@ -171,7 +171,7 @@ unsay · end-to-end · the demo as code
 
   templates                 care://{patient}/{domain}/{version}, care-internal://{patient}/{domain}/{version}
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 35146 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html+skybridge · 35544 bytes · MCP Apps card
   agent skill               skill/SKILL.md — 4571 bytes, the same two rules as instructions
   completion {version}      ["v2","v1"]  ← resolved via context.arguments
 
@@ -189,7 +189,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  2.13 ms
+  notifications/resources/updated  1.44 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -216,7 +216,7 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `2.13 ms` will differ on your machine and between two runs on this one;
+The `1.44 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
 <!-- e2e:end -->
 
@@ -506,6 +506,8 @@ that the counts in the documents are the counts.
 | `npm run fixtures` | Regenerates the two WAV clips byte-identically from source |
 | `npm run keygen` | Prints 32 random bytes of hex for `UNSAY_MASTER_KEY` or `UNSAY_TOKEN_SECRET` |
 | `npm run docs:arch` | Regenerates `ARCHITECTURE.md` from the code — nothing in it is hand-written |
+| `npm run e2e:browser` | The pages in a real Chromium: every page cold, the two-tab correction, no sideways scroll at 375/768/1440 px. Needs `npx playwright install chromium` once |
+| `npm run lighthouse` | Lighthouse on the landing page, `/judge`, the clinician screen and the Echo Show; accessibility below 0.9 fails |
 
 ---
 

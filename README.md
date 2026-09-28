@@ -18,6 +18,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 
 [![Live](https://img.shields.io/badge/Live-api.unsay.edycu.dev-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/)
 [![Verify](https://img.shields.io/badge/Public%20proof-%2Fverify-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/verify)
+[![For judges](https://img.shields.io/badge/For%20judges-%2Fjudge-F2A93B?style=for-the-badge)](https://api.unsay.edycu.dev/judge)
 
 *No Video badge: no video is recorded yet. A badge for an artifact that does not exist is the
 failure this repository is written against.*
@@ -26,10 +27,11 @@ failure this repository is written against.*
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat)
 ![Node 22](https://img.shields.io/badge/Node-22-339933?style=flat)
-![tests](https://img.shields.io/badge/vitest-298%20passing-3F9E63?style=flat)
+![tests](https://img.shields.io/badge/vitest-301%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
+[![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 
-[**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
+[**For judges**](JUDGE.md) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
 
 </div>
 
@@ -183,14 +185,14 @@ write path, and the retraction rendered server-side:
 ```
   protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 35146 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html+skybridge · 35544 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  2.13 ms
+  notifications/resources/updated  1.44 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -207,7 +209,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `2.13 ms` will differ on your machine and between two runs on this one;
+The `1.44 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -332,25 +334,28 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**298 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**301 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 29 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and
 executed against a live server — because the transport a demo video would film was the one
 transport nothing ran.
 
-The CI is committed and has **never run**. `.github/workflows/ci.yml` runs the suite, the
-type-check and the four scripts — `verify`, `e2e`, `probe`, `probe:resume` — on every push and
-every pull request, with no `continue-on-error` anywhere in it;
-`.github/workflows/fresh-clone.yml` runs the fresh-clone gate nightly. But this repository has no
-remote yet, so no runner has executed either of them, and that is why there is no CI badge in the
-header: a badge for a workflow that has never run is the same claim as a Live badge with nothing
-deployed. It goes in after the first green run, not before.
+CI runs on every push and every pull request, with no `continue-on-error` anywhere in it.
+It first ran on a runner the day the repository went public; before that, private-repo Actions
+never started, which is why this header carried no CI badge until there was a green run behind it.
 
-The gate that has actually run — locally, not on a runner — is
-`./scripts/fresh_clone_check.sh`, which clones to a temp directory with empty
-state, installs from scratch, runs every command in [`DEMO.md`](DEMO.md) including the `curl`
-walkthrough against a real `npm start`, and exits non-zero if any of it drifts.
+| Workflow | What it runs |
+|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | the suite, `tsc --strict`, and the four scripts — `verify`, `e2e`, `probe`, `probe:resume` — against a real server; the pages in Chromium (`npm run e2e:browser`); Lighthouse with accessibility as an error gate (`npm run lighthouse`) |
+| [`fresh-clone.yml`](.github/workflows/fresh-clone.yml) | nightly: `./scripts/fresh_clone_check.sh` — an empty clone, a cold install, every command in [`DEMO.md`](DEMO.md) including the `curl` walkthrough, and no drift allowed in any block a script wrote |
+| [`codeql.yml`](.github/workflows/codeql.yml) | static analysis, `security-extended`, over the HMAC check, the SigV4 signer, the token verifier and the markdown renderer |
+| [`gitleaks.yml`](.github/workflows/gitleaks.yml) | secrets across the **whole history**, not just the tip |
+| [`release.yml`](.github/workflows/release.yml) | a semver tag and GitHub Release from `feat:` / `fix:` commit prefixes; any other push releases nothing |
+
+The browser suite exists because it catches what the unit suite structurally cannot. Its first run
+found two broken screenshots on `/doc/readme`: `docs/img/*.png` resolved under `/doc/` and 404'd,
+while the same README rendered fine on GitHub. The regression test that pins it is named for it.
 
 Coverage is deliberately not headlined — see [`DEMO.md`](DEMO.md#the-tests) for why, and
 `./scripts/fresh_clone_check.sh` for the gate that actually catches what a suite misses.
