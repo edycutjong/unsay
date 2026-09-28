@@ -300,6 +300,8 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   baseIn.value = q.get('base') || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
   tokenIn.value = q.get('token') || S.get('sessionStorage', 'unsay.token') || ''
   let shown = q.get('domain') || 'weight_bearing'
+  // ?present=1 opens straight into presentation mode — for an embed that cannot press F
+  const presentOnLoad = q.get('present') === '1'
   if (q.has('token') || q.has('base')) {
     S.set('localStorage', 'unsay.base', baseIn.value)
     S.set('sessionStorage', 'unsay.token', tokenIn.value)
@@ -706,6 +708,7 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   paint()
   resize()
   connect()
+  if (presentOnLoad) togglePresent(true)
 })()
 </script>
 </body>

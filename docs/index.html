@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsay — the assistant that takes back what it just said</title>
+<meta name="description" content="An MCP server for Alexa+ whose care plan is live: when a physio changes an instruction, Alexa retracts it mid-sentence, and the notes that must never be spoken never leave the server.">
+<meta name="theme-color" content="#F4F1E8">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Unsay">
+<meta property="og:title" content="Unsay — the assistant that takes back what it just said">
+<meta property="og:description" content="A physio changes the plan while Alexa is still reading the old one. Unsay makes it stop, mid-sentence, and say so.">
+<meta property="og:image" content="https://api.unsay.edycu.dev/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://api.unsay.edycu.dev/og.png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* design.md §4 — every colour and face on this page is one of these */
+:root {
+  --bg:      #F4F1E8;  /* chart paper */
+  --paper:   #FFFDF6;  /* a chart sheet lying on the paper */
+  --ink:     #16201B;
+  --muted:   #5D6660;
+  --current: #2C7A4B;  /* state: current */
+  --changed: #B8690A;  /* state: changed */
+  --stale:   #B03A2E;  /* state: stale */
+  --rule:    #CFD2C4;
+  --margin:  #D9A79E;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-body:    "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-data:    "IBM Plex Mono", ui-monospace, monospace;
+  --gutter: clamp(20px, 4vw, 56px);
+  --left: clamp(20px, 9vw, 150px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font: 18px/1.6 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    linear-gradient(90deg, transparent calc(var(--left) - 32px), var(--margin) calc(var(--left) - 32px), var(--margin) calc(var(--left) - 31px), transparent calc(var(--left) - 31px)),
+    repeating-linear-gradient(0deg, transparent 0 39px, color-mix(in srgb, var(--rule) 70%, transparent) 39px 40px);
+}
+::selection { background: color-mix(in srgb, var(--changed) 28%, transparent); color: var(--ink); }
+:focus-visible { outline: 2.5px solid var(--changed); outline-offset: 3px; border-radius: 2px; }
+html { scrollbar-color: var(--muted) var(--bg); }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+code, .data { font-family: var(--font-data); font-size: .84em; }
+p code { background: color-mix(in srgb, var(--rule) 45%, transparent); padding: .08em .35em; border-radius: 3px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; min-height: 0 !important; padding: 0 !important; }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--bg); padding: 8px 14px; z-index: 50; }
+.skip:focus { left: 8px; }
+
+/* ── nav ─────────────────────────────────────────────── */
+.nav {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 14px var(--gutter) 14px var(--left);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 80%, transparent);
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+.brand span { font: 400 28px/1 var(--font-display); letter-spacing: -.01em; }
+.nav ul { display: flex; gap: 22px; list-style: none; padding: 0; font-size: 15px; }
+.nav ul a { text-decoration: none; color: var(--muted); transition: color .15s; }
+.nav ul a:hover { color: var(--ink); }
+.nav .gh { font: 700 14px var(--font-body); text-decoration: none; padding: 8px 14px; border: 1.5px solid var(--ink); border-radius: 3px; transition: background .15s, color .15s; }
+.nav .gh:hover { background: var(--ink); color: var(--bg); }
+
+/* ── hero ────────────────────────────────────────────── */
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  gap: clamp(32px, 5vw, 72px); align-items: center;
+  padding: clamp(40px, 7vh, 88px) var(--gutter) 64px var(--left);
+}
+.eyebrow { font: 500 12px/1.4 var(--font-data); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--ink); font-weight: 500; }
+h1 {
+  font: 400 clamp(54px, 6.6vw, 104px)/.95 var(--font-display);
+  letter-spacing: -.012em; margin: 18px 0 26px;
+  text-wrap: balance;
+}
+h1 em { font-style: italic; color: var(--changed); position: relative; white-space: nowrap; }
+h1 em svg { position: absolute; left: -1%; bottom: .02em; width: 102%; height: .16em; overflow: visible; }
+h1 em path { fill: none; stroke: var(--changed); stroke-width: 2.5; stroke-linecap: round; opacity: .5; vector-effect: non-scaling-stroke; }
+.sub { max-width: 34em; color: #2B3530; font-size: 19px; }
+.sub b { color: var(--ink); }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  font: 700 15px/1 var(--font-body); padding: 14px 20px; border-radius: 3px;
+  border: 1.5px solid var(--ink); text-decoration: none; color: var(--ink); background: transparent;
+  cursor: pointer; transition: transform .15s, background .15s, color .15s, box-shadow .15s;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 4px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn svg { width: 17px; height: 17px; }
+.proofline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 22px; font: 400 13px/1.4 var(--font-data); color: var(--muted); }
+.proofline .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.proofline.live .dot { background: var(--current); box-shadow: 0 0 0 0 color-mix(in srgb, var(--current) 50%, transparent); animation: ping 2s infinite; }
+.proofline a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 3px; }
+@keyframes ping { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* the chart — design.md §5 */
+.chart {
+  position: relative; background: var(--paper); border: 1.5px solid var(--ink);
+  box-shadow: 10px 10px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+  font-size: 15px; transform: rotate(.4deg);
+}
+.chart::before {
+  content: ""; position: absolute; top: -13px; left: 50%; width: 96px; height: 24px; transform: translateX(-50%) rotate(-2deg);
+  background: color-mix(in srgb, #E8DDB8 80%, transparent); border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.chart-head { display: flex; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1.5px solid var(--ink); font: 500 11.5px var(--font-data); letter-spacing: .08em; text-transform: uppercase; }
+.live { display: inline-flex; align-items: center; gap: 7px; color: var(--current); }
+.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--current); animation: blink 1.6s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.cols, .row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 70px; }
+.cols { font: 500 10.5px var(--font-data); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule); }
+.cols > *, .row > * { padding: 10px 14px; }
+.cols > * + *, .row > * + * { border-left: 1px solid var(--rule); }
+.row { border-bottom: 1px solid var(--rule); min-height: 64px; }
+.k { font: 500 10.5px/1.4 var(--font-data); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.k small { display: block; font-size: 10px; letter-spacing: .04em; text-transform: none; margin-top: 4px; }
+.order { position: relative; line-height: 1.45; }
+.row.old .order { color: var(--muted); }
+.struck-text { background: linear-gradient(var(--changed), var(--changed)) no-repeat 0 58% / 100% 2.5px; }
+.sig { display: flex; flex-direction: column; justify-content: center; font: 400 italic 25px/1 var(--font-display); color: var(--muted); }
+.sig small { font: 400 10px var(--font-data); font-style: normal; margin-top: 5px; letter-spacing: .04em; }
+.row.new .order { font: 400 25px/1.15 var(--font-display); color: var(--ink); }
+.row.new .order small { display: block; font: 400 12px/1.4 var(--font-data); color: var(--changed); margin-top: 6px; }
+.row.new .sig { color: var(--changed); }
+.row.internal { background: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--rule) 38%, transparent) 7px 8px); }
+.row.internal .order { font-size: 13.5px; color: var(--muted); }
+.row.internal .order b { color: var(--ink); font-weight: 400; }
+.tag { display: inline-block; font: 500 10px var(--font-data); letter-spacing: .08em; text-transform: uppercase; color: var(--stale); border: 1px solid color-mix(in srgb, var(--stale) 50%, transparent); padding: 1px 6px; border-radius: 2px; margin-bottom: 4px; }
+.speech { display: flex; gap: 12px; align-items: baseline; padding: 14px 16px; border-top: 1.5px solid var(--ink); background: #F8F3E3; min-height: 88px; }
+.speech .who { font: 500 10.5px var(--font-data); letter-spacing: .12em; color: var(--muted); flex: none; }
+.speech q { font: 400 italic 21px/1.3 var(--font-display); quotes: "\201C" "\201D"; }
+.speech .said { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--changed); text-decoration-thickness: 2px; }
+.speech .caret { display: inline-block; width: 2px; height: 1em; background: var(--ink); vertical-align: -2px; margin-left: 1px; animation: blink .8s infinite; }
+.speech .now { display: block; font-style: normal; font: 400 21px/1.3 var(--font-display); margin-top: 4px; }
+.replay { position: absolute; right: 12px; bottom: -44px; font: 500 12px var(--font-data); color: var(--muted); background: none; border: 0; cursor: pointer; padding: 6px 4px; display: inline-flex; gap: 6px; align-items: center; }
+.replay:hover { color: var(--ink); }
+.frame-chip { position: absolute; left: -18px; top: 44%; transform: translate(-100%, -50%); font: 500 11px var(--font-data); color: var(--changed); background: var(--paper); border: 1.5px solid var(--changed); padding: 5px 9px; border-radius: 2px; white-space: nowrap; opacity: 0; pointer-events: none; }
+
+/* animation states — the default (no JS, print, screenshots) is the corrected chart */
+.chart.play .row.old .order { color: var(--ink); }
+.chart.play .struck-text { background-size: 0% 2.5px; }
+.chart.play .row.new { opacity: 0; transform: translateY(6px); }
+.chart.play .sig.initials { opacity: 0; }
+.chart .row.new, .chart .sig.initials, .chart .row.old .order { transition: opacity .5s, transform .5s, color .5s; }
+.chart .struck-text { transition: background-size .9s cubic-bezier(.65,0,.25,1); }
+.chart.struck .row.old .order { color: var(--muted); }
+.chart.struck .struck-text { background-size: 100% 2.5px; }
+.chart.struck .frame-chip { animation: chip 1.6s ease forwards; }
+.chart.landed .row.new { opacity: 1; transform: none; }
+.chart.landed .sig.initials { opacity: 1; }
+@keyframes chip { 0% { opacity: 0; transform: translate(-80%, -50%); } 18%, 70% { opacity: 1; transform: translate(-100%, -50%); } 100% { opacity: 0; transform: translate(-100%, -50%); } }
+
+/* ── receipts ────────────────────────────────────────── */
+.receipts {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 36px var(--gutter) 0 var(--left);
+  border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink);
+}
+.receipt { padding: 26px 22px 22px; text-decoration: none; display: block; transition: background .15s; }
+.receipt + .receipt { border-left: 1px solid var(--rule); }
+.receipt:hover { background: color-mix(in srgb, var(--paper) 70%, transparent); }
+.receipt b { display: block; font: 400 clamp(46px, 4.8vw, 68px)/1 var(--font-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.receipt b span.u { font-size: .55em; margin-left: 4px; }
+.receipt .l { display: block; margin-top: 8px; font-size: 15px; line-height: 1.4; color: #2B3530; }
+.receipt .p { display: block; margin-top: 10px; font: 400 11.5px var(--font-data); color: var(--muted); }
+.receipt:hover .p { color: var(--changed); }
+
+/* ── sections ────────────────────────────────────────── */
+section.s { padding: clamp(72px, 10vh, 120px) var(--gutter) 0 var(--left); }
+.label { font: 500 12px var(--font-data); letter-spacing: .14em; text-transform: uppercase; color: var(--changed); display: flex; align-items: center; gap: 12px; }
+.label::after { content: ""; height: 1px; width: 56px; background: var(--changed); opacity: .5; }
+h2 { font: 400 clamp(38px, 4.4vw, 62px)/1.02 var(--font-display); letter-spacing: -.01em; margin: 14px 0 16px; max-width: 18em; text-wrap: balance; }
+h2 em { color: var(--changed); }
+.lede { max-width: 40em; color: #2B3530; }
+
+/* demo pair */
+.pair { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 28px; margin-top: 40px; align-items: start; }
+.device { background: #1B1F1D; border-radius: 18px; padding: 12px; box-shadow: 0 30px 60px -30px rgba(22,32,27,.55); }
+.device img { border-radius: 8px; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
+.caption { font: 400 12.5px/1.5 var(--font-data); color: var(--muted); margin-top: 12px; }
+.term { background: #121614; color: #D9DDD6; border-radius: 10px; font: 400 12.5px/1.62 var(--font-data); overflow: hidden; box-shadow: 0 30px 60px -30px rgba(22,32,27,.55); }
+.term-bar { display: flex; justify-content: space-between; padding: 10px 14px; background: #1C211E; color: #8C958E; font-size: 11.5px; }
+.term-bar i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #3A413C; margin-right: 5px; }
+.term pre { margin: 0; padding: 16px 18px 20px; white-space: pre-wrap; word-break: break-word; min-height: 520px; font: inherit; }
+.term .c { color: #8C958E; }
+.term .g { color: #6FCF97; }
+.term .a { color: #F2B45C; }
+.term .r { color: #F08A7E; }
+.term .w { color: #FFFFFF; }
+.term .cursor { display: inline-block; width: 8px; height: 14px; background: #D9DDD6; vertical-align: -2px; animation: blink .9s infinite; }
+
+/* try it live */
+.try { margin-top: 36px; border: 1.5px solid var(--ink); background: var(--paper); box-shadow: 10px 10px 0 color-mix(in srgb, var(--ink) 8%, transparent); }
+.try-head { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 1.5px solid var(--ink); }
+.try-head ol { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 0; list-style: none; counter-reset: s; font-size: 15px; }
+.try-head li { counter-increment: s; }
+.try-head li::before { content: counter(s); font: 500 11px var(--font-data); display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1.2px solid var(--ink); border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.try-body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 560px; }
+.try-body > div { position: relative; min-width: 0; }
+.try-body > div + div { border-left: 1.5px solid var(--ink); }
+.pane-label { display: flex; justify-content: space-between; font: 500 10.5px var(--font-data); letter-spacing: .1em; text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid var(--rule); color: var(--muted); }
+.dark .pane-label { background: #0B0D0E; color: #8C958E; border-color: #222; }
+.try iframe { width: 100%; height: 600px; border: 0; display: block; background: #fff; }
+.try .dark iframe { background: #0B0D0E; }
+.try-body > .try-cover { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; text-align: center; padding: 28px; background: repeating-linear-gradient(0deg, transparent 0 39px, color-mix(in srgb, var(--rule) 60%, transparent) 39px 40px), var(--paper); }
+.try-cover p { max-width: 26em; color: #2B3530; margin: 14px auto 18px; font-size: 16px; }
+.try-cover .big { font: 400 32px/1.1 var(--font-display); }
+.try-foot { padding: 12px 18px; border-top: 1px solid var(--rule); font: 400 12px/1.5 var(--font-data); color: var(--muted); }
+.try-status { font: 500 12px var(--font-data); color: var(--muted); }
+.try-status.ok { color: var(--current); }
+.try-status.err { color: var(--stale); }
+
+/* two audiences */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); margin-top: 40px; align-items: stretch; }
+.lane { background: var(--paper); border: 1.5px solid var(--ink); padding: 22px 22px 20px; }
+.lane h3 { font: 400 28px/1.1 var(--font-display); margin: 8px 0 12px; }
+.lane .uri { font: 500 13px var(--font-data); }
+.lane.user .uri { color: var(--current); }
+.lane.internal { background: repeating-linear-gradient(135deg, var(--paper) 0 9px, color-mix(in srgb, var(--rule) 30%, var(--paper)) 9px 10px); }
+.lane.internal .uri { color: var(--stale); }
+.lane blockquote { font: 400 italic 20px/1.35 var(--font-display); border-left: 2.5px solid var(--rule); padding-left: 14px; margin: 14px 0; }
+.lane dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14.5px; margin-top: 14px; }
+.lane dt { font: 500 11px/1.9 var(--font-data); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wall { display: grid; place-items: center; }
+.wall span { writing-mode: vertical-rl; font: 500 11px var(--font-data); letter-spacing: .2em; text-transform: uppercase; color: var(--stale); border-left: 2px dashed var(--stale); border-right: 2px dashed var(--stale); padding: 14px 6px; height: 100%; text-align: center; }
+.result { margin-top: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; background: #121614; color: #D9DDD6; padding: 18px 22px; border-radius: 10px; font: 400 13.5px/1.6 var(--font-data); }
+.result b { color: #F2B45C; font-weight: 500; }
+.result .q { font: 400 italic 22px/1.3 var(--font-display); color: #fff; }
+
+/* bento */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; margin-top: 40px; }
+.card { background: var(--paper); border: 1.5px solid var(--ink); padding: 22px 22px 24px; position: relative; transition: transform .2s, box-shadow .2s; }
+.card:hover { transform: translate(-3px, -3px); box-shadow: 6px 6px 0 color-mix(in srgb, var(--ink) 14%, transparent); }
+.card:nth-child(1) { grid-column: span 4; }
+.card:nth-child(2) { grid-column: span 2; }
+.card:nth-child(3), .card:nth-child(4), .card:nth-child(5) { grid-column: span 2; }
+.card:nth-child(6) { grid-column: span 6; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.card svg.ic { width: 36px; height: 36px; margin-bottom: 14px; }
+.card svg.ic * { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.card svg.ic .hl { stroke: var(--changed); }
+.card h3 { font: 400 27px/1.1 var(--font-display); margin-bottom: 8px; }
+.card p { font-size: 16px; color: #2B3530; }
+.chip { position: absolute; top: 18px; right: 18px; font: 500 11px var(--font-data); border: 1px solid var(--rule); padding: 3px 8px; border-radius: 99px; color: var(--muted); background: var(--bg); }
+.card .chip + .chip { top: 46px; }
+.mini-chart { margin-top: 16px; border: 1px solid var(--rule); font: 400 12.5px/1.5 var(--font-data); }
+.mini-chart div { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--rule); }
+.mini-chart div:last-child { border-bottom: 0; }
+.mini-chart .v { color: var(--muted); }
+.mini-chart .x { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--changed); }
+.mini-chart .h { color: var(--muted); }
+
+/* honest */
+.quotes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 40px; }
+.quote { border-top: 2.5px solid var(--ink); padding-top: 18px; }
+.quote p { font: 400 23px/1.28 var(--font-display); overflow-wrap: anywhere; }
+.quote p b { font-weight: 400; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--changed) 26%, transparent) 62%); }
+.quote cite { display: block; margin-top: 14px; font: 500 11.5px var(--font-data); font-style: normal; color: var(--muted); letter-spacing: .04em; }
+
+/* faq */
+.faq { margin-top: 32px; max-width: 900px; border-top: 1.5px solid var(--ink); }
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 18px; padding: 20px 4px; font: 400 25px/1.2 var(--font-display); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font: 400 26px/1 var(--font-data); color: var(--changed); transition: transform .2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq summary:hover { color: var(--changed); }
+.faq .a { padding: 0 4px 22px; max-width: 44em; color: #2B3530; font-size: 17px; }
+
+/* footer */
+footer { margin-top: 110px; padding: 40px var(--gutter) 48px var(--left); border-top: 1.5px solid var(--ink); display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; }
+footer .big { font: 400 44px/1 var(--font-display); }
+footer .big em { color: var(--changed); }
+footer ul { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 15px; }
+footer ul a { text-decoration-color: var(--rule); text-underline-offset: 4px; }
+footer ul a:hover { text-decoration-color: var(--changed); }
+.fine { grid-column: 1 / -1; font-size: 13.5px; color: var(--muted); max-width: 60em; }
+
+/* reveal — content is visible by default; JS only adds motion to what is below the fold */
+.js .rv { opacity: 0; transform: translateY(14px); transition: opacity .7s ease, transform .7s ease; }
+.js .rv.in { opacity: 1; transform: none; }
+.js .hero .st { opacity: 0; transform: translateY(12px); animation: up .8s cubic-bezier(.2,.7,.2,1) forwards; }
+.js .hero .st:nth-child(2) { animation-delay: .08s; } .js .hero .st:nth-child(3) { animation-delay: .2s; }
+.js .hero .st:nth-child(4) { animation-delay: .32s; } .js .hero .st:nth-child(5) { animation-delay: .42s; }
+@keyframes up { to { opacity: 1; transform: none; } }
+
+@media (max-width: 1080px) {
+  .nav ul { display: none; }
+  .hero { grid-template-columns: 1fr; }
+  .chart { transform: none; max-width: 640px; }
+  .frame-chip { left: auto; right: 12px; top: -16px; transform: none; }
+  @keyframes chip { 0% { opacity: 0; } 18%, 70% { opacity: 1; } 100% { opacity: 0; } }
+  .pair { grid-template-columns: 1fr; }
+  .bento .card:nth-child(n) { grid-column: span 3; }
+  .bento .card:nth-child(1), .bento .card:nth-child(6) { grid-column: span 6; }
+}
+@media (max-width: 760px) {
+  :root { --left: 20px; }
+  body { background-image: repeating-linear-gradient(0deg, transparent 0 39px, color-mix(in srgb, var(--rule) 70%, transparent) 39px 40px); font-size: 17px; }
+  .receipts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receipt { padding: 20px 14px 18px; }
+  .receipt b { font-size: 40px; }
+  .receipt:nth-child(3) { border-left: 0; }
+  .receipt:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .cols, .row { grid-template-columns: 74px minmax(0, 1fr) 50px; }
+  .cols > *, .row > * { padding: 9px 10px; }
+  .try-body { grid-template-columns: 1fr; }
+  .try-body > div + div { border-left: 0; border-top: 1.5px solid var(--ink); }
+  .try iframe { height: 560px; }
+  .split { grid-template-columns: 1fr; gap: 0; }
+  .wall { padding: 10px 0; }
+  .wall span { writing-mode: horizontal-tb; border: 0; border-top: 2px dashed var(--stale); border-bottom: 2px dashed var(--stale); width: 100%; height: auto; padding: 8px; }
+  .result { grid-template-columns: 1fr; }
+  .bento .card:nth-child(n) { grid-column: span 6; }
+  .card:nth-child(6) { grid-template-columns: 1fr; }
+  .quotes { grid-template-columns: 1fr; }
+  footer { grid-template-columns: 1fr; }
+  .speech q, .speech .now { font-size: 19px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .js .rv, .js .hero .st { opacity: 1; transform: none; }
+}
+@media print {
+  .nav, .replay, .try, .skip { display: none; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <a class="brand" href="#top" aria-label="Unsay, home"><img src="assets/icon.svg" alt="" width="30" height="30"><span>Unsay</span></a>
+  <nav aria-label="Sections">
+    <ul>
+      <li><a href="#demo">Demo</a></li>
+      <li><a href="#try">Try it live</a></li>
+      <li><a href="#audiences">Never spoken</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#honest">Honesty</a></li>
+      <li><a href="#faq">FAQ</a></li>
+      <li><a href="pitch/">Pitch deck</a></li>
+    </ul>
+  </nav>
+  <a class="gh" href="https://github.com/edycutjong/unsay">GitHub</a>
+</header>
+
+<main id="main">
+<section class="hero" id="top">
+  <div>
+    <p class="eyebrow st">Alexa+ track · <b>Care chart</b> · Ray Dunn · post-op day 5</p>
+    <h1 class="st">The assistant that <em>takes back<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M1 7 C 25 2, 50 9, 99 4"/></svg></em> what it just said.</h1>
+    <p class="sub st">Ray is 68, five days home after a hip replacement. His physio changes the plan while Alexa is still reading him the old one. Unsay publishes his care plan as live MCP resources, so the correction reaches the speaker <b>mid-sentence, 200/200 times, p95&nbsp;668&nbsp;ms</b> across the public internet. The notes his family wrote about him shape the answer and are <b>never spoken</b>. The server enforces that, not the model.</p>
+    <div class="ctas st">
+      <a class="btn primary" href="https://github.com/edycutjong/unsay"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.81.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>View on GitHub</a>
+      <a class="btn" href="pitch/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg>Pitch deck</a>
+      <a class="btn" href="#try"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0"/></svg>Try it live</a>
+    </div>
+    <p class="proofline st" id="proofline"><span><span class="dot"></span><span id="proof-text">public proof: replay the version chain with no account</span></span> <a href="https://api.unsay.edycu.dev/verify">api.unsay.edycu.dev/verify</a></p>
+  </div>
+
+  <figure class="chart" id="chart" aria-label="Ray's care chart. The weight-bearing order, partial weight-bearing, is struck through with one amber line and initialled by Sarah Okafor, physio. The new order, full weight-bearing as tolerated, stands beneath it.">
+    <div class="chart-head"><span>Ray Dunn · post-op day 5 · care://ray</span><span class="live"><i></i>live</span></div>
+    <div class="cols" aria-hidden="true"><span>Order</span><span>Instruction</span><span>Signed</span></div>
+    <div class="row old">
+      <span class="k">Weight<br>bearing<small>v2</small></span>
+      <span class="order"><span class="struck-text">Partial weight-bearing, about half your body weight through the operated leg.</span></span>
+      <span class="sig">MA<small>2 days ago</small></span>
+    </div>
+    <div class="row new">
+      <span class="k">Weight<br>bearing<small>v3 · now</small></span>
+      <span class="order">Full weight-bearing as tolerated.<small>changed just now · Sarah Okafor, physio</small></span>
+      <span class="sig initials">SO<small>just now</small></span>
+    </div>
+    <div class="row internal">
+      <span class="k">Risk<small>care-internal://</small></span>
+      <span class="order"><span class="tag">never spoken</span><br><b>Fall risk: high.</b> Lives alone Monday to Thursday. Shapes the answer; never reaches the speaker.</span>
+      <span class="sig">MA</span>
+    </div>
+    <div class="speech" aria-live="off">
+      <span class="who">ALEXA</span>
+      <span><q id="said" class="said">You can put about half your weight on it—</q><span class="now" id="now">“Wait — don’t do that. Full weight-bearing as tolerated.”</span></span>
+    </div>
+    <span class="frame-chip" aria-hidden="true">notifications/resources/updated</span>
+    <button class="replay" id="replay" type="button" aria-label="Replay the correction"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>replay the correction</button>
+  </figure>
+</section>
+
+<div class="receipts" aria-label="Receipts">
+  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="200" data-suffix="/200">200/200</b><span class="l">corrections landed inside a spoken sentence, on the deployed server</span><span class="p">docs/proof/bench.remote.txt →</span></a>
+  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="668" data-unit=" ms">668<span class="u">ms</span></b><span class="l">p95 from the physio’s write to the speaker holding the correction, across the Pacific</span><span class="p">docs/proof/bench.remote.txt →</span></a>
+  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/verify.json"><b data-count="34" data-suffix="/34">34/34</b><span class="l">safety assertions passing, 15 in process and 19 over HTTP</span><span class="p">docs/proof/verify.json →</span></a>
+  <a class="receipt rv" href="https://github.com/edycutjong/unsay#-testing--ci"><b data-count="298">298</b><span class="l">tests, including 58 that run the Echo Show’s own MCP client against a live server</span><span class="p">npm test →</span></a>
+</div>
+
+<section class="s" id="demo">
+  <p class="label rv">§1 · The demo</p>
+  <h2 class="rv">It stops. It says <em>what changed</em>, who changed it, and how long ago.</h2>
+  <p class="lede rv">The physio’s write is a real signed HTTP request, and the notification is a real Streamable HTTP frame. Left, the Echo Show at the moment the correction lands. Right, the same demo as code, typed out from a real <code>npm run e2e</code> run.</p>
+  <div class="pair">
+    <figure class="rv">
+      <div class="device"><img src="img/echo-retraction.png" alt="The Echo Show screen: 'Partial weight-bearing, about half your body weight through the operated leg' struck through in amber; beneath it 'Full weight-bearing as tolerated.' and 'changed 1 second ago · Sarah Okafor, physio'." width="1280" height="800" loading="lazy"></div>
+      <figcaption class="caption">Ray’s Echo Show, a real capture of <code>web/echo.html</code>, 2026-09-04. The correction is struck through, never erased.</figcaption>
+    </figure>
+    <div class="term rv" aria-label="Terminal replay of npm run e2e">
+      <div class="term-bar"><span><i></i><i></i><i></i> npm run e2e</span><span>2026-09-28 · loopback</span></div>
+      <pre id="term" aria-hidden="true"></pre>
+      <pre class="sr-only" id="term-full"></pre>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="try">
+  <p class="label rv">§2 · Try it live</p>
+  <h2 class="rv">Be Sarah. <em>Change Ray’s plan</em> and watch Alexa take it back.</h2>
+  <p class="lede rv">These are the real screens, served by the deployed server at <code>api.unsay.edycu.dev</code> with a read token it mints for you. Nothing on this page simulates them.</p>
+  <div class="try rv">
+    <div class="try-head">
+      <ol><li>Press <b>change</b> on Weight bearing</li><li>Type a new instruction</li><li>Publish, and watch the right</li></ol>
+      <span class="try-status" id="try-status" role="status">not connected</span>
+    </div>
+    <div class="try-body">
+      <div><span class="pane-label"><span>Clinician · Sarah Okafor</span><span>writes</span></span><iframe id="f-clin" title="Unsay clinician screen, live" loading="lazy"></iframe></div>
+      <div class="dark"><span class="pane-label"><span>Ray’s Echo Show</span><span>listens · resources/subscribe</span></span><iframe id="f-echo" title="Unsay Echo Show screen, live" loading="lazy"></iframe></div>
+      <div class="try-cover" id="try-cover">
+        <div>
+          <p class="big">Two screens, one live server.</p>
+          <p>Connecting loads Sarah’s clinician screen and Ray’s Echo Show from <code>api.unsay.edycu.dev</code>. The patient is fictional, and the server is in memory, so anything you write is gone on the next restart.</p>
+          <button class="btn primary" id="connect" type="button">Connect to the live server</button>
+        </div>
+      </div>
+    </div>
+    <p class="try-foot">Shared sandbox: the clinician screen carries the development write key this repository publishes, on purpose, so anyone can fire a revision. Other visitors’ changes appear too. Open the screens full-size at <a href="https://api.unsay.edycu.dev/">api.unsay.edycu.dev</a>.</p>
+  </div>
+</section>
+
+<section class="s" id="audiences">
+  <p class="label rv">§3 · The line nobody reads aloud</p>
+  <h2 class="rv">Some of the chart is for Ray. Some of it <em>is about him.</em></h2>
+  <p class="lede rv">A care chart holds things a patient should hear and things only his carers should know. Unsay puts them behind two URI schemes and two OAuth scopes, and enforces the split where the server reads. It isn’t done with an annotation the assistant is trusted to honour.</p>
+  <div class="split">
+    <div class="lane user rv">
+      <span class="uri">care://ray/…</span>
+      <h3>What Ray may hear</h3>
+      <blockquote>“Full weight-bearing as tolerated.”</blockquote>
+      <dl><dt>scope</dt><dd><code>care.read.user</code>: Ray’s own host, and the assistant</dd><dt>audience</dt><dd><code>["user"]</code>, speakable</dd></dl>
+    </div>
+    <div class="wall rv" aria-hidden="true"><span>−32002 · resource not found</span></div>
+    <div class="lane internal rv">
+      <span class="uri">care-internal://ray/risk</span>
+      <h3>What only the assistant knows</h3>
+      <blockquote>“Fall risk: HIGH. Lives alone Monday to Thursday. Family disputes the discharge plan.”</blockquote>
+      <dl><dt>scope</dt><dd><code>care.read.assistant</code> only</dd><dt>Ray’s host</dt><dd><code>-32002</code>, the same answer as for a URI that doesn’t exist</dd></dl>
+    </div>
+  </div>
+  <div class="result rv">
+    <span>Alexa’s answer, <b>shaped by</b> the risk note:</span>
+    <span><span class="q">“Take it slowly the first time, and have someone nearby.”</span><br>← from care-internal://ray/risk, reason never spoken</span>
+  </div>
+</section>
+
+<section class="s" id="how">
+  <p class="label rv">§4 · How it works</p>
+  <h2 class="rv">MCP isn’t a wrapper here. <em>It is the product.</em></h2>
+  <p class="lede rv">Ten request handlers and three notification senders on <code>@modelcontextprotocol/sdk</code> 1.30.0, over Streamable HTTP, with the negotiated protocol version asserted at ≥ 2025-11-25. Remove MCP and nothing is left.</p>
+  <div class="bento">
+    <article class="card rv">
+      <span class="chip">resources/subscribe</span>
+      <svg class="ic" viewBox="0 0 36 36" aria-hidden="true"><path d="M4 12h20"/><path class="hl" d="M3 12h24"/><path d="M4 22h14"/><circle class="hl" cx="29" cy="12" r="2.5"/></svg>
+      <h3>The care plan is live, not a PDF.</h3>
+      <p>Each instruction is a <code>care://</code> resource. When a clinician signs a write, the server fires <code>notifications/resources/updated</code>, the subscribed host re-reads, and the answer already in progress is retracted: the old line, who changed it, and how long ago.</p>
+      <div class="mini-chart" aria-label="The version history of weight_bearing">
+        <div><span class="v">v1</span><span class="x">No weight through the operated leg. Transfers with the frame only.</span><span class="h">MA</span></div>
+        <div><span class="v">v2</span><span class="x">Partial, about half your body weight.</span><span class="h">MA</span></div>
+        <div><span class="v">v3</span><span>Full weight-bearing as tolerated.</span><span class="h" style="color:var(--changed)">SO</span></div>
+      </div>
+    </article>
+    <article class="card rv">
+      <span class="chip">annotations.audience</span>
+      <svg class="ic" viewBox="0 0 36 36" aria-hidden="true"><rect x="4" y="6" width="12" height="24" rx="1"/><rect x="20" y="6" width="12" height="24" rx="1"/><path class="hl" d="M18 3v30" stroke-dasharray="3 3"/></svg>
+      <h3>Two audiences, one server.</h3>
+      <p>Speakable facts and assistant-only context live at different URIs behind different scopes. A non-compliant client can’t leak what it is never sent.</p>
+    </article>
+    <article class="card rv">
+      <span class="chip">SHA-256 chain</span>
+      <svg class="ic" viewBox="0 0 36 36" aria-hidden="true"><rect x="3" y="12" width="9" height="12" rx="2"/><rect x="14" y="12" width="9" height="12" rx="2"/><rect class="hl" x="25" y="12" width="9" height="12" rx="2"/><path d="M12 18h2M23 18h2"/></svg>
+      <h3>A retraction you can audit.</h3>
+      <p>Every version carries the previous one’s hash. <code>/verify</code> replays the chain for anyone, with no account.</p>
+    </article>
+    <article class="card rv">
+      <span class="chip">lastModified</span>
+      <svg class="ic" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="13"/><path class="hl" d="M18 10v8l5 4"/></svg>
+      <h3>Stale facts say their age.</h3>
+      <p>A record past its review date is read out with its age: “last changed 9 days ago by Dr Mensah, GP”.</p>
+    </article>
+    <article class="card rv">
+      <span class="chip">Last-Event-ID</span>
+      <svg class="ic" viewBox="0 0 36 36" aria-hidden="true"><path d="M6 20a14 14 0 0 1 24 0"/><path d="M11 24a8 8 0 0 1 14 0"/><path class="hl" d="M4 4l28 28"/></svg>
+      <h3>It survives the Wi-Fi dropping.</h3>
+      <p>The stream resumes where it left off. 3 revisions written while it was down, 3 replayed on reconnect.</p>
+    </article>
+    <article class="card rv">
+      <div>
+        <span class="chip">ui://unsay/echo</span>
+        <h3>An MCP Apps card for the Echo Show.</h3>
+        <p>The retraction screen ships as an MCP Apps resource the host can render. The Alexa+ track’s own rubric names MCP Apps as a creative use.</p>
+      </div>
+      <div>
+        <h3>An Agent Skill, and a fallback that still retracts.</h3>
+        <p><code>skill/SKILL.md</code> teaches the assistant the two rules. If a host never subscribes, the <code>whats_changed</code> tool returns the previous value too, so the fallback can still retract.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="s" id="honest">
+  <p class="label rv">§5 · Honest by design</p>
+  <h2 class="rv">What this build <em>doesn’t</em> do, in its own words.</h2>
+  <div class="quotes">
+    <figure class="quote rv"><p>“The gating question — whether Alexa+ itself declares <code>capabilities.resources.subscribe</code> — has not been answered, which is exactly why the <b>whats_changed fallback is built and exercised</b>.”</p><cite>README · What is not here</cite></figure>
+    <figure class="quote rv"><p>“The AWS KMS provider is SigV4-signed and shaped but has <b>never been executed against a live key</b>.”</p><cite>README · What is not here</cite></figure>
+    <figure class="quote rv"><p>“Unsay relays what a clinician wrote. It <b>does not generate clinical guidance</b> and is not a medical device.”</p><cite>web/clinician.html · every screen</cite></figure>
+  </div>
+</section>
+
+<section class="s" id="faq">
+  <p class="label rv">§6 · Questions a judge would ask</p>
+  <h2 class="rv">Before you ask.</h2>
+  <div class="faq">
+    <details class="rv"><summary>Has it run on a real Alexa+ device?</summary><div class="a">Not yet, and the repo says so: <code>docs/proof/initialize.json</code> is committed with <code>"status": "not-run"</code>. The server is driven by the MCP SDK’s own spec-compliant client over Streamable HTTP. If a host turns out not to subscribe, the <code>whats_changed</code> tool retracts instead, and <code>npm run e2e</code> exercises that path on every run.</div></details>
+    <details class="rv"><summary>What is mocked?</summary><div class="a">Nothing in the demo path. The write is a real HMAC-signed HTTP request, the notification is a real Streamable HTTP frame, and there’s no <code>MOCK=</code>, <code>OFFLINE=1</code> or <code>--dry-run</code> anywhere in the repo. Ray and Sarah are fictional; their care plan is committed as a seed record.</div></details>
+    <details class="rv"><summary>Is 668 ms fast enough?</summary><div class="a">A 12-word sentence takes about 3,400 ms to say. That’s an assumed speech rate, not a measurement of Alexa+. Against the deployed server, 200 of 200 corrections landed inside that window, with the client in Indonesia and the server in us-west2. On one machine the same path takes 3.3 ms at p95.</div></details>
+    <details class="rv"><summary>Couldn’t a badly behaved assistant leak the private notes?</summary><div class="a">It never receives them. The split is enforced where the server reads (<code>LiveResourceStore.read()</code>), and a user-scope token asking for <code>care-internal://</code> gets <code>-32002</code>, the same answer as for a URI that doesn’t exist. <code>npm run verify</code> asserts it in process and over HTTP.</div></details>
+    <details class="rv"><summary>Can I run it myself?</summary><div class="a"><code>git clone https://github.com/edycutjong/unsay.git &amp;&amp; cd unsay &amp;&amp; npm install &amp;&amp; npm start</code>. Node 22, one runtime dependency, no database and no cloud account. <code>./scripts/fresh_clone_check.sh</code> runs every command in <code>DEMO.md</code> from an empty clone.</div></details>
+    <details class="rv"><summary>Is it open source?</summary><div class="a">MIT, from the first commit. <code>packages/live-resources</code> is the reusable half (versioned resources, the hash chain, the audience partition, the notifier), with its own licence and 29 standalone tests.</div></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div>
+    <p class="big">Some sentences deserve to be <em>unsaid.</em></p>
+  </div>
+  <ul>
+    <li><a href="https://github.com/edycutjong/unsay">GitHub repository</a></li>
+    <li><a href="pitch/">Pitch deck</a></li>
+    <li><a href="https://api.unsay.edycu.dev/">Live server</a></li>
+    <li><a href="https://api.unsay.edycu.dev/verify">Public proof · /verify</a></li>
+    <li><a href="https://api.unsay.edycu.dev/doc/friction">Friction log · 14 entries</a></li>
+    <li><a href="https://github.com/edycutjong/unsay/blob/main/LICENSE">MIT licence</a></li>
+  </ul>
+  <p class="fine">Built for the Alexa+ track of Build, Ship, Shape: the Amazon Developer Hackathon. Unsay relays what a clinician wrote; it does not generate clinical guidance and is not a medical device. Ray Dunn, Sarah Okafor and this care plan are a scenario; the seed record is committed at <code>src/seed.ts</code>.</p>
+</footer>
+
+<script>
+(() => {
+  const API = 'https://api.unsay.edycu.dev';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.documentElement.classList.add('js');
+
+  /* ── the correction, played from the top ──────────────── */
+  const chart = document.getElementById('chart');
+  const said = document.getElementById('said');
+  const now = document.getElementById('now');
+  const LINE = 'You can put about half your weight on it—';
+  let timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  function play() {
+    if (reduce) return;
+    timers.forEach(clearTimeout); timers = [];
+    chart.classList.remove('struck', 'landed'); chart.classList.add('play');
+    said.classList.remove('said'); said.textContent = '';
+    now.style.visibility = 'hidden';
+    const caret = document.createElement('span'); caret.className = 'caret';
+    said.after(caret);
+    [...LINE].forEach((ch, i) => later(() => { said.textContent += ch; }, 500 + i * 52));
+    const t = 500 + LINE.length * 52;
+    later(() => { chart.classList.add('struck'); said.classList.add('said'); caret.remove(); }, t + 250);
+    later(() => { chart.classList.add('landed'); now.style.visibility = 'visible'; }, t + 1150);
+  }
+  document.getElementById('replay').addEventListener('click', play);
+  // play once when the chart is first seen; the default markup is already the corrected chart
+  new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { play(); o.disconnect(); } }, { threshold: .5 }).observe(chart);
+
+  /* ── reveal + count-up ────────────────────────────────── */
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('in'); io.unobserve(e.target);
+    const b = e.target.querySelector('[data-count]');
+    if (b && !reduce) countUp(b);
+  }), { threshold: .15, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.rv').forEach((el) => io.observe(el));
+  function countUp(b) {
+    const end = +b.dataset.count, suf = b.dataset.suffix || '', unit = b.dataset.unit ? '<span class="u">' + b.dataset.unit.trim() + '</span>' : '';
+    const t0 = performance.now(), dur = 1300;
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur), v = Math.round(end * (1 - Math.pow(1 - p, 3)));
+      b.innerHTML = v + suf + unit;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* ── terminal replay: real `npm run e2e` output, 2026-09-28 ── */
+  const T = [
+    ['c', '$ npm run e2e'],
+    ['w', 'unsay · end-to-end · the demo as code'],
+    ['', ''],
+    ['', '  protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum'],
+    ['', '  capabilities.resources    {"subscribe":true,"listChanged":true}'],
+    ['', '  read  ui://unsay/echo   ← text/html+skybridge · MCP Apps card'],
+    ['', ''],
+    ['w', '  RAY   "Can I put weight on it yet?"'],
+    ['', '  read  care://ray/weight_bearing'],
+    ['', '        Partial weight-bearing, about half your body weight through the operated leg.'],
+    ['r', '  read  care-internal://ray/risk   ← audience:assistant · NOT SPOKEN'],
+    ['r', "  Ray's own host reads care-internal://ray/risk"],
+    ['r', '        -32002 Resource not found — same answer as for a URI that does not exist'],
+    ['', ''],
+    ['', '  tampered write            HTTP 401 · refused, and says nothing about why'],
+    ['g', '  POST /write               HTTP 200 · v3 · 1 subscribed host(s)'],
+    ['a', '  notifications/resources/updated  1.43 ms'],
+    ['w', '  ALEXA "You can put about half your weight on it—"'],
+    ['a', '        Wait — don’t do that. What I just told you is out of date.'],
+    ['a', '        Sarah Okafor, physio changed it just now: “Full weight-bearing as tolerated.”'],
+    ['', '        "Take it slowly the first time, and have someone nearby."   ← from care-internal://ray/risk, reason never spoken'],
+    ['g', '  v3.prevHash === v2.versionHash  YES — the retraction is auditable'],
+    ['', ''],
+    ['g', '  PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)'],
+  ];
+  const pre = document.getElementById('term');
+  const full = document.getElementById('term-full');
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const html = T.map(([c, s]) => (c ? '<span class="' + c + '">' + esc(s) + '</span>' : esc(s))).join('\n');
+  full.textContent = T.map((l) => l[1]).join('\n');
+  pre.innerHTML = html; // visible by default
+  let typed = false;
+  new IntersectionObserver((es, o) => {
+    if (!es[0].isIntersecting || typed || reduce) return;
+    typed = true; o.disconnect(); pre.innerHTML = '';
+    let i = 0;
+    const next = () => {
+      if (i >= T.length) { pre.insertAdjacentHTML('beforeend', '<span class="cursor"></span>'); return; }
+      const [c, s] = T[i++];
+      pre.insertAdjacentHTML('beforeend', (c ? '<span class="' + c + '">' + esc(s) + '</span>' : esc(s)) + '\n');
+      setTimeout(next, s ? (i === 1 ? 500 : c === 'a' || c === 'r' ? 260 : 120) : 60);
+    };
+    next();
+  }, { threshold: .35 }).observe(pre);
+
+  /* ── live proof line: GET /verify on the deployed server ── */
+  const pl = document.getElementById('proofline'), pt = document.getElementById('proof-text');
+  fetch(API + '/verify', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+    if (!d || !Array.isArray(d.chains)) return;
+    pl.classList.add('live');
+    pt.textContent = 'live now: ' + d.chains.length + ' chains · ' + d.versions + ' versions · ' + (d.intact ? 'all intact' : 'CHAIN BROKEN');
+  }).catch(() => {});
+
+  /* ── try it live: the server's own landing mints a read token per request ── */
+  const btn = document.getElementById('connect'), st = document.getElementById('try-status');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Connecting…'; st.className = 'try-status'; st.textContent = 'connecting';
+    try {
+      const html = await (await fetch(API + '/index.html', { cache: 'no-store' })).text();
+      const unq = (s) => s.replace(/&amp;/g, '&');
+      const echo = /href="(echo\.html\?[^"]+)"/.exec(html);
+      const clin = /href="(clinician\.html\?[^"]+)"/.exec(html);
+      if (!echo || !clin) throw new Error('no demo links');
+      document.getElementById('f-echo').src = API + '/' + unq(echo[1]) + '&present=1';
+      document.getElementById('f-clin').src = API + '/' + unq(clin[1]);
+      document.getElementById('try-cover').remove();
+      st.className = 'try-status ok'; st.textContent = '● connected · api.unsay.edycu.dev';
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Try again';
+      st.className = 'try-status err'; st.textContent = 'the live server did not answer. Open it directly at api.unsay.edycu.dev';
+    }
+  });
+})();
+</script>
+</body>
+</html>
