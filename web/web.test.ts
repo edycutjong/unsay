@@ -357,11 +357,12 @@ describe('every pointer the pages give a judge lands on something', () => {
     const http = readFileSync(join(REPO, 'src/http.ts'), 'utf8')
     const served = new Set([...http.matchAll(/'(\/[\w./-]+)': '[\w./-]+',/g)].map((m) => m[1]!))
     served.add('/verify')
-    // The five prose documents are rendered at /doc/<name> rather than served as
-    // markdown source; the routes come from the same table the server routes on.
+    // The six prose documents are rendered at /doc/<name> (and JUDGE.md at /judge)
+    // rather than served as markdown source; the routes come from the same table
+    // the server routes on.
     const docs = readFileSync(join(REPO, 'src/docpage.ts'), 'utf8')
-    const docRoutes = [...docs.matchAll(/'(\/doc\/\w+)': \{ file:/g)].map((m) => m[1]!)
-    expect(docRoutes.length, 'DOC_PAGES no longer parses').toBe(5)
+    const docRoutes = [...docs.matchAll(/'(\/(?:doc\/)?\w+)': \{ file:/g)].map((m) => m[1]!)
+    expect(docRoutes.length, 'DOC_PAGES no longer parses').toBe(6)
     for (const r of docRoutes) served.add(r)
     const rooted = [...all['index.html']!.matchAll(/(?:href|data-source|data-probe)="(\/[^"#]*)"/g)]
       .map((m) => m[1]!)
@@ -994,5 +995,75 @@ describe('the served pages are what a judge actually gets', () => {
     expect(out).toContain('<span class="unlinked">nothing</span>')
     expect(out).not.toContain('<script>')
     expect(out).toContain('&lt;script&gt;')
+  })
+})
+
+describe('the judge page', () => {
+  it('answers /judge with no token, no cookie and no redirect, and leads with the claim', async () => {
+    // /judge is the URL printed in the submission. A judge page that needs a key,
+    // or bounces to one, is worse than none — it is the first thing they click.
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const res = await fetch(`${srv.baseUrl}/judge`, { redirect: 'manual' })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toContain('text/html')
+      expect(res.headers.get('set-cookie')).toBeNull()
+      const body = await res.text()
+      expect(body).toContain('An MCP server whose resources can be revised mid-sentence')
+      expect(body).toContain('aria-current="page">Judges</a>')
+      // Its receipts are the committed ones, not a fourth hand-typed copy.
+      const remote = readFileSync(join(REPO, 'docs/proof/bench.remote.txt'), 'utf8')
+      const judge = readFileSync(join(REPO, 'JUDGE.md'), 'utf8')
+      const n = /mid-sentence in (\d+\/\d+) runs/.exec(remote)![1]!
+      const p95 = Math.round(Number(/END-TO-END[^\n]*?\s([\d.]+)ms\s+[\d.]+ms\s*$/m.exec(remote)![1]))
+      expect(judge).toContain(`**${n}**`)
+      expect(judge).toContain(`p95 **${p95} ms**`)
+    } finally {
+      await srv.close()
+    }
+  })
+})
+
+describe('the rendered documents', () => {
+  it('serves every image they show — no relative docs/img/ src resolving under /doc/', async () => {
+    // README.md's two screenshots were `<img src="docs/img/…">`. On GitHub that is
+    // the repo root; on /doc/readme it resolved to /doc/docs/img/… and 404'd, so
+    // the page a judge reads first carried two broken images. Found by the browser
+    // suite (e2e/pages.spec.ts), which is the only thing that loads a page's images.
+    const { createHttpServer } = await import('../src/http.ts')
+    const { DOC_PAGES } = await import('../src/docpage.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      let checked = 0
+      for (const path of Object.keys(DOC_PAGES)) {
+        const body = await (await fetch(`${srv.baseUrl}${path}`)).text()
+        for (const [, src] of body.matchAll(/<img src="([^"]+)"/g)) {
+          if (/^https?:/.test(src!)) continue
+          expect(src, `${path} renders a relative image`).toMatch(/^\//)
+          const res = await fetch(`${srv.baseUrl}${src}`)
+          expect(res.status, `${path} → ${src}`).toBe(200)
+          expect(res.headers.get('content-type'), src).toMatch(/^image\//)
+          checked++
+        }
+      }
+      expect(checked).toBeGreaterThanOrEqual(4)
+    } finally {
+      await srv.close()
+    }
+  })
+})
+
+describe('the rendered documents describe themselves', () => {
+  it('gives every doc page a meta description drawn from its own first paragraph', async () => {
+    // /judge scored 0.9 on Lighthouse SEO for want of one. Written beside the
+    // document it would drift; drawn from it, it cannot.
+    const { DOC_PAGES, describeDoc } = await import('../src/docpage.ts')
+    for (const [path, doc] of Object.entries(DOC_PAGES)) {
+      const d = describeDoc(readFileSync(join(REPO, doc.file), 'utf8'))
+      expect(d.length, path).toBeGreaterThan(20)
+      expect(d.length, path).toBeLessThanOrEqual(160)
+      expect(d, path).not.toMatch(/Generated:|\*\*|`|\]\(/)
+    }
   })
 })

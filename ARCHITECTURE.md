@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-28T08:34:23.602Z_
+_Generated: 2026-09-28T14:04:00.086Z_
 
 ## Protocol
 
@@ -85,18 +85,19 @@ this table only names methods with a sender or handler in the source. It is
 | `/index.html` (and `/`) | GET · HEAD | public — served from `web/` |
 | `/clinician.html` | GET · HEAD | public — served from `web/` |
 | `/echo.html` | GET · HEAD | public — served from `web/` |
+| `/judge` | GET · HEAD | public — `JUDGE.md` rendered by `src/docpage.ts` |
 | `/doc/readme` | GET · HEAD | public — `README.md` rendered by `src/docpage.ts` |
 | `/doc/demo` | GET · HEAD | public — `DEMO.md` rendered by `src/docpage.ts` |
 | `/doc/architecture` | GET · HEAD | public — `ARCHITECTURE.md` rendered by `src/docpage.ts` |
 | `/doc/friction` | GET · HEAD | public — `FRICTION.md` rendered by `src/docpage.ts` |
 | `/doc/spec` | GET · HEAD | public — `docs/SPEC.md` rendered by `src/docpage.ts` |
 
-**6 routes + 3 static pages + 5 rendered documents**, all in `src/http.ts`.
+**6 routes + 3 static pages + 6 rendered documents**, all in `src/http.ts`.
 
 Plus a second read-only allowlist — the documents and receipts the landing page
 cites, so every link on it resolves against the server a judge is already running:
 
-`/README.md` · `/DEMO.md` · `/ARCHITECTURE.md` · `/FRICTION.md` · `/LICENSE` · `/docs/SPEC.md` · `/docs/proof/bench.txt` · `/docs/proof/bench.remote.txt` · `/docs/proof/verify.json` · `/docs/proof/bench.json` · `/docs/proof/live_run.jsonl` · `/docs/proof/probe_subscribe.json` · `/docs/proof/resume.json` · `/skill/SKILL.md` · `/icon.svg` · `/og.png` · `/docs/assets/readme-hero-animated.svg` · `/docs/assets/icon-animated.svg` · `/packages/live-resources/src/store.ts` · `/src/server.ts` · `/src/http.ts`
+`/JUDGE.md` · `/README.md` · `/DEMO.md` · `/ARCHITECTURE.md` · `/FRICTION.md` · `/LICENSE` · `/docs/SPEC.md` · `/docs/proof/bench.txt` · `/docs/proof/bench.remote.txt` · `/docs/proof/verify.json` · `/docs/proof/bench.json` · `/docs/proof/live_run.jsonl` · `/docs/proof/probe_subscribe.json` · `/docs/proof/resume.json` · `/skill/SKILL.md` · `/icon.svg` · `/og.png` · `/docs/assets/readme-hero-animated.svg` · `/docs/assets/icon-animated.svg` · `/docs/img/echo-retraction.png` · `/docs/img/verify-route.png` · `/packages/live-resources/src/store.ts` · `/src/server.ts` · `/src/http.ts`
 
 ## Declared capabilities
 
@@ -116,7 +117,7 @@ tools: {},
 |---|---|
 | `src/audit.ts` | `AuditLog` |
 | `src/blobs.ts` | `EXERCISE_CLIP`, `GAIT_NOTE`, `CLIPS`, `blobFor` |
-| `src/docpage.ts` | `DOC_PAGES`, `slugify`, `resolveDocLink`, `renderMarkdown`, `renderDocPage` |
+| `src/docpage.ts` | `DOC_PAGES`, `slugify`, `resolveDocLink`, `renderMarkdown`, `describeDoc`, `renderDocPage` |
 | `src/envelope.ts` | `EnvelopeError`, `MasterKeyMissingError`, `KmsUnavailableError`, `DecryptionFailedError`, `EnvelopeKeyMismatchError`, `describeSealed`, `Envelope`, `startupLine`, `announceOnce`, `LocalKeyProvider`, `KmsKeyProvider`, `envelopeFromEnv` |
 | `src/http.ts` | `DEV_TOKEN_SECRET`, `DEV_WRITE_SECRET`, `SCOPES_SUPPORTED`, `WRITE_SKEW_MS`, `mintToken`, `TokenError`, `verifyToken`, `writeSigningMaterial`, `signWriteBody`, `urisNamedBy`, `replayAllowed`, `MemoryEventStore`, `createHttpServer` |
 | `src/retraction.ts` | `GLOSSARY`, `spokenAge`, `glossesFor`, `renderRetraction` |
@@ -159,6 +160,9 @@ without Unsay. Consumed here by relative import; not published to npm.
 | `npm run fixtures` | `node --experimental-strip-types fixtures/gen.ts` |
 | `npm run keygen` | `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` |
 | `npm run docs:arch` | `scripts/gen_architecture.ts` |
+| `npm run e2e:browser` | `playwright test` |
+| `npm run e2e:browser:ui` | `playwright test --ui` |
+| `npm run lighthouse` | `npx -y @lhci/cli@0.15.1 autorun` |
 
 ## Runtime dependencies
 

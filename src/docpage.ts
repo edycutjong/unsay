@@ -1,5 +1,5 @@
 /**
- * The five prose documents, rendered as pages instead of handed over as source.
+ * The six prose documents, rendered as pages instead of handed over as source.
  *
  * `/README.md` and its four siblings were served `text/plain`, so every link in the
  * landing page's footer and two of its Proof cards dropped a judge into ~150 kB of
@@ -28,6 +28,9 @@ export interface DocPage {
 }
 
 export const DOC_PAGES: Record<string, DocPage> = {
+  // The one page written for a single reader. Top-level rather than under /doc/
+  // because it is the URL printed in the submission, and a judge types it.
+  '/judge': { file: 'JUDGE.md', title: 'Unsay — for judges' },
   '/doc/readme': { file: 'README.md', title: 'Unsay — README' },
   '/doc/demo': { file: 'DEMO.md', title: 'Unsay — reproduce everything' },
   '/doc/architecture': { file: 'ARCHITECTURE.md', title: 'Unsay — architecture' },
@@ -43,6 +46,7 @@ export const DOC_PAGES: Record<string, DocPage> = {
  * and a `.ts` path that is not on the allowlist would 404 under `npm start`.
  */
 const LINK_ROUTES: Record<string, string> = {
+  'JUDGE.md': '/judge',
   'README.md': '/doc/readme',
   'DEMO.md': '/doc/demo',
   'ARCHITECTURE.md': '/doc/architecture',
@@ -57,6 +61,8 @@ const LINK_ROUTES: Record<string, string> = {
   'docs/assets/og-image.png': '/og.png',
   'docs/assets/readme-hero-animated.svg': '/docs/assets/readme-hero-animated.svg',
   'docs/assets/icon-animated.svg': '/docs/assets/icon-animated.svg',
+  'docs/img/echo-retraction.png': '/docs/img/echo-retraction.png',
+  'docs/img/verify-route.png': '/docs/img/verify-route.png',
   'docs/proof/bench.txt': '/docs/proof/bench.txt',
   'docs/proof/bench.remote.txt': '/docs/proof/bench.remote.txt',
   'docs/proof/bench.json': '/docs/proof/bench.json',
@@ -136,7 +142,12 @@ function rawBlock(line: string): string | null {
   const img = /^<img\s+src="([^"]+)"\s+alt="([^"]*)"(?:\s+width="(\d+)")?(?:\s+height="(\d+)")?\s*>$/
     .exec(line)
   if (img) {
-    const src = resolveDocLink(img[1]!) ?? img[1]!
+    // Same rule as an inline image: a src this server answers nowhere is dropped,
+    // not passed through. Passed through, a relative `docs/img/x.png` resolved
+    // against /doc/readme to /doc/docs/img/x.png — a broken image on the page a
+    // judge reads first, while the same README rendered fine on GitHub.
+    const src = resolveDocLink(img[1]!)
+    if (!src) return ''
     const w = img[3] ? ` width="${img[3]}"` : ''
     const h = img[4] ? ` height="${img[4]}"` : ''
     return `<img src="${esc(src)}" alt="${esc(img[2]!)}"${w}${h}>`
@@ -313,6 +324,7 @@ img{max-width:100%; height:auto}
 
 const NAV = [
   ['/index.html', 'Overview'],
+  ['/judge', 'Judges'],
   ['/doc/readme', 'README'],
   ['/doc/demo', 'Demo'],
   ['/doc/architecture', 'Architecture'],
@@ -324,6 +336,23 @@ const NAV = [
  * A whole page for one document. `rawPath` is the plain-text original, kept
  * visible at the foot so `curl` and a diff still have somewhere obvious to go.
  */
+/**
+ * The page's meta description, taken from the document rather than written beside
+ * it: the first prose paragraph, markdown stripped, cut at a word near 160
+ * characters. A description kept in a second place is one that drifts.
+ */
+export function describeDoc(markdown: string): string {
+  const paras = markdown.split(/\n\s*\n/).map((p) => p.trim())
+  const prose = paras.find((p) => p && !/^(?:#|<|\||```|>|_|-{3}|!\[|\[!\[|\d+\.\s|[-*]\s)/.test(p)) ?? ''
+  const text = prose
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/`|\*\*|\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (text.length <= 160) return text
+  return text.slice(0, 157).replace(/\s+\S*$/, '') + '…'
+}
+
 export function renderDocPage(markdown: string, opts: { title: string; path: string; rawPath: string }): string {
   const nav = NAV.map(([href, label]) =>
     `<a href="${href}"${href === opts.path ? ' aria-current="page"' : ''}>${label}</a>`,
@@ -334,6 +363,7 @@ export function renderDocPage(markdown: string, opts: { title: string; path: str
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)}</title>
+<meta name="description" content="${esc(describeDoc(markdown))}">
 <meta name="color-scheme" content="dark light">
 <meta name="robots" content="index, follow">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">

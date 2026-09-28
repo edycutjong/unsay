@@ -74,7 +74,7 @@ const repoFiles = allowlist('REPO_FILES')
  * is the same R6 shape as documenting a route that does not exist.
  */
 const docSource = bodies.get('src/docpage.ts') ?? ''
-const docRoutes = [...docSource.matchAll(/'(\/doc\/\w+)': \{ file: '([^']+)'/g)]
+const docRoutes = [...docSource.matchAll(/'(\/(?:doc\/)?\w+)': \{ file: '([^']+)'/g)]
   .map((m) => ({ route: m[1]!, file: m[2]! }))
 const routeMethods = (path: string) => {
   if (path === '/mcp') return 'POST · GET · DELETE'

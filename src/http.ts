@@ -997,6 +997,7 @@ const STATIC_PAGES: Record<string, string> = {
  * arithmetic.
  */
 const REPO_FILES: Record<string, string> = {
+  '/JUDGE.md': 'JUDGE.md',
   '/README.md': 'README.md',
   '/DEMO.md': 'DEMO.md',
   '/ARCHITECTURE.md': 'ARCHITECTURE.md',
@@ -1018,6 +1019,8 @@ const REPO_FILES: Record<string, string> = {
   '/og.png': 'docs/assets/og-image.png',
   '/docs/assets/readme-hero-animated.svg': 'docs/assets/readme-hero-animated.svg',
   '/docs/assets/icon-animated.svg': 'docs/assets/icon-animated.svg',
+  '/docs/img/echo-retraction.png': 'docs/img/echo-retraction.png',
+  '/docs/img/verify-route.png': 'docs/img/verify-route.png',
   '/packages/live-resources/src/store.ts': 'packages/live-resources/src/store.ts',
   '/src/server.ts': 'src/server.ts',
   '/src/http.ts': 'src/http.ts',
