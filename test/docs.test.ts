@@ -289,14 +289,16 @@ describe('the drawn artwork says what the code says', () => {
     store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
     const chain = store.versions(RAY, 'weight_bearing')
     const opening = renderRetraction(chain.at(-2)!, chain.at(-1)!).split('.')[0]! + '.'
-    for (const art of ['docs/readme-hero.svg', 'docs/og.svg']) {
+    // The social card is now a raster exported from the kitchen pipeline, so the animated
+    // hero is the one drawn artifact in the repo whose wording can be read back.
+    for (const art of ['docs/assets/readme-hero-animated.svg']) {
       expect(read(art), art).toContain(opening)
       expect(read(art), `${art} still shows a retired wording`).not.toContain('actually, stop')
     }
   })
 
   it('labels the hero as an illustration rather than a recording', () => {
-    expect(read('docs/readme-hero.svg')).toContain('Illustration of the mechanism')
+    expect(read('docs/assets/readme-hero-animated.svg')).toContain('Illustration of the mechanism')
     // Tolerant of emphasis marks, strict about the two words that carry the claim.
     expect(README).toMatch(/\*{0,2}illustration\*{0,2} of the mechanism/i)
   })

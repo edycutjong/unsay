@@ -780,9 +780,11 @@ Each item names where to look, so none of it has to be taken on trust.
 - **Rendering is not verified.** Layout, animation timing, the 1280×800 device fit and the
   contrast tokens were checked by eye and by hand-computed WCAG ratios, not by a headless
   browser. There are no committed screenshots of the running screens, and the README says so.
-- **The landing page's `og:image` is an SVG.** `docs/og.svg` is a real 1200×630 card, but most
-  link-preview scrapers will not rasterise SVG, so a shared link degrades to a text-only preview
-  until a PNG exists. Named here rather than left to be discovered in a Slack channel.
+- **The landing page's `og:image` was an SVG until the asset suite landed.** `docs/og.svg` was a
+  real 1200×630 card, but most link-preview scrapers will not rasterise SVG, so a shared link
+  degraded to a text-only preview. It is now a 2400×1260 PNG (`docs/assets/og-image.png`,
+  exported at 2× from the asset pipeline) and `web/web.test.ts` reads its IHDR. Named here rather
+  than left to be discovered in a Slack channel.
 
 ### The number
 

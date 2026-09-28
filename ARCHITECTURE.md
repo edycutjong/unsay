@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-04T20:07:36.200Z_
+_Generated: 2026-09-17T08:14:53.539Z_
 
 ## Protocol
 
@@ -96,7 +96,7 @@ this table only names methods with a sender or handler in the source. It is
 Plus a second read-only allowlist — the documents and receipts the landing page
 cites, so every link on it resolves against the server a judge is already running:
 
-`/README.md` · `/DEMO.md` · `/ARCHITECTURE.md` · `/FRICTION.md` · `/LICENSE` · `/docs/SPEC.md` · `/docs/proof/bench.txt` · `/docs/proof/verify.json` · `/docs/proof/bench.json` · `/docs/proof/live_run.jsonl` · `/docs/proof/probe_subscribe.json` · `/docs/proof/resume.json` · `/skill/SKILL.md` · `/icon.svg` · `/og.svg` · `/og.png` · `/docs/readme-hero.svg` · `/packages/live-resources/src/store.ts` · `/src/server.ts` · `/src/http.ts`
+`/README.md` · `/DEMO.md` · `/ARCHITECTURE.md` · `/FRICTION.md` · `/LICENSE` · `/docs/SPEC.md` · `/docs/proof/bench.txt` · `/docs/proof/verify.json` · `/docs/proof/bench.json` · `/docs/proof/live_run.jsonl` · `/docs/proof/probe_subscribe.json` · `/docs/proof/resume.json` · `/skill/SKILL.md` · `/icon.svg` · `/og.png` · `/docs/assets/readme-hero-animated.svg` · `/docs/assets/icon-animated.svg` · `/packages/live-resources/src/store.ts` · `/src/server.ts` · `/src/http.ts`
 
 ## Declared capabilities
 

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Unsay — a spoken instruction struck through in amber, the new line standing beneath it">
+  <title>Unsay</title>
+  <!--
+    Three shapes on a self-plated tile, so the mark holds on GitHub light AND dark:
+      1. the old bar   — the instruction that was being spoken, now dimmed
+      2. the strike    — amber, ending in its full stop: the frame that struck it
+      3. the new bar   — the instruction that stands now
+    Colours use the token-with-fallback pattern: standalone rasterisation takes the
+    hex; embedded next to _tokens.css the variable wins.
+  -->
+  <defs>
+    <!-- userSpaceOnUse: an objectBoundingBox gradient on a zero-height horizontal line renders NOTHING in Chromium -->
+    <linearGradient id="strike" gradientUnits="userSpaceOnUse" x1="88" y1="0" x2="398" y2="0">
+      <stop offset="0" stop-color="var(--accent, #F2A93B)"/>
+      <stop offset="1" stop-color="var(--accent-hot, #FFC15E)"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="var(--bg-base, #0B0D0E)"/>
+  <rect x="1" y="1" width="510" height="510" rx="115" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <!-- 1 · the old bar -->
+  <line x1="110" y1="197" x2="336" y2="197" stroke="var(--text-dim, #636C72)" stroke-width="46" stroke-linecap="round"/>
+  <!-- 2 · the strike, and its full stop -->
+  <line x1="88" y1="197" x2="378" y2="197" stroke="url(#strike)" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="398" cy="197" r="30" fill="var(--accent, #F2A93B)"/>
+  <!-- 3 · the new line -->
+  <line x1="110" y1="315" x2="284" y2="315" stroke="var(--text-hi, #F2F4F5)" stroke-width="46" stroke-linecap="round"/>
+</svg>

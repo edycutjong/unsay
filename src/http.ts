@@ -1010,13 +1010,13 @@ const REPO_FILES: Record<string, string> = {
   '/docs/proof/probe_subscribe.json': 'docs/proof/probe_subscribe.json',
   '/docs/proof/resume.json': 'docs/proof/resume.json',
   '/skill/SKILL.md': 'skill/SKILL.md',
-  '/icon.svg': 'docs/icon.svg',
-  '/og.svg': 'docs/og.svg',
-  // The raster card. No scraper renders an SVG og:image, so the SVG is the source
-  // and this is what the meta tag names. web/web.test.ts reads its IHDR and fails
-  // if it is not exactly 1200×630.
-  '/og.png': 'docs/og.png',
-  '/docs/readme-hero.svg': 'docs/readme-hero.svg',
+  '/icon.svg': 'docs/assets/icon.svg',
+  // The raster card. No scraper renders an SVG og:image, so this is what the meta
+  // tag names: the 1200×630 card exported at 2× from the asset pipeline. web/web.test.ts
+  // reads its IHDR and fails if it is not exactly 2400×1260.
+  '/og.png': 'docs/assets/og-image.png',
+  '/docs/assets/readme-hero-animated.svg': 'docs/assets/readme-hero-animated.svg',
+  '/docs/assets/icon-animated.svg': 'docs/assets/icon-animated.svg',
   '/packages/live-resources/src/store.ts': 'packages/live-resources/src/store.ts',
   '/src/server.ts': 'src/server.ts',
   '/src/http.ts': 'src/http.ts',

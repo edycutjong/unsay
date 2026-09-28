@@ -819,13 +819,13 @@ describe('the social card is a raster a scraper can render', () => {
    * upload for the Devpost gallery card either. R13: a great repo behind a weak
    * platform surface.
    */
-  const png = readFileSync(join(REPO, 'docs/og.png'))
+  const png = readFileSync(join(REPO, 'docs/assets/og-image.png'))
 
-  it('is a PNG of exactly 1200×630, the size every scraper crops to', () => {
+  it('is a PNG of exactly 2400×1260 — the 1200×630 card every scraper crops to, exported at 2×', () => {
     expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
     expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR')
-    expect(png.readUInt32BE(16)).toBe(1200)
-    expect(png.readUInt32BE(20)).toBe(630)
+    expect(png.readUInt32BE(16)).toBe(2400)
+    expect(png.readUInt32BE(20)).toBe(1260)
   })
 
   it('is what every page names, with the dimensions and the alt text beside it', () => {
@@ -833,8 +833,8 @@ describe('the social card is a raster a scraper can render', () => {
       const html = all[page]!
       expect(html, page).toContain('<meta property="og:image" content="/og.png">')
       expect(html, page).toContain('<meta name="twitter:image" content="/og.png">')
-      expect(html, page).toContain('<meta property="og:image:width" content="1200">')
-      expect(html, page).toContain('<meta property="og:image:height" content="630">')
+      expect(html, page).toContain('<meta property="og:image:width" content="2400">')
+      expect(html, page).toContain('<meta property="og:image:height" content="1260">')
       expect(html, page).toMatch(/<meta property="og:image:alt" content="[^"]{20,}">/)
       expect(html, page).toContain(`<meta property="og:url" content="/${page}">`)
       expect(html, page).not.toContain('content="/og.svg"')

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/icon.svg" alt="" width="144" height="144">
+<img src="docs/assets/icon.svg" alt="" width="144" height="144">
 
 # Unsay
 
@@ -9,7 +9,7 @@
 An MCP server whose resources can be revised mid-sentence — so an assistant can stop,
 retract what it just said, and name what changed, who changed it, and how long ago.
 
-<img src="docs/readme-hero.svg" alt="Alexa is told a care-plan fact, the physio changes it mid-answer, and the assistant retracts: the old instruction struck through, the new one beneath it, and the protocol frames that caused it." width="900">
+<img src="docs/assets/readme-hero-animated.svg" alt="Unsay — retracts what Alexa just said. The spoken instruction is struck through in amber the instant the update frame lands; the new line stands white beneath." width="1280">
 
 [![Reproduce it](https://img.shields.io/badge/Reproduce%20it-DEMO.md-0B0D0E?style=for-the-badge)](DEMO.md)
 [![Spec & threat model](https://img.shields.io/badge/Spec%20%26%20threat%20model-SPEC.md-262B2E?style=for-the-badge)](docs/SPEC.md)
