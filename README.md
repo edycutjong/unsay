@@ -192,7 +192,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.73 ms
+  notifications/resources/updated  1.36 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -209,7 +209,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.73 ms` will differ on your machine and between two runs on this one;
+The `1.36 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -283,10 +283,10 @@ out of the same run that writes [`docs/proof/bench.txt`](docs/proof/bench.txt):
 <!-- bench:begin — written by `npm run bench`. Do not edit by hand; test/docs.test.ts fails if you do. -->
 ```
 segment                             p50        p95        max
-signed write → notification       0.8ms      1.2ms      3.8ms
-notification → re-read            0.9ms      2.2ms      5.0ms
+signed write → notification       0.7ms      1.1ms      3.1ms
+notification → re-read            0.8ms      2.1ms      4.2ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)        1.7ms      3.3ms      8.5ms
+END-TO-END (write → value)        1.6ms      3.0ms      6.3ms
 
 retraction lands mid-sentence in 200/200 runs (100%)
 a host was subscribed for every run: yes

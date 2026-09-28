@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-28T14:04:00.086Z_
+_Generated: 2026-09-28T22:30:48.079Z_
 
 ## Protocol
 
@@ -168,7 +168,7 @@ without Unsay. Consumed here by relative import; not published to npm.
 
 | Package | Version | Used in |
 |---|---|---|
-| `@modelcontextprotocol/sdk` | `^1.30.0` | `src/http.ts`, `src/server.ts`, `packages/live-resources/src/notifier.ts`, `scripts/bench.ts`, `scripts/e2e.ts`, `scripts/probe_resume.ts`, `scripts/probe_subscribe.ts`, `scripts/verify.ts` |
+| `@modelcontextprotocol/sdk` | `^1.30.1` | `src/http.ts`, `src/server.ts`, `packages/live-resources/src/notifier.ts`, `scripts/bench.ts`, `scripts/e2e.ts`, `scripts/probe_resume.ts`, `scripts/probe_subscribe.ts`, `scripts/verify.ts` |
 
 ## Not built
 

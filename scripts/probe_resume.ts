@@ -23,7 +23,7 @@
  *
  * Run: node --experimental-strip-types scripts/probe_resume.ts
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -32,6 +32,12 @@ import { ResourceUpdatedNotificationSchema } from '@modelcontextprotocol/sdk/typ
 import { DEV_WRITE_SECRET, createHttpServer, mintToken, signWriteBody } from '../src/http.ts'
 import { LiveResourceStore, uriFor } from '../src/store.ts'
 import { RAY, seedDemo } from '../src/seed.ts'
+
+// The SDK version this run actually loaded, read from the installed package rather
+// than typed here — a hand-typed version is a receipt that goes stale on the next bump.
+const SDK_VERSION: string = JSON.parse(
+  readFileSync(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8'),
+).version
 
 /** Long enough to finish a write inside it, short enough that the probe stays quick. */
 const RECONNECT_DELAY_MS = 800
@@ -201,7 +207,7 @@ writeFileSync(
     {
       probe: 'last_event_id_resumability',
       ranAt: new Date().toISOString(),
-      sdk: '@modelcontextprotocol/sdk@1.30.0',
+      sdk: `@modelcontextprotocol/sdk@${SDK_VERSION}`,
       transport: 'StreamableHTTP',
       uri: WB,
       revisions,

@@ -36,6 +36,12 @@ import { LiveResourceStore, uriFor } from '../src/store.ts'
 import { envelopeFromEnv } from '../src/envelope.ts'
 import { RAY, seedDemo } from '../src/seed.ts'
 
+// The SDK version this run actually loaded, read from the installed package rather
+// than typed here — a hand-typed version is a receipt that goes stale on the next bump.
+const SDK_VERSION: string = JSON.parse(
+  readFileSync(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8'),
+).version
+
 const N = Number(process.argv[process.argv.indexOf('--n') + 1]) || 200
 const REMOTE = process.argv.includes('--url')
   ? process.argv[process.argv.indexOf('--url') + 1]!.replace(/\/+$/, '')
@@ -160,7 +166,7 @@ if (REMOTE) {
   const out = [
     `unsay bench · ${N} revisions · ${new Date().toISOString()}`,
     `transport: Streamable HTTP over the public internet → ${REMOTE}`,
-    `client: this machine · sdk @modelcontextprotocol/sdk 1.30.0`,
+    `client: this machine · sdk @modelcontextprotocol/sdk ${SDK_VERSION}`,
     `path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read`,
     srv.atRest,
     '',
@@ -211,7 +217,7 @@ if (REMOTE) {
 
 const out = [
   `unsay bench · ${N} revisions · ${new Date().toISOString()}`,
-  `transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk 1.30.0`,
+  `transport: Streamable HTTP (loopback) · sdk @modelcontextprotocol/sdk ${SDK_VERSION}`,
   `path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read`,
   srv.atRest,
   '',

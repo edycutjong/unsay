@@ -16,7 +16,7 @@
  */
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -29,6 +29,12 @@ import {
   UnsubscribeRequestSchema,
   ResourceUpdatedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js'
+
+// The SDK version this run actually loaded, read from the installed package rather
+// than typed here — a hand-typed version is a receipt that goes stale on the next bump.
+const SDK_VERSION: string = JSON.parse(
+  readFileSync(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8'),
+).version
 
 const URI = 'care://ray/weight_bearing'
 const PORT = 39_517
@@ -159,7 +165,7 @@ log(`\n  VERDICT: correction lands mid-sentence (< ${speechWindowMs} ms): ${midS
 const proof = {
   probe: 'subscribe_updated_streamable_http',
   ranAt: new Date().toISOString(),
-  sdk: '@modelcontextprotocol/sdk@1.30.0',
+  sdk: `@modelcontextprotocol/sdk@${SDK_VERSION}`,
   transport: 'StreamableHTTP',
   serverCapabilities: caps?.resources ?? null,
   uri: URI,
