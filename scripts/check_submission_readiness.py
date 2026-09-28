@@ -15,7 +15,8 @@ Side effect, deliberately: this regenerates ARCHITECTURE.md in order to diff it.
 working tree is dirty afterwards, that IS the finding — the committed copy had drifted
 from the code it claims to be generated from.
 """
-import json, os, re, subprocess, sys
+import json, os, re, subprocess, sys, tempfile
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 fails, warns = [], []
@@ -87,9 +88,11 @@ declared = int(m.group(1)) if m else None
 b = re.search(r"shields\.io/badge/vitest-(\d+)(?:%20|-)passing", readme)
 badged = int(b.group(1)) if b else None
 try:
-    out = subprocess.run(["npx", "vitest", "run", "--reporter=json"], cwd=ROOT,
-                         capture_output=True, text=True, timeout=300).stdout
-    actual = json.loads(out[out.index("{"):]).get("numTotalTests")
+    # vitest 5 writes the json reporter to a file, not stdout, so name the file.
+    report = Path(tempfile.mkdtemp()) / "vitest.json"
+    subprocess.run(["npx", "vitest", "run", "--reporter=json", f"--outputFile={report}"],
+                   cwd=ROOT, capture_output=True, text=True, timeout=300)
+    actual = json.loads(report.read_text()).get("numTotalTests")
 except Exception as e:                                   # noqa: BLE001
     actual = None
     warns.append(f"could not run vitest ({e})")

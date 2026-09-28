@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-17T08:14:53.539Z_
+_Generated: 2026-09-28T08:32:27.523Z_
 
 ## Protocol
 
