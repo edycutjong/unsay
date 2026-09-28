@@ -70,6 +70,7 @@ nothing Unsay does needs one — the server it tests is the server that is deplo
 
 ## Links
 
+- Landing page and pitch deck: [unsay.edycu.dev](https://unsay.edycu.dev/) · [unsay.edycu.dev/pitch](https://unsay.edycu.dev/pitch/)
 - Live: [api.unsay.edycu.dev/](https://api.unsay.edycu.dev/)
 - Public receipt: [api.unsay.edycu.dev/verify](https://api.unsay.edycu.dev/verify)
 - Repository: [github.com/edycutjong/unsay](https://github.com/edycutjong/unsay)

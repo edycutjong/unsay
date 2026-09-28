@@ -16,6 +16,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 [![Friction log](https://img.shields.io/badge/Friction%20log-14%20entries-DE8F13?style=for-the-badge)](FRICTION.md)
 [![Hackathon](https://img.shields.io/badge/Amazon%20Developer-Alexa%2B%20track-5B8DEF?style=for-the-badge)](https://amazonappdev2026.devpost.com/)
 
+[![Landing](https://img.shields.io/badge/Landing-unsay.edycu.dev-DE8F13?style=for-the-badge)](https://unsay.edycu.dev/)
 [![Live](https://img.shields.io/badge/Live-api.unsay.edycu.dev-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/)
 [![Verify](https://img.shields.io/badge/Public%20proof-%2Fverify-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/verify)
 [![For judges](https://img.shields.io/badge/For%20judges-%2Fjudge-F2A93B?style=for-the-badge)](https://api.unsay.edycu.dev/judge)
