@@ -815,7 +815,7 @@ Each item names where to look, so none of it has to be taken on trust.
 
 ### Not started
 
-No demo video. No screenshots of the running screens. No published npm package. No external
+No published npm package. No external
 users. No sourced epidemiology behind the impact case — the README says so in
 the section that would otherwise carry it, because a market-size figure this repo did not measure
 is exactly the kind of number it refuses to print. None of these is claimed anywhere else in this

@@ -10,6 +10,8 @@ No account, no clone, no key. Everything on this page is live at
 
 ## The thirty-second path
 
+Rather watch first? The [2:49 demo video](https://youtu.be/jJM5LWHONDU) films this path, then the protocol under it.
+
 1. Open the landing page, [api.unsay.edycu.dev/](https://api.unsay.edycu.dev/). It mints its own demo tokens; you do
    not need one.
 2. From it, open **The Echo Show screen** and **The clinician write screen** side by side.
@@ -64,12 +66,13 @@ nothing Unsay does needs one — the server it tests is the server that is deplo
   fallback tool is built and exercised by `npm run e2e`, not merely described.
 - **The AWS KMS provider has never run against a live key.** It is SigV4-signed by hand and
   shaped; the deployment runs plaintext at rest and `/verify` says so out loud.
-- **No video yet, and no external users.** The deployment's clinician screen carries this
+- **No external users.** The deployment's clinician screen carries this
   repository's published dev write key on purpose, so you can fire a revision yourself; the
   patient is fictional.
 
 ## Links
 
+- Demo video (2:49): [youtu.be/jJM5LWHONDU](https://youtu.be/jJM5LWHONDU)
 - Landing page and pitch deck: [unsay.edycu.dev](https://unsay.edycu.dev/) · [unsay.edycu.dev/pitch](https://unsay.edycu.dev/pitch/)
 - Live: [api.unsay.edycu.dev/](https://api.unsay.edycu.dev/)
 - Public receipt: [api.unsay.edycu.dev/verify](https://api.unsay.edycu.dev/verify)

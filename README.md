@@ -16,13 +16,11 @@ retract what it just said, and name what changed, who changed it, and how long a
 [![Friction log](https://img.shields.io/badge/Friction%20log-14%20entries-DE8F13?style=for-the-badge)](FRICTION.md)
 [![Hackathon](https://img.shields.io/badge/Amazon%20Developer-Alexa%2B%20track-5B8DEF?style=for-the-badge)](https://amazonappdev2026.devpost.com/)
 
+[![Demo video](https://img.shields.io/badge/Demo%20video-2%3A49-E0402E?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/jJM5LWHONDU)
 [![Landing](https://img.shields.io/badge/Landing-unsay.edycu.dev-DE8F13?style=for-the-badge)](https://unsay.edycu.dev/)
 [![Live](https://img.shields.io/badge/Live-api.unsay.edycu.dev-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/)
 [![Verify](https://img.shields.io/badge/Public%20proof-%2Fverify-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/verify)
 [![For judges](https://img.shields.io/badge/For%20judges-%2Fjudge-F2A93B?style=for-the-badge)](https://api.unsay.edycu.dev/judge)
-
-*No Video badge: no video is recorded yet. A badge for an artifact that does not exist is the
-failure this repository is written against.*
 
 ![MCP 2025-11-25](https://img.shields.io/badge/MCP-2025--11--25-5B8DEF?style=flat)
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
@@ -32,7 +30,7 @@ failure this repository is written against.*
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 
-[**For judges**](JUDGE.md) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
+[**For judges**](JUDGE.md) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
 
 </div>
 
@@ -76,8 +74,8 @@ unauthenticated, and rendered for whoever asks:
 <img src="docs/img/verify-route.png" alt="GET /verify in a browser: five care:// chains, all INTACT, six versions replayed from SHA-256, and no care-internal:// chain listed." width="820">
 
 The hero at the top of this file is an **illustration** of the mechanism, drawn from the committed
-seed record. The two images in this section are not. There is no demo video yet and no hosted URL;
-see [What is not here](#what-is-not-here).
+seed record. The two images in this section are not. The whole flow, filmed against the running
+server, is the [2:49 demo video](https://youtu.be/jJM5LWHONDU); the same server is live at <https://api.unsay.edycu.dev/>.
 
 ## 💡 The Problem & Solution
 
@@ -193,7 +191,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.37 ms
+  notifications/resources/updated  1.46 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +208,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.37 ms` will differ on your machine and between two runs on this one;
+The `1.46 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -365,7 +363,7 @@ Coverage is deliberately not headlined — see [`DEMO.md`](DEMO.md#the-tests) fo
 
 ## 🚧 What is not here
 
-No demo video, no screenshots of the running screens, no external users, and nothing published to npm — `packages/live-resources` is extracted and consumed from
+No external users, and nothing published to npm — `packages/live-resources` is extracted and consumed from
 source, not released. The AWS KMS provider is SigV4-signed and shaped but has **never been
 executed against a live key**. The MCP Apps `_meta` template binding has never been rendered by a
 host. No OAuth authorization server is shipped; Unsay is a protected resource only. The deployment is
