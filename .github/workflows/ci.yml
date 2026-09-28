@@ -31,7 +31,7 @@ jobs:
 
       # Node 22 is not a preference. `npm start` runs TypeScript through native type
       # stripping with no build step, which is a 22 feature — see FRICTION.md F-009.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm

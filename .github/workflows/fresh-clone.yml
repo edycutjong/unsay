@@ -37,7 +37,7 @@ jobs:
 
       # No `cache: npm` here, deliberately. The point of this job is the install a
       # stranger gets, and a warm cache is state the stranger does not have.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
