@@ -31,7 +31,7 @@ jobs:
     steps:
       # fetch-depth 0: the script runs `git clone` against this checkout, and a
       # shallow checkout is not reliably cloneable.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

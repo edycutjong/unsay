@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Node 22 is not a preference. `npm start` runs TypeScript through native type
       # stripping with no build step, which is a 22 feature — see FRICTION.md F-009.
