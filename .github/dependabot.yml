@@ -6,8 +6,13 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    # A major bump is a migration, not maintenance, and on a submitted repository it
+    # breaks the demo a judge is about to click. Security alerts stay on regardless.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     # The SDK's own version is quoted in docs/proof/bench.txt and in scripts/bench.ts.
     # Its bumps get their own PR rather than being grouped away, because each one needs
     # the receipts regenerated and the friction entries re-read.
@@ -21,4 +26,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']

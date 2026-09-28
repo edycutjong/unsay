@@ -1,0 +1,30 @@
+# Secrets, over the whole history rather than the tip. GitHub's own secret scanning
+# only knows provider-shaped keys; this repository's secrets are HMAC keys named
+# UNSAY_*, and the one that matters most is the one a past commit might still carry.
+#
+# The dev secrets in src/http.ts are published on purpose (see .env.example and the
+# README's "What is not here"). They are not credentials to anything that persists.
+name: gitleaks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: full history
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
