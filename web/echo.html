@@ -300,14 +300,24 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   const httpOrigin = /^https?:$/.test(location.protocol) ? location.origin : ''
   const q = new URLSearchParams(location.search)
   const baseIn = $('base'), tokenIn = $('token')
-  baseIn.value = q.get('base') || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
-  tokenIn.value = q.get('token') || S.get('sessionStorage', 'unsay.token') || ''
+  // Credentials are bound to the server they were issued for, and never carried to
+  // another. The base used to fall back to localStorage even when the link carried
+  // a token — so one earlier visit to `?base=https://elsewhere` (no credentials)
+  // planted a base, and the next demo link from the landing page handed its bearer
+  // token to it. A link carrying credentials now talks to the origin that minted
+  // it; stored credentials are reused only against the base they were stored with.
+  const trimBase = (v) => (v || '').trim().replace(/\/+$/, '')
+  const linkCreds = q.has('token')
+  baseIn.value = q.get('base') || (linkCreds && httpOrigin) || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
+  const bound = S.get('sessionStorage', 'unsay.credBase') === trimBase(baseIn.value)
+  tokenIn.value = q.get('token') || (bound && S.get('sessionStorage', 'unsay.token')) || ''
   let shown = q.get('domain') || 'weight_bearing'
   // ?present=1 opens straight into presentation mode — for an embed that cannot press F
   const presentOnLoad = q.get('present') === '1'
   if (q.has('token') || q.has('base')) {
     S.set('localStorage', 'unsay.base', baseIn.value)
     S.set('sessionStorage', 'unsay.token', tokenIn.value)
+    S.set('sessionStorage', 'unsay.credBase', trimBase(baseIn.value))
     history.replaceState(null, '', location.pathname + location.hash)
   }
   if (!tokenIn.value) $('setup').open = true
@@ -316,7 +326,9 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   const token = () => tokenIn.value.trim()
 
   baseIn.addEventListener('change', () => { S.set('localStorage', 'unsay.base', base()); connect() })
-  tokenIn.addEventListener('change', () => { S.set('sessionStorage', 'unsay.token', token()); connect() })
+  tokenIn.addEventListener('change', () => {
+    S.set('sessionStorage', 'unsay.token', token()); S.set('sessionStorage', 'unsay.credBase', base()); connect()
+  })
   $('reconnect').addEventListener('click', connect)
   $('forget').addEventListener('click', () => { tokenIn.value = ''; S.del('sessionStorage', 'unsay.token'); connect() })
 

@@ -320,13 +320,23 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
   const q = new URLSearchParams(location.search)
   const baseIn = $('base'), tokenIn = $('token'), keyIn = $('key')
 
-  baseIn.value = q.get('base') || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
-  tokenIn.value = q.get('token') || S.get('sessionStorage', 'unsay.token') || ''
-  keyIn.value = q.get('key') || S.get('sessionStorage', 'unsay.key') || ''
+  // Credentials are bound to the server they were issued for, and never carried to
+  // another. The base used to fall back to localStorage even when the link carried
+  // a token — so one earlier visit to `?base=https://elsewhere` (no credentials)
+  // planted a base, and the next demo link from the landing page handed its bearer
+  // token to it. A link carrying credentials now talks to the origin that minted
+  // it; stored credentials are reused only against the base they were stored with.
+  const trimBase = (v) => (v || '').trim().replace(/\/+$/, '')
+  const linkCreds = q.has('token') || q.has('key')
+  baseIn.value = q.get('base') || (linkCreds && httpOrigin) || S.get('localStorage', 'unsay.base') || httpOrigin || 'http://127.0.0.1:39500'
+  const bound = S.get('sessionStorage', 'unsay.credBase') === trimBase(baseIn.value)
+  tokenIn.value = q.get('token') || (bound && S.get('sessionStorage', 'unsay.token')) || ''
+  keyIn.value = q.get('key') || (bound && S.get('sessionStorage', 'unsay.key')) || ''
   if (q.has('token') || q.has('key') || q.has('base')) {
     S.set('localStorage', 'unsay.base', baseIn.value)
     S.set('sessionStorage', 'unsay.token', tokenIn.value)
     S.set('sessionStorage', 'unsay.key', keyIn.value)
+    S.set('sessionStorage', 'unsay.credBase', trimBase(baseIn.value))
     // Credentials do not belong in the address bar or the history entry.
     history.replaceState(null, '', location.pathname + location.hash)
   }
@@ -337,8 +347,12 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
   const wkey = () => keyIn.value
 
   baseIn.addEventListener('change', () => { S.set('localStorage', 'unsay.base', base()); connect() })
-  tokenIn.addEventListener('change', () => { S.set('sessionStorage', 'unsay.token', token()); connect() })
-  keyIn.addEventListener('input', () => { S.set('sessionStorage', 'unsay.key', wkey()); render() })
+  tokenIn.addEventListener('change', () => {
+    S.set('sessionStorage', 'unsay.token', token()); S.set('sessionStorage', 'unsay.credBase', base()); connect()
+  })
+  keyIn.addEventListener('input', () => {
+    S.set('sessionStorage', 'unsay.key', wkey()); S.set('sessionStorage', 'unsay.credBase', base()); render()
+  })
   $('reconnect').addEventListener('click', connect)
   $('forget').addEventListener('click', () => {
     tokenIn.value = ''; keyIn.value = ''
