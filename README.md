@@ -192,7 +192,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.36 ms
+  notifications/resources/updated  1.55 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -209,7 +209,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.36 ms` will differ on your machine and between two runs on this one;
+The `1.55 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
