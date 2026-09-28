@@ -20,12 +20,16 @@
     "seed": "node --experimental-strip-types scripts/seed_dump.ts",
     "fixtures": "node --experimental-strip-types fixtures/gen.ts",
     "keygen": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
-    "docs:arch": "node --experimental-strip-types scripts/gen_architecture.ts"
+    "docs:arch": "node --experimental-strip-types scripts/gen_architecture.ts",
+    "e2e:browser": "playwright test",
+    "e2e:browser:ui": "playwright test --ui",
+    "lighthouse": "npx -y @lhci/cli@0.15.1 autorun"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vite": "^8.3.1",

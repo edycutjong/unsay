@@ -59,3 +59,47 @@ jobs:
       # A correction has to survive the network dropping under it.
       - name: npm run probe:resume
         run: npm run probe:resume
+
+  # The pages, in a real browser. `npm run e2e` above is the protocol as a host
+  # speaks it; this is the product as a person clicks it — the landing page's own
+  # tokened links, two tabs, a published revision, a struck-through line.
+  browser:
+    name: the pages, in Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: npm run e2e:browser
+        run: npm run e2e:browser
+      - name: keep the trace when it fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # Accessibility is the hard gate (error below 0.9). Performance, best practices
+  # and SEO warn — they are reported, and a warning does not turn the run green
+  # while hiding a failure, because it was never a failure.
+  lighthouse:
+    name: lighthouse (accessibility gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: npm run lighthouse
+        run: npm run lighthouse

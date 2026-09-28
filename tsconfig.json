@@ -18,5 +18,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "fixtures/**/*.ts", "web/**/*.ts", "vitest.config.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "fixtures/**/*.ts", "web/**/*.ts", "e2e/**/*.ts", "vitest.config.ts", "playwright.config.ts"]
 }

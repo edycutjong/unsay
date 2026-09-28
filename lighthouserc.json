@@ -1,0 +1,25 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "PORT=39563 node --experimental-strip-types scripts/serve.ts",
+      "startServerReadyPattern": "listening on",
+      "url": [
+        "http://127.0.0.1:39563/",
+        "http://127.0.0.1:39563/judge",
+        "http://127.0.0.1:39563/clinician.html",
+        "http://127.0.0.1:39563/echo.html"
+      ],
+      "numberOfRuns": 1,
+      "settings": { "preset": "desktop", "chromeFlags": "--no-sandbox --disable-gpu --headless=new" }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["warn", { "minScore": 0.8 }],
+        "categories:accessibility": ["error", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.85 }],
+        "categories:seo": ["warn", { "minScore": 0.9 }]
+      }
+    },
+    "upload": { "target": "filesystem", "outputDir": ".lighthouseci/reports" }
+  }
+}
