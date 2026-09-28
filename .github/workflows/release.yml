@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
     steps:
       # fetch-depth 0: a shallow checkout has no tags, so every run would compute v0.0.1.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
