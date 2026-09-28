@@ -71,6 +71,8 @@ p code { background: color-mix(in srgb, var(--rule) 45%, transparent); padding: 
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .brand img { width: 30px; height: 30px; }
 .brand span { font: 400 28px/1 var(--font-display); letter-spacing: -.01em; }
+.brand span { transition: color .15s; }
+.brand:hover span { color: var(--changed); }
 .nav ul { display: flex; gap: 22px; list-style: none; padding: 0; font-size: 15px; }
 .nav ul a { text-decoration: none; color: var(--muted); transition: color .15s; }
 .nav ul a:hover { color: var(--ink); }
@@ -109,7 +111,8 @@ h1 em path { fill: none; stroke: var(--changed); stroke-width: 2.5; stroke-linec
 .proofline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 22px; font: 400 13px/1.4 var(--font-data); color: var(--muted); }
 .proofline .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .proofline.live .dot { background: var(--current); box-shadow: 0 0 0 0 color-mix(in srgb, var(--current) 50%, transparent); animation: ping 2s infinite; }
-.proofline a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.proofline a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 3px; transition: text-decoration-color .15s; }
+.proofline a:hover { text-decoration-color: var(--changed); }
 @keyframes ping { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 
 /* the chart — design.md §5 */
@@ -227,6 +230,8 @@ h2 em { color: var(--changed); }
 .try-cover p { max-width: 26em; color: #2B3530; margin: 14px auto 18px; font-size: 16px; }
 .try-cover .big { font: 400 32px/1.1 var(--font-display); }
 .try-foot { padding: 12px 18px; border-top: 1px solid var(--rule); font: 400 12px/1.5 var(--font-data); color: var(--muted); }
+.try-foot a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 3px; transition: text-decoration-color .15s; }
+.try-foot a:hover { text-decoration-color: var(--changed); }
 .try-status { font: 500 12px var(--font-data); color: var(--muted); }
 .try-status.ok { color: var(--current); }
 .try-status.err { color: var(--stale); }
