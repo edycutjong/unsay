@@ -61,9 +61,12 @@ run "npm run e2e"          e2e
 # finding nothing but the latency changed is the mechanical form of "this block is a
 # capture" — the same check ARCHITECTURE.md gets below. The committed block said
 # 33625 bytes for a card the script prints at 34404 until it was generated.
+# `[`]`, not `\``: BSD grep reads `\`` as a literal backtick, GNU grep as the
+# start-of-buffer anchor. So this filter passed on a Mac and never matched on the
+# Linux runner, and the nightly gate failed on a latency line it exists to ignore.
 e2e_drift() {
   git --no-pager diff -U0 -- README.md DEMO.md | grep -E '^[+-][^+-]' |
-    grep -vE '(ms\` will differ|notifications/resources/updated +[0-9])'
+    grep -vE '(ms[`] will differ|notifications/resources/updated +[0-9])'
 }
 printf '  %-34s' "npm run e2e (no doc drift)"
 if [ -z "$(e2e_drift)" ]; then echo "PASS"; else echo "FAIL"; e2e_drift | sed 's/^/      /' | head -10; fail=1; fi

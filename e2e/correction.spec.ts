@@ -25,6 +25,10 @@ test('a published revision strikes through on the Echo Show', async ({ browser, 
 
   const clin = await context.newPage()
   await clin.goto('/' + clinHref)
+  // The screen paints the seed plan while it connects, then swaps in the live one.
+  // A click during the swap lands on a card that is about to be replaced — it
+  // flaked exactly that way on a CI runner — so wait for live, as a person would.
+  await expect(clin.locator('#statusText')).toContainText('live', { timeout: 15_000 })
   const card = clin.locator('li').filter({ hasText: before }).first()
   await card.getByRole('button').first().click()
 
