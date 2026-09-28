@@ -494,6 +494,7 @@ describe('the three pages are served from this process', () => {
       ['/LICENSE', 'MIT'],
       ['/skill/SKILL.md', 'unsay-care-plan'],
       ['/docs/proof/bench.txt', 'lands mid-sentence'],
+      ['/docs/proof/bench.remote.txt', 'public internet'],
       ['/packages/live-resources/src/store.ts', 'read('],
     ] as const) {
       const res = await fetch(`${srv.baseUrl}${path}`)

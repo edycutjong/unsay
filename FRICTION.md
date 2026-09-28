@@ -628,7 +628,9 @@ already written down under *Durability* below and is the price of this decision.
 **What is therefore not true.** One process. No horizontal scale — a second instance would hold
 its own subscriptions and its own chain. Subscriptions and replay history die with the process.
 And no network hop between the clinician's browser and the host is inside the measured number,
-because there is nowhere for one to be: nothing is deployed.
+because there is nowhere for one to be: nothing is deployed. *(Update 2026-09-28: it is now
+deployed, and `npm run bench -- --url` measures the same loop over the public internet — p95
+668 ms, `docs/proof/bench.remote.txt`. The loopback figure stays as the floor.)*
 
 **Why it is written down here rather than in a commit message.** Because two files went on
 describing the road not taken as though it were merely work that had not happened yet.
@@ -814,7 +816,7 @@ Each item names where to look, so none of it has to be taken on trust.
 ### Not started
 
 No demo video. No screenshots of the running screens. No published npm package. No external
-users. No deployment URL. No sourced epidemiology behind the impact case — the README says so in
+users. No sourced epidemiology behind the impact case — the README says so in
 the section that would otherwise carry it, because a market-size figure this repo did not measure
 is exactly the kind of number it refuses to print. None of these is claimed anywhere else in this
 repository, and this line exists so that absence is explicit rather than merely unmentioned.

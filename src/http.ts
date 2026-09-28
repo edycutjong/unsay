@@ -1004,6 +1004,7 @@ const REPO_FILES: Record<string, string> = {
   '/LICENSE': 'LICENSE',
   '/docs/SPEC.md': 'docs/SPEC.md',
   '/docs/proof/bench.txt': 'docs/proof/bench.txt',
+  '/docs/proof/bench.remote.txt': 'docs/proof/bench.remote.txt',
   '/docs/proof/verify.json': 'docs/proof/verify.json',
   '/docs/proof/bench.json': 'docs/proof/bench.json',
   '/docs/proof/live_run.jsonl': 'docs/proof/live_run.jsonl',

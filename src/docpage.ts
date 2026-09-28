@@ -58,6 +58,7 @@ const LINK_ROUTES: Record<string, string> = {
   'docs/assets/readme-hero-animated.svg': '/docs/assets/readme-hero-animated.svg',
   'docs/assets/icon-animated.svg': '/docs/assets/icon-animated.svg',
   'docs/proof/bench.txt': '/docs/proof/bench.txt',
+  'docs/proof/bench.remote.txt': '/docs/proof/bench.remote.txt',
   'docs/proof/bench.json': '/docs/proof/bench.json',
   'docs/proof/verify.json': '/docs/proof/verify.json',
   'docs/proof/live_run.jsonl': '/docs/proof/live_run.jsonl',

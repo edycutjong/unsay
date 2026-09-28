@@ -201,7 +201,7 @@ check("MIT licence present", "MIT License" in lic)
 # ── submission-only checks (warn until the URLs exist) ────────────────────────
 print("\nsubmission surface (warn until filled)")
 for label, pat in [("repo URL in README", r"https://github\.com/\S+"),
-                   ("live URL in README", r"https://\S*vercel\.app"),
+                   ("live URL in README", r"https://\S*(vercel\.app|railway\.app|edycu\.dev)"),
                    ("video URL in README", r"https://(www\.)?(youtube\.com|youtu\.be)/\S+")]:
     check(label, bool(re.search(pat, readme)), warn_only=True)
 

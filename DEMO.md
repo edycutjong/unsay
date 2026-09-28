@@ -7,7 +7,7 @@ disable the thing being judged, this submission would be worthless.
 build step, no database, no cloud account, one runtime dependency.
 
 ```bash
-git clone <REPO_URL> && cd unsay
+git clone https://github.com/edycutjong/unsay.git && cd unsay
 npm install
 ```
 
@@ -189,7 +189,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.72 ms
+  notifications/resources/updated  2.13 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -216,7 +216,7 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.72 ms` will differ on your machine and between two runs on this one;
+The `2.13 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
 <!-- e2e:end -->
 
