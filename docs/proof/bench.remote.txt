@@ -1,0 +1,21 @@
+unsay bench · 200 revisions · 2026-09-28T07:57:53.121Z
+transport: Streamable HTTP over the public internet → https://unsay-production.up.railway.app
+client: this machine · sdk @modelcontextprotocol/sdk 1.30.0
+path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read
+at-rest: as deployed (see https://unsay-production.up.railway.app/verify)
+
+segment                             p50        p95        max
+signed write → notification     251.9ms    332.8ms    436.0ms
+notification → re-read          274.8ms    399.9ms    879.5ms
+─────────────────────────────────────────────────────────────
+END-TO-END (write → value)      533.3ms    667.9ms   1148.3ms
+
+speech window: a 12-word utterance ≈ 3400 ms (an assumed speech rate, not a
+measurement of Alexa+ TTS)
+retraction lands mid-sentence in 200/200 runs (100%)
+a host was subscribed for every run: yes
+
+NOTE: two real network hops are inside every figure — the clinician's write
+travels client → server, and the notification and re-read travel server → client.
+Both ends are the same machine here, so the round trip is paid twice; a clinician
+and a host in different places each pay one leg. Not a measurement of Alexa+.

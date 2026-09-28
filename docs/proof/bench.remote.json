@@ -1,0 +1,21 @@
+{
+  "ranAt": "2026-09-28T07:57:53.123Z",
+  "n": 200,
+  "transport": "streamable-http-public-internet",
+  "url": "https://unsay-production.up.railway.app",
+  "speechWindowMs": 3400,
+  "endToEnd": {
+    "p50": 533.33,
+    "p95": 667.925,
+    "max": 1148.253
+  },
+  "writeToNotification": {
+    "p50": 251.918,
+    "p95": 332.81
+  },
+  "midSentence": {
+    "count": 200,
+    "of": 200
+  },
+  "subscribedEveryRun": true
+}

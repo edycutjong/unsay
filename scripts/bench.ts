@@ -16,6 +16,14 @@
  * LESSONS R8: headline exactly ONE verifiable number with a runnable script.
  *
  * Run: npm run bench -- --n 200
+ *      npm run bench -- --n 200 --url https://unsay-production.up.railway.app
+ *
+ * With --url, the same loop runs against a DEPLOYED server over the public
+ * internet instead of a loopback one it starts itself. The token comes from the
+ * landing page (a care.read.user token minted per request — all this URI needs),
+ * so no server secret is required. Receipts go to docs/proof/bench.remote.* and
+ * nothing else is rewritten: the README, DEMO.md and landing-page blocks stay
+ * bound to the reproducible loopback run.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 
@@ -29,6 +37,9 @@ import { envelopeFromEnv } from '../src/envelope.ts'
 import { RAY, seedDemo } from '../src/seed.ts'
 
 const N = Number(process.argv[process.argv.indexOf('--n') + 1]) || 200
+const REMOTE = process.argv.includes('--url')
+  ? process.argv[process.argv.indexOf('--url') + 1]!.replace(/\/+$/, '')
+  : null
 const WB = uriFor(RAY, 'weight_bearing', 'user')
 const WRITE_SECRET = process.env.UNSAY_WRITE_SECRET ?? DEV_WRITE_SECRET
 
@@ -39,18 +50,41 @@ const WRITE_SECRET = process.env.UNSAY_WRITE_SECRET ?? DEV_WRITE_SECRET
  */
 const SPEECH_WINDOW_MS = 3400
 
-const envelope = await envelopeFromEnv()
-const srv = await createHttpServer({
-  store: seedDemo(new LiveResourceStore({ envelope: envelope ?? undefined })),
-  announce: false,
-})
+/** A deployed server stands in for the local one: same routes, nothing to close. */
+async function remoteServer(base: string) {
+  const meta = (await (await fetch(`${base}/.well-known/oauth-protected-resource`)).json()) as {
+    resource: string
+  }
+  const landing = await (await fetch(`${base}/index.html`)).text()
+  const tok = /href="echo\.html\?token=([^"&]+)"/.exec(landing)?.[1]
+  if (!tok) throw new Error(`no demo token on ${base}/index.html — is the demo seed mounted?`)
+  return {
+    srv: {
+      baseUrl: base,
+      resourceUrl: meta.resource,
+      atRest: `at-rest: as deployed (see ${base}/verify)`,
+      close: async () => {},
+    },
+    token: decodeURIComponent(tok),
+  }
+}
 
-const token = mintToken({
-  sub: 'bench',
-  scopes: ['care.read.user', 'care.read.assistant'],
-  audience: srv.resourceUrl,
-  ttlSeconds: 3600,
-})
+const { srv, token } = REMOTE
+  ? await remoteServer(REMOTE)
+  : await (async () => {
+      const envelope = await envelopeFromEnv()
+      const srv = await createHttpServer({
+        store: seedDemo(new LiveResourceStore({ envelope: envelope ?? undefined })),
+        announce: false,
+      })
+      const token = mintToken({
+        sub: 'bench',
+        scopes: ['care.read.user', 'care.read.assistant'],
+        audience: srv.resourceUrl,
+        ttlSeconds: 3600,
+      })
+      return { srv, token }
+    })()
 
 const client = new Client({ name: 'unsay-bench', version: '0.1.0' }, { capabilities: {} })
 let onNotify: (() => void) | null = null
@@ -99,8 +133,10 @@ for (let i = 0; i < N; i++) {
   if (!res.ok) throw new Error(`write rejected at rev ${i + 1}: HTTP ${res.status}`)
   // The server's own count of hosts holding a subscription to this URI. A run in
   // which nobody was listening would still produce timings, and they would mean
-  // nothing — so the number is checked rather than assumed.
-  if (((await res.json()) as { subscribers: number }).subscribers !== 1) subscribedEvery = false
+  // nothing — so the number is checked rather than assumed. A public deployment may
+  // have other visitors subscribed too, so there it is "at least this client".
+  const subs = ((await res.json()) as { subscribers: number }).subscribers
+  if (REMOTE ? subs < 1 : subs !== 1) subscribedEvery = false
 
   const tN = await got
   await client.readResource({ uri: WB })
@@ -119,6 +155,59 @@ const row = (label: string, xs: number[]) =>
   `${label.padEnd(30)}${pct(xs, 50).toFixed(1).padStart(7)}ms${pct(xs, 95).toFixed(1).padStart(9)}ms${Math.max(...xs).toFixed(1).padStart(9)}ms`
 
 const midSentence = endToEnd.filter((x) => x < SPEECH_WINDOW_MS).length
+
+if (REMOTE) {
+  const out = [
+    `unsay bench · ${N} revisions · ${new Date().toISOString()}`,
+    `transport: Streamable HTTP over the public internet → ${REMOTE}`,
+    `client: this machine · sdk @modelcontextprotocol/sdk 1.30.0`,
+    `path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read`,
+    srv.atRest,
+    '',
+    `${'segment'.padEnd(30)}${'p50'.padStart(9)}${'p95'.padStart(11)}${'max'.padStart(11)}`,
+    row('signed write → notification', writeToNotify),
+    row('notification → re-read', notifyToRead),
+    '─'.repeat(61),
+    row('END-TO-END (write → value)', endToEnd),
+    '',
+    `speech window: a 12-word utterance ≈ ${SPEECH_WINDOW_MS} ms (an assumed speech rate, not a`,
+    `measurement of Alexa+ TTS)`,
+    `retraction lands mid-sentence in ${midSentence}/${N} runs (${((midSentence / N) * 100).toFixed(0)}%)`,
+    `a host was subscribed for every run: ${subscribedEvery ? 'yes' : 'NO — the timings mean nothing'}`,
+    '',
+    `NOTE: two real network hops are inside every figure — the clinician's write`,
+    `travels client → server, and the notification and re-read travel server → client.`,
+    `Both ends are the same machine here, so the round trip is paid twice; a clinician`,
+    `and a host in different places each pay one leg. Not a measurement of Alexa+.`,
+  ].join('\n')
+  console.log(out)
+  writeFileSync('docs/proof/bench.remote.txt', out + '\n')
+  writeFileSync(
+    'docs/proof/bench.remote.json',
+    JSON.stringify(
+      {
+        ranAt: new Date().toISOString(),
+        n: N,
+        transport: 'streamable-http-public-internet',
+        url: REMOTE,
+        speechWindowMs: SPEECH_WINDOW_MS,
+        endToEnd: {
+          p50: +pct(endToEnd, 50).toFixed(3),
+          p95: +pct(endToEnd, 95).toFixed(3),
+          max: +Math.max(...endToEnd).toFixed(3),
+        },
+        writeToNotification: { p50: +pct(writeToNotify, 50).toFixed(3), p95: +pct(writeToNotify, 95).toFixed(3) },
+        midSentence: { count: midSentence, of: N },
+        subscribedEveryRun: subscribedEvery,
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+  console.log('\nreceipts → docs/proof/bench.remote.txt · docs/proof/bench.remote.json')
+  await client.close()
+  process.exit(midSentence === N && subscribedEvery ? 0 : 1)
+}
 
 const out = [
   `unsay bench · ${N} revisions · ${new Date().toISOString()}`,
