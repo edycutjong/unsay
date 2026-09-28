@@ -31,13 +31,13 @@ jobs:
     steps:
       # fetch-depth 0: the script runs `git clone` against this checkout, and a
       # shallow checkout is not reliably cloneable.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       # No `cache: npm` here, deliberately. The point of this job is the install a
       # stranger gets, and a warm cache is state the stranger does not have.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
