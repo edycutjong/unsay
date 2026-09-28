@@ -243,10 +243,9 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   <p class="note">With no server answering, the chip reads <b>SEED · NOT LIVE</b> and the screen shows
     the committed record from <code>src/seed.ts</code> with its pinned clock. It never invents a
     correction: no strike-through and no amber dot can appear unless a real revision arrived.</p>
-  <p class="note"><b>Serve this page from the server’s own origin.</b> The Unsay server sends no CORS
-    headers and answers a preflight with <code>405</code>, so a browser blocks these requests before
-    they leave when the page is opened from <code>file://</code> or a different port. Same origin, and
-    everything above is live.</p>
+  <p class="note"><b>Any origin can point this page at a server.</b> The Unsay server answers the
+    preflight and allows the MCP headers, and that grants nothing: every request carries its own
+    Bearer token, and there is no cookie for another origin to borrow. Everything above is live.</p>
   <p class="note">Press <b>F</b> for presentation mode — the page chrome disappears and the device fills
     the display, which is what the demo video films. <a href="clinician.html">Open the clinician
     screen</a> in another window and publish a revision to watch this one retract.</p>

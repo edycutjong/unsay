@@ -147,6 +147,7 @@ h1 em, h2 em { color: var(--changed); }
 .mark { position: absolute; top: 20px; bottom: 50px; width: 0; border-left: 3px solid var(--changed); }
 .mark span { position: absolute; top: -8px; left: 10px; font: 500 21px var(--font-data); color: var(--changed); white-space: nowrap; }
 .mark.max { border-left-style: dashed; }
+.mark.flip span { left: auto; right: 10px; }
 
 /* s8 */
 .tiles { display: grid; grid-template-columns: 1.3fr 1fr 1fr; grid-template-rows: auto auto; gap: 26px; }
@@ -174,9 +175,10 @@ h1 em, h2 em { color: var(--changed); }
 .closer em { color: var(--changed); }
 
 /* chrome */
-.counter { position: fixed; right: 18px; bottom: 14px; font: 500 13px var(--font-data); color: #C9CFC9; letter-spacing: .08em; z-index: 5; }
-.navbtn { position: fixed; bottom: 8px; z-index: 5; background: none; border: 0; color: #C9CFC9; font: 500 22px var(--font-data); padding: 6px 12px; cursor: pointer; }
-.navbtn:hover { color: #fff; }
+.counter { position: fixed; right: 18px; bottom: 14px; font: 500 13px var(--font-data); color: #fff; background: color-mix(in srgb, var(--ink) 72%, transparent); padding: 4px 10px; border-radius: 20px; letter-spacing: .08em; z-index: 5; }
+.navbtn { position: fixed; bottom: 8px; z-index: 5; background: color-mix(in srgb, var(--ink) 72%, transparent); border: 0; border-radius: 20px; color: #fff; font: 500 22px var(--font-data); padding: 4px 14px; cursor: pointer; transition: background .15s; }
+.navbtn:hover { background: var(--ink); }
+.navbtn:focus-visible { outline: 2px solid var(--changed); outline-offset: 2px; }
 .prev { left: 8px; } .next { left: 52px; }
 .notes { position: fixed; left: 0; right: 0; bottom: 0; height: 20vh; background: #121614; color: #E6E9E4; padding: 18px 28px; font: 400 19px/1.5 var(--font-body); display: none; z-index: 6; overflow: auto; }
 body.presenter .notes { display: block; }
@@ -289,7 +291,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <text x="1040" y="206" font-size="19" fill="#5D6660">resources/read</text>
     <path d="M1384 232V330" stroke="#16201B" stroke-width="3" marker-end="url(#ar)"/>
     <rect x="1170" y="340" width="418" height="110" fill="#F8F3E3" stroke="#16201B" stroke-width="3"/>
-    <text x="1192" y="386" font-size="24" fill="#16201B">speaks the retraction</text><text x="1192" y="424" font-size="20" fill="#A25C07">p95 668 ms</text>
+    <text x="1192" y="386" font-size="24" fill="#16201B">speaks the retraction</text><text x="1192" y="424" font-size="20" fill="#A25C07">p95 461 ms</text>
     <path d="M795 262V360" stroke="#B03A2E" stroke-width="3" stroke-dasharray="8 8"/>
     <text x="620" y="400" font-size="22" fill="#B03A2E">care-internal:// → −32002</text>
   </svg>
@@ -317,15 +319,15 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   <p class="sec">§5 · Deployed · measured</p>
   <div class="main">
   <p class="big">200/200<small>inside the sentence</small></p>
-  <div class="timeline" aria-label="A 3,400 millisecond spoken sentence. p50 533 ms, p95 668 ms and the worst run 1,148 ms all land in its first third.">
+  <div class="timeline" aria-label="A 3,400 millisecond spoken sentence. p50 415 ms, p95 461 ms and the worst run 592 ms all land in its first fifth.">
     <div class="tl-bar">“You can put about half your weight on it—”</div>
-    <div class="mark" style="left:15.7%"><span>p50 533 ms</span></div>
-    <div class="mark" style="left:19.6%;top:56px"><span>p95 668 ms</span></div>
-    <div class="mark max" style="left:33.8%"><span>worst 1,148 ms</span></div>
+    <div class="mark flip" style="left:12.2%"><span>p50 415 ms</span></div>
+    <div class="mark flip" style="left:13.5%;top:56px"><span style="right:32px">p95 461 ms</span></div>
+    <div class="mark max" style="left:17.4%"><span>worst 592 ms</span></div>
     <div class="tl-axis"><span>0 ms</span><span>one sentence ≈ 3,400 ms (assumed)</span></div>
   </div>
   </div>
-  <aside class="speaker-notes">Two hundred signed writes against the live server at api.unsay.edycu.dev, client in Indonesia, server in us-west2. Every correction landed inside the sentence — even the worst run lands in its first third. Receipts in docs/proof/bench.remote.txt; 34 of 34 safety assertions pass.</aside>
+  <aside class="speaker-notes">Two hundred signed writes against the live server at api.unsay.edycu.dev, client in Indonesia, server in us-west2. Every correction landed inside the sentence — even the worst run lands in its first fifth. Receipts in docs/proof/bench.remote.txt; 34 of 34 safety assertions pass.</aside>
   <p class="folio"><span>Unsay · v0.1.0 · docs/proof/bench.remote.txt</span><span>Sheet <b>07</b> / 10</span></p>
 </section>
 

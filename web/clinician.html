@@ -253,10 +253,10 @@ X-Unsay-Signature: &lt;hex HMAC-SHA256( timestamp + "." + body , write secret )&
 
 {"patient":"ray","domain":"weight_bearing","audience":"user","value":"…",
  "authorId":"okafor","authorLabel":"Sarah Okafor, physio","priority":0.9}</pre>
-    <p style="margin-top:14px"><b>Serve this page from the server’s own origin.</b> The Unsay server
-      sends no CORS headers and answers a preflight with <code>405</code>, so a browser blocks every
-      request above before it leaves when this page is opened from <code>file://</code> or a different
-      port. From the same origin it needs nothing.</p>
+    <p style="margin-top:14px"><b>Any origin can point this page at a server.</b> The Unsay server
+      answers the preflight and allows the signature headers, and that grants nothing: every write
+      carries its own HMAC and every read its own Bearer token, and there is no cookie for another
+      origin to borrow.</p>
     <p><code>writtenAt</code> is not in the body on purpose: the server stamps
       it from its own clock. A writer that could set it could backdate a correction, and “how old is
       this instruction” is something the assistant says out loud.</p>

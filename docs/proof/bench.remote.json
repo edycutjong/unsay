@@ -1,17 +1,17 @@
 {
-  "ranAt": "2026-09-28T07:57:53.123Z",
+  "ranAt": "2026-09-28T22:34:26.503Z",
   "n": 200,
   "transport": "streamable-http-public-internet",
-  "url": "https://unsay-production.up.railway.app",
+  "url": "https://api.unsay.edycu.dev",
   "speechWindowMs": 3400,
   "endToEnd": {
-    "p50": 533.33,
-    "p95": 667.925,
-    "max": 1148.253
+    "p50": 414.703,
+    "p95": 460.479,
+    "max": 592.251
   },
   "writeToNotification": {
-    "p50": 251.918,
-    "p95": 332.81
+    "p50": 205.069,
+    "p95": 230.429
   },
   "midSentence": {
     "count": 200,

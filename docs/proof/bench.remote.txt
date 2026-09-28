@@ -1,14 +1,14 @@
-unsay bench · 200 revisions · 2026-09-28T07:57:53.121Z
-transport: Streamable HTTP over the public internet → https://unsay-production.up.railway.app
-client: this machine · sdk @modelcontextprotocol/sdk 1.30.0
+unsay bench · 200 revisions · 2026-09-28T22:34:26.501Z
+transport: Streamable HTTP over the public internet → https://api.unsay.edycu.dev
+client: this machine · sdk @modelcontextprotocol/sdk 1.30.1
 path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read
-at-rest: as deployed (see https://unsay-production.up.railway.app/verify)
+at-rest: as deployed (see https://api.unsay.edycu.dev/verify)
 
 segment                             p50        p95        max
-signed write → notification     251.9ms    332.8ms    436.0ms
-notification → re-read          274.8ms    399.9ms    879.5ms
+signed write → notification     205.1ms    230.4ms    346.1ms
+notification → re-read          206.7ms    228.5ms    389.6ms
 ─────────────────────────────────────────────────────────────
-END-TO-END (write → value)      533.3ms    667.9ms   1148.3ms
+END-TO-END (write → value)      414.7ms    460.5ms    592.3ms
 
 speech window: a 12-word utterance ≈ 3400 ms (an assumed speech rate, not a
 measurement of Alexa+ TTS)

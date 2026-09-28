@@ -26,7 +26,7 @@ is real for everyone until the next restart resets it to the seed.
 
 | What | Number | Where it was written |
 |---|---|---|
-| Retraction lands inside the speech window, over the public internet | **200/200**, end-to-end p95 **668 ms** | [`docs/proof/bench.remote.txt`](docs/proof/bench.remote.txt) |
+| Retraction lands inside the speech window, over the public internet | **200/200**, end-to-end p95 **461 ms** | [`docs/proof/bench.remote.txt`](docs/proof/bench.remote.txt) |
 | Safety assertions that MUST fail, and do | **34/34** (15 in-process, 19 over HTTP) | [`docs/proof/verify.json`](docs/proof/verify.json) |
 | Test suite | **301 passing**, `tsc --strict` clean | `npm test` · `npm run typecheck` |
 | Real protocol frames of the whole demo | one JSONL line per frame | [`docs/proof/live_run.jsonl`](docs/proof/live_run.jsonl) |

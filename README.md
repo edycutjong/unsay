@@ -300,7 +300,7 @@ Loopback figures, and the 3,400 ms speech window is an assumed speech rate rathe
 measurement of Alexa+ TTS. Neither is ever quoted as a production number.
 
 Over the public internet, `npm run bench -- --n 200 --url https://api.unsay.edycu.dev` runs the same loop against the
-deployed server: **200/200 inside the window, end-to-end p95 668 ms**, with the client in
+deployed server: **200/200 inside the window, end-to-end p95 461 ms**, with the client in
 Indonesia and the server in us-west2, so both legs of the trip cross the Pacific. Receipt:
 [`docs/proof/bench.remote.txt`](docs/proof/bench.remote.txt).
 
