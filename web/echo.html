@@ -145,6 +145,9 @@ body.present{background:#000; overflow:hidden}
 body.present .shell{display:none}
 .present-stage{display:none}
 body.present .present-stage{display:flex; position:fixed; inset:0; align-items:center; justify-content:center}
+/* centred by flex, so it must scale from its centre: a top-left origin pushed a
+   scaled-down device up and off-screen whenever the window was under 1280 px */
+body.present .device{transform-origin:center; flex:none}
 body.present .exit-hint{position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
   color:#4A5155; font-size:13px; letter-spacing:.06em}
 
