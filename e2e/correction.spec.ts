@@ -19,7 +19,10 @@ test('a published revision strikes through on the Echo Show', async ({ browser, 
 
   const echo = await context.newPage()
   await echo.goto('/' + echoHref)
-  await expect(echo.locator('#sStatusText')).not.toHaveText('connecting', { timeout: 15_000 })
+  // LIVE, not merely "not connecting": before the first read the screen shows the
+  // committed seed, and both device projects share one server — so after the
+  // desktop run the seed text is no longer the current value (flaked on CI).
+  await expect(echo.locator('#sStatusText')).toContainText('LIVE', { timeout: 15_000 })
   const before = (await echo.locator('#sFact').textContent())!.trim()
   expect(before).not.toBe('—')
 
@@ -29,7 +32,8 @@ test('a published revision strikes through on the Echo Show', async ({ browser, 
   // A click during the swap lands on a card that is about to be replaced — it
   // flaked exactly that way on a CI runner — so wait for live, as a person would.
   await expect(clin.locator('#statusText')).toContainText('live', { timeout: 15_000 })
-  const card = clin.locator('li').filter({ hasText: before }).first()
+  // By field, not by text: the text is whatever the previous run left there.
+  const card = clin.locator('li').filter({ hasText: /weight[ _-]?bearing/i }).filter({ hasText: before }).first()
   await card.getByRole('button').first().click()
 
   const revised = `Walk with two crutches, partial weight only, until review (${Date.now()})`
