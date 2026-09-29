@@ -11,9 +11,10 @@ exists, a command that exits 0, a grep that hits, or a URL that returns 200.
 
 Exit 0 = safe to submit. Exit 1 = do not submit.
 
-Side effect, deliberately: this regenerates ARCHITECTURE.md in order to diff it. If the
-working tree is dirty afterwards, that IS the finding — the committed copy had drifted
-from the code it claims to be generated from.
+Side effect, deliberately: this regenerates ARCHITECTURE.md in order to diff it. When
+only the timestamp line moved, the committed copy is put back; if the working tree is
+dirty afterwards, that IS the finding — the committed copy had drifted from the code it
+claims to be generated from.
 """
 import json, os, re, subprocess, sys, tempfile
 from pathlib import Path
@@ -185,6 +186,10 @@ except Exception:                                         # noqa: BLE001
 after = read("ARCHITECTURE.md") or ""
 strip_ts = lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("_Generated:"))
 current = strip_ts(before) == strip_ts(after)
+# Only the timestamp moved: put the committed copy back, so a clean run leaves a clean
+# tree and a dirty one after this gate always means real drift.
+if current and before and before != after:
+    Path(ROOT, "ARCHITECTURE.md").write_text(before)
 check("npm run docs:arch exits 0", rc == 0)
 check("ARCHITECTURE.md is current", current,
       "" if current else "regenerating it changed the file — commit the regenerated copy")
