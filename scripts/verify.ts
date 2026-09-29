@@ -368,7 +368,8 @@ check(
 
 // A rejected write is the row that matters, and it must not be a place a stolen
 // credential can come to rest.
-const auditText = JSON.stringify(srv.audit.rows())
+// versionHash is public (GET /verify prints every one); any OTHER 64-hex run is a MAC.
+const auditText = JSON.stringify(srv.audit.rows().map(({ versionHash: _public, ...row }) => row))
 check(
   'no audit row carries a credential, a MAC or a bearer token',
   !auditText.includes(writeSecret) &&

@@ -276,7 +276,20 @@ export class LiveResourceStore {
       ? this.#partition.uriFor(subject, topic, first.audience)
       : `${subject}/${topic}`
     let prev: string | null = null
-    for (const r of chain) {
+    for (const [i, r] of chain.entries()) {
+      // The stored link is checked, not only recomputed: prevHash is the field a
+      // client compares ("v3 descends from the v2 I hold"), so a rewritten prevHash
+      // must break the chain here too.
+      if (r.version !== i + 1 || r.prevHash !== prev) {
+        return {
+          uri,
+          versions: chain.length,
+          intact: false,
+          brokenAt: r.version,
+          expected: String(prev),
+          actual: String(r.prevHash),
+        }
+      }
       let value: string
       try {
         value = this.#open(r).value
@@ -375,6 +388,13 @@ export class LiveResourceStore {
    * Test seam. Corrupts a stored value in place so a test can prove verify()
    * catches it — the only way to demonstrate a tamper-evident chain is to tamper.
    */
+  /** Test hook: rewrite one version's stored prevHash, leaving its value and hash alone. */
+  _tamperLink(subject: string, topic: string, version: number, prevHash: string) {
+    const chain = this.#chains.get(this.#key(subject, topic))
+    const i = chain?.findIndex((r) => r.version === version) ?? -1
+    if (chain && i >= 0) chain[i] = Object.freeze({ ...chain[i]!, prevHash })
+  }
+
   _tamper(subject: string, topic: string, version: number, newValue: string) {
     // Records are frozen; the only way to change one is to replace it, here.
     const chain = this.#chains.get(this.#key(subject, topic))

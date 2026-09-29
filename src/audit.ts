@@ -44,11 +44,16 @@ export interface AuditRow {
   outcome: AuditOutcome
   reason: AuditReason
   via: AuditVia
+  /** On an accepted write: the head it created, so the log witnesses the chain. */
+  version?: number
+  versionHash?: string
 }
 
 export interface AuditEntry {
   actor?: string
   uri?: string
+  version?: number
+  versionHash?: string
   outcome: AuditOutcome
   reason: AuditReason
   via: AuditVia
@@ -81,6 +86,7 @@ export class AuditLog {
       outcome: entry.outcome,
       reason: entry.reason,
       via: entry.via,
+      ...(entry.version !== undefined ? { version: entry.version, versionHash: entry.versionHash } : {}),
     }
     this.#rows.push(row)
     if (this.#sink) {

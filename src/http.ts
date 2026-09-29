@@ -945,7 +945,15 @@ export async function createHttpServer(
      * chain (T-4: one shared write secret means `authorId` is claimed, not
      * proven) — but the row now says who actually presented a credential.
      */
-    audit.append({ outcome: 'accepted', reason: 'ok', via, actor: actor ?? authorId, uri })
+    audit.append({
+      outcome: 'accepted',
+      reason: 'ok',
+      via,
+      actor: actor ?? authorId,
+      uri,
+      version: record.version,
+      versionHash: record.versionHash,
+    })
     stats.writesAccepted++
     // Counted, not asserted. This used to be a constant `true`, which says a
     // notification was DISPATCHED — a clinician receipt that renders "a host was

@@ -463,3 +463,15 @@ describe('ResourceNotifier', () => {
     expect(notifier.subscriptions.size).toBe(0)
   })
 })
+
+describe('verify() checks the stored link, not only the recomputed hash (a2a r01)', () => {
+  it('reports a rewritten prevHash at that version', () => {
+    const store = new LiveResourceStore()
+    const base = { subject: 'p', topic: 't', audience: 'user' as const, authorId: 'a', authorLabel: 'A' }
+    store.publish({ ...base, value: 'one', writtenAt: '2026-10-08T09:00:00Z' })
+    store.publish({ ...base, value: 'two', writtenAt: '2026-10-08T09:01:00Z' })
+    expect(store.verify('p', 't').intact).toBe(true)
+    store._tamperLink('p', 't', 2, 'f'.repeat(64))
+    expect(store.verify('p', 't')).toMatchObject({ intact: false, brokenAt: 2 })
+  })
+})

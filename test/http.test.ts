@@ -346,7 +346,9 @@ describe('POST /write', () => {
   })
 
   it('never records a credential in an audit row', () => {
-    const serialised = JSON.stringify(audit.rows())
+    // versionHash is public (GET /verify prints every one); any OTHER 64-hex run
+    // would be a MAC, presented or expected.
+    const serialised = JSON.stringify(audit.rows().map(({ versionHash: _public, ...row }) => row))
     expect(serialised).not.toContain(WRITE_SECRET)
     expect(serialised).not.toContain(TOKEN_SECRET)
     expect(serialised).not.toMatch(/[0-9a-f]{64}/) // no hex MAC, presented or expected
