@@ -30,7 +30,7 @@ is real for everyone until the next restart resets it to the seed.
 |---|---|---|
 | Retraction lands inside the speech window, over the public internet | **200/200**, end-to-end p95 **461 ms** | [`docs/proof/bench.remote.txt`](docs/proof/bench.remote.txt) |
 | Safety assertions that MUST fail, and do | **34/34** (15 in-process, 19 over HTTP) | [`docs/proof/verify.json`](docs/proof/verify.json) |
-| Test suite | **343 passing**, `tsc --strict` clean | `npm test` · `npm run typecheck` |
+| Test suite | **344 passing**, `tsc --strict` clean | `npm test` · `npm run typecheck` |
 | Real protocol frames of the whole demo | one JSONL line per frame | [`docs/proof/live_run.jsonl`](docs/proof/live_run.jsonl) |
 | A correction survives the connection dropping under it | resumed with `Last-Event-ID` | [`docs/proof/resume.json`](docs/proof/resume.json) |
 

@@ -924,3 +924,28 @@ describe('a re-confirmation in the same words carries no retraction', () => {
     expect((after.contents[0] as { text: string }).text.startsWith('[STALE')).toBe(false)
   })
 })
+
+describe('whats_changed never loses a write stamped in its asOf millisecond (a2a r03)', () => {
+  it('returns a revision written at exactly asOf on the next poll, with its retraction', async () => {
+    const store = seedDemo()
+    const built = buildServer({ store, principal: () => ({ sub: 't', scopes: BOTH }), now: () => DEMO_NOW })
+    const { client } = await attach(built)
+    await client.listTools()
+    await client.readResource({ uri: WB }) // hears v2
+    const first = await client.callTool({ name: 'whats_changed', arguments: {} })
+    const asOf = (first.structuredContent as { asOf: string }).asOf
+    store.publish({ ...STAGED_REVISION, writtenAt: asOf }) // same millisecond, frozen clock
+    const next = await client.callTool({ name: 'whats_changed', arguments: { since: asOf } })
+    const item = (next.structuredContent as { changed: Record<string, unknown>[] }).changed.find(
+      (c) => c.uri === WB,
+    )
+    expect(item?.value).toBe(STAGED_REVISION.value)
+    expect(item?.retraction).toBeDefined()
+    // Returned again on the following poll (asOf unchanged): same words, no second retraction.
+    const again = await client.callTool({ name: 'whats_changed', arguments: { since: asOf } })
+    const repeat = (again.structuredContent as { changed: Record<string, unknown>[] }).changed.find(
+      (c) => c.uri === WB,
+    )
+    expect(repeat?.retraction).toBeUndefined()
+  })
+})

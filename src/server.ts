@@ -646,7 +646,10 @@ export function buildServer(opts: BuildOptions) {
     const since = rawSince === undefined ? new Date(at.getTime() - 86_400_000) : new Date(rawSince)
     const changed = store
       .list(opts.principal())
-      .filter(({ record }) => new Date(record.writtenAt) > since)
+      // Inclusive: asOf and writtenAt share a millisecond clock, and a write stamped in the
+      // asOf millisecond would otherwise never be returned. Seen twice, it carries no
+      // retraction the second time — the same-words guard below.
+      .filter(({ record }) => new Date(record.writtenAt) >= since)
       .map(({ record, uri }) => {
         const parsed = parseUri(uri)!
         const chain = store.versions(parsed.subject, parsed.topic)
