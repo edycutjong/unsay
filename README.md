@@ -29,6 +29,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 ![tests](https://img.shields.io/badge/vitest-303%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/edycutjong/unsay?style=flat&color=F2A93B)](https://github.com/edycutjong/unsay/releases/latest)
 
 [**For judges**](JUDGE.md) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
 
