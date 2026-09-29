@@ -444,7 +444,9 @@ export async function createHttpServer(
 
   const http = createServer((req, res) => {
     void route(req, res).catch((e: unknown) => {
-      console.error('[unsay] unhandled', req.method, req.url, e)
+      // req.url is attacker-controlled: strip CR/LF so it cannot forge a second log line.
+      const where = String(req.url ?? '').replace(/[\r\n]/g, '')
+      console.error('[unsay] unhandled', req.method, where, e)
       if (!res.headersSent) json(res, 500, { error: 'internal_error' })
       else res.end()
     })
