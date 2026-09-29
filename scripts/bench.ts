@@ -167,6 +167,7 @@ if (REMOTE) {
     `unsay bench · ${N} revisions · ${new Date().toISOString()}`,
     `transport: Streamable HTTP over the public internet → ${REMOTE}`,
     `client: this machine · sdk @modelcontextprotocol/sdk ${SDK_VERSION}`,
+    `server: ${client.getServerVersion()?.name} ${client.getServerVersion()?.version} (as initialize reported it)`,
     `path: POST /write (HMAC-SHA256 verified) → store → notification → authorized re-read`,
     srv.atRest,
     '',

@@ -1,0 +1,27 @@
+# The live server is deployed by hand (`railway up`), not on push, so the repository and
+# api.unsay.edycu.dev can drift without anything noticing — a2a round 1 found exactly
+# that. This asks the deployment which version it runs and fails when it is not the
+# version the repository has released.
+name: live-version
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-version:
+    name: the live server runs the released version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: compare /health with package.json
+        run: |
+          live=$(curl -fsS https://api.unsay.edycu.dev/health | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).version))")
+          want=$(node -p "require('./package.json').version")
+          echo "live $live · repository $want"
+          test "$live" = "$want" || { echo "live runs $live, the repository is at $want: redeploy"; exit 1; }

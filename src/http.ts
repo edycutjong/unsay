@@ -41,7 +41,7 @@ import { AuditLog } from './audit.ts'
 import type { AuditReason, AuditVia } from './audit.ts'
 import { DOC_PAGES, renderDocPage } from './docpage.ts'
 import { type Envelope, announceOnce, envelopeFromEnv, startupLine } from './envelope.ts'
-import { buildServer } from './server.ts'
+import { VERSION, buildServer } from './server.ts'
 import { LiveResourceStore, parseUri } from './store.ts'
 import { LiveResourceError } from '../packages/live-resources/src/index.ts'
 import type { CareRecord } from './types.ts'
@@ -511,7 +511,16 @@ export async function createHttpServer(
       })
     }
 
-    if (path === '/health') return json(res, 200, { ok: true, sessions: sessions.size })
+    // Which build is answering. Railway does not deploy on push, so the repo and the
+    // live server can drift; this is how a judge (and the nightly check) can tell.
+    if (path === '/health') {
+      return json(res, 200, {
+        ok: true,
+        version: VERSION,
+        commit: process.env.UNSAY_COMMIT ?? process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+        sessions: sessions.size,
+      })
+    }
     if (path === '/verify') return handleVerify(req, res, url)
     if (path === '/write') return handleWrite(req, res)
     if (path === '/mcp') return handleMcp(req, res)
