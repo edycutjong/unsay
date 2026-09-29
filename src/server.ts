@@ -116,7 +116,7 @@ export function buildServer(opts: BuildOptions) {
   const now = opts.now ?? (() => new Date())
 
   const server = new Server(
-    { name: 'unsay', version: '0.1.0' },
+    { name: 'unsay', version: '1.0.0' },
     {
       capabilities: {
         resources: { subscribe: true, listChanged: true },
