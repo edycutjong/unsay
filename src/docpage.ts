@@ -199,7 +199,10 @@ export function renderMarkdown(md: string): string {
     if (trimmed.startsWith('|') && /^\|[\s:|-]+\|$/.test(lines[i + 1]?.trim() ?? '')) {
       closeList()
       const cells = (row: string) =>
-        row.trim().replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()))
+        // GFM: `\|` is a literal pipe inside a cell, not a column break. Splitting on
+        // every `|` turned README's `patient\|domain\|version\|audience` row into six
+        // cells under a three-column header (Lighthouse td-has-header).
+        row.trim().replace(/^\||(?<!\\)\|$/g, '').split(/(?<!\\)\|/).map((c) => inline(c.trim().replace(/\\\|/g, '|')))
       const head = cells(trimmed)
       i += 2
       const body: string[][] = []
@@ -364,6 +367,7 @@ export function renderDocPage(markdown: string, opts: { title: string; path: str
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)}</title>
 <meta name="description" content="${esc(describeDoc(markdown))}">
+<meta name="author" content="Edy Cu">
 <meta name="color-scheme" content="dark light">
 <meta name="robots" content="index, follow">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">

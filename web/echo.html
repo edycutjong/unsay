@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Unsay — Echo Show card</title>
 <meta name="description" content="1280×800. What Ray sees while the assistant speaks: the current instruction, the retracted line struck through, and who changed it.">
+<meta name="author" content="Edy Cu">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#EDF0F2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0B0D0E" media="(prefers-color-scheme: dark)">
@@ -13,15 +14,15 @@
 <meta property="og:title" content="Unsay — Echo Show card">
 <meta property="og:description" content="1280×800 device card: the current instruction, the retracted line struck through, and who changed it.">
 <meta property="og:url" content="/echo.html">
-<meta property="og:image" content="/og.png">
+<meta property="og:image" content="/og.png?v=2">
 <meta property="og:image:type" content="image/png">
-<meta property="og:image:width" content="2400">
-<meta property="og:image:height" content="1260">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Unsay — Echo Show card">
 <meta name="twitter:description" content="1280×800 device card: the current instruction, the retracted line struck through, and who changed it.">
-<meta name="twitter:image" content="/og.png">
+<meta name="twitter:image" content="/og.png?v=2">
 <meta name="twitter:image:alt" content="Unsay: the retracted line struck through above the correction the physio just published.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
@@ -65,6 +66,10 @@ a:hover{border-bottom-color:var(--accent)}
 .shell{width:min(1180px,calc(100% - 32px)); margin:0 auto; padding:22px 0 60px}
 .chrome{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px}
 .chrome .sub{color:var(--muted); font-size:14px}
+/* The label changes from "connecting…" to the live path once the page connects.
+   Inline with the buttons on a phone, that re-wrapped the row and shifted the whole
+   page (CLS 0.198). On narrow screens it gets its own one-line row instead. */
+@media (max-width:760px){ .chrome .sub{order:9; flex-basis:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis} }
 .spacer{margin-left:auto}
 button{font:inherit; cursor:pointer; border-radius:8px;
   transition:background .15s, border-color .15s, color .15s, transform .06s}

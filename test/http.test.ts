@@ -1066,3 +1066,25 @@ describe('a resumed SSE stream is re-authorized, not replayed blind', () => {
     expect(replayAllowed(alien, { sub: 'x', scopes: [SCOPE.user, SCOPE.assistant] })).toBe(false)
   })
 })
+
+describe('a URL this server does not answer', () => {
+  it('gives a browser a page with a way back, and an API client JSON', async () => {
+    // A mistyped URL in a browser tab rendered {"error":"not_found"} — 21 characters
+    // and no link home (shipcheck browser.custom404).
+    const { createHttpServer } = await import('../src/http.ts')
+    const srv = await createHttpServer({ announce: false })
+    try {
+      const page = await fetch(`${srv.baseUrl}/no-such-page`, { headers: { accept: 'text/html,*/*;q=0.8' } })
+      expect(page.status).toBe(404)
+      expect(page.headers.get('content-type')).toContain('text/html')
+      const body = await page.text()
+      expect(body).toContain('href="/"')
+      expect(body).toContain('href="/judge"')
+      const api = await fetch(`${srv.baseUrl}/no-such-page`)
+      expect(api.status).toBe(404)
+      expect(await api.json()).toEqual({ error: 'not_found' })
+    } finally {
+      await srv.close()
+    }
+  })
+})

@@ -822,20 +822,25 @@ describe('the social card is a raster a scraper can render', () => {
    */
   const png = readFileSync(join(REPO, 'docs/assets/og-image.png'))
 
-  it('is a PNG of exactly 2400×1260 — the 1200×630 card every scraper crops to, exported at 2×', () => {
+  it('is a PNG of exactly 1200×630, and under 1 MB', () => {
+    // It was 2400×1260 — a 2× export declared as the 1200×630 card. Every platform
+    // resampled it with no say from us, and a scraper paid ~1 MB for pixels nobody
+    // sees at feed size (shipcheck static.og:image.exactSize1200x630).
     expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
     expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR')
-    expect(png.readUInt32BE(16)).toBe(2400)
-    expect(png.readUInt32BE(20)).toBe(1260)
+    expect(png.readUInt32BE(16)).toBe(1200)
+    expect(png.readUInt32BE(20)).toBe(630)
+    expect(png.length).toBeLessThan(1024 * 1024)
   })
 
   it('is what every page names, with the dimensions and the alt text beside it', () => {
     for (const page of PAGES) {
       const html = all[page]!
-      expect(html, page).toContain('<meta property="og:image" content="/og.png">')
-      expect(html, page).toContain('<meta name="twitter:image" content="/og.png">')
-      expect(html, page).toContain('<meta property="og:image:width" content="2400">')
-      expect(html, page).toContain('<meta property="og:image:height" content="1260">')
+      // ?v=2: the image changed size, and a platform re-fetches only a new URL.
+      expect(html, page).toContain('<meta property="og:image" content="/og.png?v=2">')
+      expect(html, page).toContain('<meta name="twitter:image" content="/og.png?v=2">')
+      expect(html, page).toContain('<meta property="og:image:width" content="1200">')
+      expect(html, page).toContain('<meta property="og:image:height" content="630">')
       expect(html, page).toMatch(/<meta property="og:image:alt" content="[^"]{20,}">/)
       expect(html, page).toContain(`<meta property="og:url" content="/${page}">`)
       expect(html, page).not.toContain('content="/og.svg"')
@@ -904,7 +909,7 @@ describe('the served pages are what a judge actually gets', () => {
       // The raw hrefs stay in the file, so the link allowlist above still holds.
       expect(all['index.html']).toContain('href="echo.html"')
       // og:image cannot be relative and reach a scraper; the server absolutizes it.
-      expect(body).toContain(`content="${srv.baseUrl}/og.png"`)
+      expect(body).toContain(`content="${srv.baseUrl}/og.png?v=2"`)
       expect(body).toContain(`content="${srv.baseUrl}/index.html"`)
     } finally {
       await srv.close()
@@ -1065,5 +1070,19 @@ describe('the rendered documents describe themselves', () => {
       expect(d.length, path).toBeLessThanOrEqual(160)
       expect(d, path).not.toMatch(/Generated:|\*\*|`|\]\(/)
     }
+  })
+})
+
+describe('tables in the rendered documents', () => {
+  it('treats \\| inside a cell as a pipe, not a column break', async () => {
+    // README's "At rest" row carries `patient\|domain\|version\|audience`. Split on
+    // every pipe it became six cells under a three-column header, with the
+    // backslashes printed — found by Lighthouse td-has-header on /doc/readme.
+    const { renderMarkdown } = await import('../src/docpage.ts')
+    const out = renderMarkdown('| a | b | c |\n|---|---|---|\n| At rest | `x\\|y\\|z` as AAD | src |\n')
+    const row = /<tbody>\s*<tr>([\s\S]*?)<\/tr>/.exec(out)![1]!
+    expect(row.match(/<td>/g)).toHaveLength(3)
+    expect(row).toContain('<code>x|y|z</code>')
+    expect(row).not.toContain('\\')
   })
 })

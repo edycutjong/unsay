@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/icon.svg" alt="" width="144" height="144">
+<img src="docs/assets/icon-animated.svg" alt="" width="144" height="144">
 
 # Unsay
 
@@ -26,7 +26,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat)
 ![Node 22](https://img.shields.io/badge/Node-22-339933?style=flat)
-![tests](https://img.shields.io/badge/vitest-301%20passing-3F9E63?style=flat)
+![tests](https://img.shields.io/badge/vitest-303%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 
@@ -184,14 +184,14 @@ write path, and the retraction rendered server-side:
 ```
   protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 36350 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html+skybridge · 36769 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.46 ms
+  notifications/resources/updated  1.79 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -208,7 +208,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.46 ms` will differ on your machine and between two runs on this one;
+The `1.79 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -333,7 +333,7 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**301 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**303 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 29 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and

@@ -495,6 +495,14 @@ export async function createHttpServer(
     if (path === '/write') return handleWrite(req, res)
     if (path === '/mcp') return handleMcp(req, res)
 
+    // A browser that mistypes a URL gets a page with a way back; an API client still
+    // gets JSON. It used to be `{"error":"not_found"}` in a browser tab too — 21
+    // characters and no link (shipcheck browser.custom404).
+    if ((req.method === 'GET' || req.method === 'HEAD') && (header(req, 'accept') ?? '').includes('text/html')) {
+      res.writeHead(404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(req.method === 'HEAD' ? undefined : NOT_FOUND_PAGE)
+      return
+    }
     return json(res, 404, { error: 'not_found' })
   }
 
@@ -996,6 +1004,18 @@ const STATIC_PAGES: Record<string, string> = {
  * simply had no route to them. Read-only, still an allowlist, still no path
  * arithmetic.
  */
+/** The one page for a URL this server does not answer. No script, no external asset. */
+const NOT_FOUND_PAGE = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found — Unsay</title><meta name="robots" content="noindex">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0B0D0E;color:#E8ECE8;
+font:17px/1.6 system-ui,-apple-system,sans-serif}main{max-width:34rem;padding:32px 24px}
+h1{font-size:28px;margin:0 0 8px}p{color:#AEB6B0}a{color:#F2A93B}a:hover{color:#fff}</style></head>
+<body><main><h1>Nothing is published at this address.</h1>
+<p>Unsay can retract a sentence, but not one it never said. Try the <a href="/">overview</a>,
+the <a href="/judge">page for judges</a>, or the public receipt at <a href="/verify">/verify</a>.</p>
+</main></body></html>`
+
 const REPO_FILES: Record<string, string> = {
   '/JUDGE.md': 'JUDGE.md',
   '/README.md': 'README.md',
