@@ -42,6 +42,12 @@ export interface StoreOptions {
    * Omitted, the store holds plaintext and `atRestReceipt()` says so out loud.
    */
   codec?: ValueCodec | null
+  /**
+   * Called when a listener throws. One failing listener must not stop the rest from
+   * hearing a revision — each listener is another session's retraction. Default:
+   * console.error.
+   */
+  onListenerError?: (error: unknown, uri: string | null) => void
 }
 
 /** One entry of `list()`: the record, and the URI the caller should ask for it by. */
@@ -57,10 +63,13 @@ export class LiveResourceStore {
   #listChanged: ListChangedListener[] = []
   #partition: AudiencePartition
   #codec: ValueCodec | null
+  #onListenerError: (error: unknown, uri: string | null) => void
 
   constructor(opts: StoreOptions = {}) {
     this.#partition = opts.partition ?? DEFAULT_PARTITION
     this.#codec = opts.codec ?? null
+    this.#onListenerError =
+      opts.onListenerError ?? ((e, uri) => console.error('[live-resources] listener failed for', uri, e))
   }
 
   get partition(): AudiencePartition {
@@ -108,10 +117,14 @@ export class LiveResourceStore {
     return this.#codec.seal(value, recordAad(id))
   }
 
-  /** A copy carrying the plaintext value. Every accessor that hands out a record uses it. */
+  /**
+   * A copy carrying the plaintext value. Every accessor that hands out a record uses
+   * it — including the plaintext store, which used to hand out the stored object
+   * itself: a caller that set `.audience = 'user'` on a read result moved a
+   * reasoning-only fact into the speakable lane, and verify() still said intact.
+   */
   #open(r: LiveRecord): LiveRecord {
-    if (!this.#codec) return r
-    return { ...r, value: this.#codec.open(r.value, recordAad(r)) }
+    return this.#codec ? { ...r, value: this.#codec.open(r.value, recordAad(r)) } : { ...r }
   }
 
   /** The raw chain, at-rest values intact. Only verify() and the receipts see this. */
@@ -151,7 +164,7 @@ export class LiveResourceStore {
       priority: input.priority ?? 0.5,
     }
 
-    const record: LiveRecord = {
+    const record: LiveRecord = Object.freeze({
       ...identity,
       value: this.#seal(input.value, identity),
       prevHash: prev?.versionHash ?? null,
@@ -166,15 +179,27 @@ export class LiveResourceStore {
         input.writtenAt,
         input.authorId,
       ),
-    }
+    })
 
     this.#chains.set(key, [...chain, record])
 
     if (prev) {
       const uri = this.#partition.uriFor(input.subject, input.topic, input.audience)
-      for (const fn of this.#updated) fn(uri)
+      for (const fn of this.#updated) {
+        try {
+          fn(uri)
+        } catch (e) {
+          this.#onListenerError(e, uri)
+        }
+      }
     } else {
-      for (const fn of this.#listChanged) fn()
+      for (const fn of this.#listChanged) {
+        try {
+          fn()
+        } catch (e) {
+          this.#onListenerError(e, null)
+        }
+      }
     }
     // Opened, not `input.value`: a publish that cannot be read back is silent data
     // loss, and this surfaces it at the write instead of at the read.
@@ -228,8 +253,7 @@ export class LiveResourceStore {
 
   /** The whole chain, oldest first. Unauthorized — callers gate it with read(). */
   versions(subject: string, topic: string): LiveRecord[] {
-    const chain = this.#raw(subject, topic)
-    return this.#codec ? chain.map((r) => this.#open(r)) : chain
+    return this.#raw(subject, topic).map((r) => this.#open(r))
   }
 
   /** Age of the newest revision, and whether it has outlived its own `staleAfter`. */
@@ -352,7 +376,9 @@ export class LiveResourceStore {
    * catches it — the only way to demonstrate a tamper-evident chain is to tamper.
    */
   _tamper(subject: string, topic: string, version: number, newValue: string) {
-    const rec = this.#chains.get(this.#key(subject, topic))?.find((r) => r.version === version)
-    if (rec) rec.value = newValue
+    // Records are frozen; the only way to change one is to replace it, here.
+    const chain = this.#chains.get(this.#key(subject, topic))
+    const i = chain?.findIndex((r) => r.version === version) ?? -1
+    if (chain && i >= 0) chain[i] = Object.freeze({ ...chain[i]!, value: newValue })
   }
 }

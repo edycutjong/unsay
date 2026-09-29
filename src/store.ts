@@ -57,6 +57,8 @@ export interface StoreOptions {
    * encryption existed — plaintext in memory, and `atRest()` admits it.
    */
   envelope?: Envelope
+  /** Passed through to the generic store: called when a revision listener throws. */
+  onListenerError?: (error: unknown, uri: string | null) => void
 }
 
 /**
@@ -97,6 +99,7 @@ export class LiveResourceStore extends GenericStore {
     super({
       partition: CARE_PARTITION,
       codec: envelope ? codecFor(envelope) : null,
+      onListenerError: opts.onListenerError,
     })
     this.#envelope = envelope
   }

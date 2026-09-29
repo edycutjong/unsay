@@ -43,8 +43,10 @@ import { DOC_PAGES, renderDocPage } from './docpage.ts'
 import { type Envelope, announceOnce, envelopeFromEnv, startupLine } from './envelope.ts'
 import { buildServer } from './server.ts'
 import { LiveResourceStore, parseUri } from './store.ts'
+import { LiveResourceError } from '../packages/live-resources/src/index.ts'
+import type { CareRecord } from './types.ts'
 import type { AtRestReceipt } from './store.ts'
-import { seedDemo } from './seed.ts'
+import { RAY, seedDemo } from './seed.ts'
 import type { Audience, ChainVerdict, Principal } from './types.ts'
 import { SCOPE } from './types.ts'
 
@@ -358,6 +360,12 @@ export interface CreateHttpServerOptions {
   announce?: boolean
   /** Serve `web/` from this process. Default true; the pages need a same-origin server. */
   serveWeb?: boolean
+  /**
+   * The patients /write may publish for. There is no per-patient authorization
+   * (docs/SPEC.md, out of scope), so no second patient may come into existence
+   * through a write. Default: UNSAY_PATIENTS, comma-separated, else the seeded one.
+   */
+  patients?: string[]
 }
 
 export interface UnsayHttpServer {
@@ -420,6 +428,18 @@ export async function createHttpServer(
   })
   const serveWeb = opts.serveWeb !== false
   const sessions = new Map<string, Session>()
+  const patients = new Set(
+    (opts.patients ?? (process.env.UNSAY_PATIENTS ?? RAY).split(','))
+      .map((p) => p.trim())
+      .filter(Boolean),
+  )
+  /**
+   * Signatures applied inside the skew window → the answer they got. A captured
+   * signed write re-sent inside WRITE_SKEW_MS used to be applied again — rolling a
+   * newer correction back and announcing the rollback as fresh. Bounded by the
+   * number of writes in one window.
+   */
+  const applied = new Map<string, { at: number; answer: Record<string, unknown> }>()
   const stats = { sseOpens: 0, sseResumes: 0, lastResumeAt: 0, writesAccepted: 0, writesRejected: 0 }
 
   const http = createServer((req, res) => {
@@ -763,6 +783,7 @@ export async function createHttpServer(
     const signature = header(req, 'x-unsay-signature')
     let via: AuditVia = 'none'
     let actor: string | undefined
+    let sigKey: string | undefined
 
     if (signature) {
       via = 'hmac'
@@ -777,6 +798,16 @@ export async function createHttpServer(
       const expected = hmac(secrets.write, writeSigningMaterial(timestamp, raw))
       const presented = Buffer.from(signature.replace(/^sha256=/, ''), 'hex')
       if (!equalBytes(expected, presented)) return rejectWrite(res, 'bad_signature', via)
+
+      // At most once per signature: a retry gets the original answer, never a second revision.
+      sigKey = presented.toString('hex')
+      const t = now().getTime()
+      for (const [k, v] of applied) if (t - v.at > WRITE_SKEW_MS) applied.delete(k)
+      const prior = applied.get(sigKey)
+      if (prior) {
+        audit.append({ outcome: 'rejected', reason: 'replayed', via })
+        return json(res, 200, { ...prior.answer, replayed: true })
+      }
     } else {
       // The other real writer: an interactive clinician app holding an OAuth
       // token. `care.write` is advertised in the metadata, so it must be enforced.
@@ -798,84 +829,139 @@ export async function createHttpServer(
       }
     }
 
-    let body: Record<string, unknown>
+    let parsed: unknown
     try {
-      body = JSON.parse(raw.toString('utf8'))
+      parsed = JSON.parse(raw.toString('utf8'))
     } catch {
       return rejectWrite(res, 'malformed_body', via, actor)
     }
+    // `null`, an array or a number parse fine and used to throw past every audit call.
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return rejectWrite(res, 'malformed_body', via, actor)
+    }
+    const body = parsed as Record<string, unknown>
 
     const patient = str(body.patient)
     const domain = str(body.domain)
     const value = str(body.value)
-    const audience = body.audience === 'assistant' ? 'assistant' : 'user'
     const authorId = str(body.authorId) ?? actor
     const authorLabel = str(body.authorLabel) ?? authorId
-    if (!patient || !domain || !value || !authorId || !authorLabel) {
+    // The partition's only input: two literal values, nothing defaulted. This used
+    // to read `=== 'assistant' ? 'assistant' : 'user'`, so "Assistant" was spoken.
+    const audience: Audience | null =
+      body.audience === 'user' || body.audience === 'assistant' ? body.audience : null
+    // MCP bounds annotations.priority to [0,1]; the SDK validates it on every
+    // resources/list, so one out-of-range write broke listing for every SDK host.
+    const priority =
+      body.priority === undefined
+        ? undefined
+        : typeof body.priority === 'number' && body.priority >= 0 && body.priority <= 1
+          ? body.priority
+          : null
+    const staleAfter =
+      body.staleAfter === undefined
+        ? undefined
+        : typeof body.staleAfter === 'string' && !Number.isNaN(Date.parse(body.staleAfter))
+          ? body.staleAfter
+          : null
+    /**
+     * One path segment: lowercase letters, digits, `_` and `-`. A segment holding
+     * the path separator publishes a record `parseUri()` reads as a malformed
+     * version and refuses forever — append-only, unreadable, uncorrectable — and
+     * `|` is the AAD separator the envelope reserves. A zero-width or look-alike
+     * character publishes an invisible twin of a real fact under a real clinician's
+     * name. Nothing but the closed alphabet gets through.
+     */
+    const SEGMENT = /^[a-z0-9][a-z0-9_-]{0,63}$/
+    if (
+      !patient || !domain || !value || !authorId || !authorLabel ||
+      audience === null || priority === null || staleAfter === null ||
+      !SEGMENT.test(patient) || !SEGMENT.test(domain) || !patients.has(patient) ||
+      value.length > 4000 || authorLabel.length > 120
+    ) {
       return rejectWrite(res, 'invalid_fields', via, actor)
     }
-    /**
-     * A path segment cannot contain the path separator, and `|` is the AAD
-     * separator the envelope reserves. Without this check `patient: "ray/evil"`
-     * publishes a record at `care://ray/evil/d` that `parseUri()` then reads as a
-     * malformed version segment and refuses forever: append-only, unreadable,
-     * uncorrectable, and still occupying a cursor page. A write nobody can ever
-     * revise is the opposite of this product.
-     */
-    if (/[/|]/.test(patient) || /[/|]/.test(domain)) {
-      return rejectWrite(res, 'invalid_fields', via, actor)
+    const uri = `${audience === 'assistant' ? 'care-internal://' : 'care://'}${patient}/${domain}`
+
+    // A body identical to the current version changes nothing and interrupts no one:
+    // "I said X… changed it: X" is not a correction.
+    const head = store.versions(patient, domain).at(-1)
+    if (
+      head &&
+      head.audience === audience &&
+      head.value === value &&
+      head.authorId === authorId &&
+      head.authorLabel === authorLabel &&
+      head.staleAfter === staleAfter
+    ) {
+      audit.append({ outcome: 'accepted', reason: 'unchanged', via, actor: actor ?? authorId, uri })
+      return json(res, 200, {
+        uri,
+        version: head.version,
+        versionHash: head.versionHash,
+        writtenAt: head.writtenAt,
+        unchanged: true,
+        subscribers: 0,
+        notified: false,
+      })
     }
 
+    let record: CareRecord
     try {
       // writtenAt is the SERVER clock. A writer that could set it could backdate
       // a correction, and "how old is this instruction" is a spoken safety claim.
-      const record = store.publish({
+      record = store.publish({
         subject: patient,
         topic: domain,
-        audience: audience as Audience,
+        audience,
         value,
         authorId,
         authorLabel,
         writtenAt: now().toISOString(),
-        staleAfter: str(body.staleAfter),
-        priority: typeof body.priority === 'number' ? body.priority : undefined,
+        staleAfter,
+        priority,
       })
-      const uri = `${audience === 'assistant' ? 'care-internal://' : 'care://'}${patient}/${domain}`
-      /**
-       * The audit actor is the VERIFIED principal wherever one exists, never the
-       * body's `authorId`.
-       *
-       * This used to log `authorId`, which on the bearer path silently discarded
-       * `p.sub` — so a `care.write` holder could name any clinician as the author
-       * and the trail recorded the impersonated name while the real principal
-       * appeared in no row at all. SPEC I-14 promises every write attempt is
-       * attributable; that promise was false on exactly the path where an identity
-       * had been proved. The claimed author still reaches the record and the hash
-       * chain (T-4: one shared write secret means `authorId` is claimed, not
-       * proven) — but the row now says who actually presented a credential.
-       */
-      audit.append({ outcome: 'accepted', reason: 'ok', via, actor: actor ?? authorId, uri })
-      stats.writesAccepted++
-      // Counted, not asserted. This used to be a constant `true`, which says a
-      // notification was DISPATCHED — a clinician receipt that renders "a host was
-      // corrected" from a constant is exactly the {success:true} lie the verify
-      // gate exists to catch. Sessions are counted after publish(), so a host that
-      // subscribed to this URI is in the number.
-      const subscribers = [...sessions.values()].filter((s) => s.subscriptions.has(uri)).length
-      return json(res, 200, {
-        uri,
-        version: record.version,
-        versionHash: record.versionHash,
-        writtenAt: record.writtenAt,
-        subscribers,
-        notified: subscribers > 0,
-      })
-    } catch {
-      // The store refuses an audience flip on an existing chain (store.publish).
+    } catch (e) {
+      // Only the store's own refusal (an audience flip on an existing chain) is a
+      // clinical conflict. Anything else is a server fault and is not dressed up as one.
+      if (!(e instanceof LiveResourceError)) throw e
       audit.append({ outcome: 'rejected', reason: 'store_rejected', via, actor: actor ?? authorId })
       stats.writesRejected++
       return json(res, 409, { error: 'conflict' })
     }
+
+    // ── committed: nothing below may report this write as rejected ──
+    /**
+     * The audit actor is the VERIFIED principal wherever one exists, never the
+     * body's `authorId`.
+     *
+     * This used to log `authorId`, which on the bearer path silently discarded
+     * `p.sub` — so a `care.write` holder could name any clinician as the author
+     * and the trail recorded the impersonated name while the real principal
+     * appeared in no row at all. SPEC I-14 promises every write attempt is
+     * attributable; that promise was false on exactly the path where an identity
+     * had been proved. The claimed author still reaches the record and the hash
+     * chain (T-4: one shared write secret means `authorId` is claimed, not
+     * proven) — but the row now says who actually presented a credential.
+     */
+    audit.append({ outcome: 'accepted', reason: 'ok', via, actor: actor ?? authorId, uri })
+    stats.writesAccepted++
+    // Counted, not asserted. This used to be a constant `true`, which says a
+    // notification was DISPATCHED — a clinician receipt that renders "a host was
+    // corrected" from a constant is exactly the {success:true} lie the verify
+    // gate exists to catch. Sessions are counted after publish(), so a host that
+    // subscribed to this URI is in the number.
+    const subscribers = [...sessions.values()].filter((s) => s.subscriptions.has(uri)).length
+    const answer = {
+      uri,
+      version: record.version,
+      versionHash: record.versionHash,
+      writtenAt: record.writtenAt,
+      subscribers,
+      notified: subscribers > 0,
+    }
+    if (sigKey) applied.set(sigKey, { at: now().getTime(), answer })
+    return json(res, 200, answer)
   }
 
   // ── /verify — the link a judge clicks ─────────────────────────────────────

@@ -1,21 +1,21 @@
-{"t":"2026-09-29T06:31:03.869Z","event":"unauthenticated","status":401,"wwwAuthenticate":"Bearer realm=\"unsay\", resource_metadata=\"http://127.0.0.1:51539/.well-known/oauth-protected-resource/mcp\""}
-{"t":"2026-09-29T06:31:03.891Z","event":"initialize","capabilities":{"logging":{},"completions":{},"prompts":{},"resources":{"subscribe":true,"listChanged":true},"tools":{}},"protocolVersion":"2025-11-25"}
-{"t":"2026-09-29T06:31:03.896Z","event":"templates/list","count":2}
-{"t":"2026-09-29T06:31:03.906Z","event":"resources/list","pages":3,"uris":["care-internal://ray/adherence","care-internal://ray/gait_note","care-internal://ray/risk","care://ray/anticoagulant","care://ray/contact","care://ray/exercise","care://ray/exercise_clip","care://ray/weight_bearing","ui://unsay/echo"]}
-{"t":"2026-09-29T06:31:03.910Z","event":"resources/read","uri":"ui://unsay/echo","mimeType":"text/html+skybridge","bytes":36769}
-{"t":"2026-09-29T06:31:03.914Z","event":"completion/complete","arg":"version","context":{"domain":"weight_bearing"},"values":["v2","v1"]}
-{"t":"2026-09-29T06:31:03.917Z","event":"resources/read","uri":"care://ray/weight_bearing","audience":"user","meta":{"unsay/version":2,"unsay/versionHash":"f709337db83a57a271e69da3bb6803e278c71def53c9423cea814921101ef65a","unsay/prevHash":"8396b80c4953f86ab7f19152c9d17ab7c0eae009af783825714755b1b3f5bfc6","unsay/audience":"user","unsay/lastModified":"2026-10-06T09:14:00.000Z","unsay/stale":false,"unsay/superseded":false,"unsay/currentVersion":2}}
-{"t":"2026-09-29T06:31:03.919Z","event":"resources/read","uri":"care-internal://ray/risk","audience":"assistant","spoken":false}
-{"t":"2026-09-29T06:31:03.921Z","event":"resources/read","uri":"care://ray/exercise_clip","blob":"audio/wav","bytes":24044}
-{"t":"2026-09-29T06:31:03.931Z","event":"audience partition","uri":"care-internal://ray/risk","refusedForUserScope":true,"leakedUris":0}
-{"t":"2026-09-29T06:31:03.935Z","event":"resources/subscribe","uri":"care://ray/weight_bearing"}
-{"t":"2026-09-29T06:31:03.937Z","event":"write rejected","status":401,"reason":"one byte changed after signing"}
-{"t":"2026-09-29T06:31:03.939Z","event":"notifications/resources/updated","uri":"care://ray/weight_bearing","latencyMs":1.777,"version":3,"subscribers":1}
-{"t":"2026-09-29T06:31:03.940Z","event":"resources/read","uri":"care://ray/weight_bearing","afterCorrection":true,"value":"Full weight-bearing as tolerated.","chained":true}
-{"t":"2026-09-29T06:31:03.940Z","event":"unsay/retraction","uri":"care://ray/weight_bearing","rendered":"Wait — don’t do that. What I just told you is out of date. I said “Partial weight-bearing, about half your body weight through the operated leg.” Sarah Okafor, physio changed it just now: “Full weight-bearing as tolerated.” In plain terms, full weight-bearing as tolerated means you can put as much weight through that leg as is comfortable.","from":"src/retraction.ts"}
-{"t":"2026-09-29T06:31:03.941Z","event":"resources/read","uri":"care://ray/anticoagulant","stale":true}
-{"t":"2026-09-29T06:31:03.943Z","event":"prompts/get","name":"brief_carer","speakableOnly":true,"chars":873}
-{"t":"2026-09-29T06:31:03.945Z","event":"tools/call","tool":"whats_changed","changedCount":1,"carriesPreviousValue":true}
-{"t":"2026-09-29T06:31:03.958Z","event":"logging/setLevel","level":"emergency","logsBefore":1,"logsAfter":1,"resourceUpdatedStillDelivered":true}
-{"t":"2026-09-29T06:31:03.959Z","event":"GET /verify","intact":true,"versions":8,"sealed":0}
-{"t":"2026-09-29T06:31:03.960Z","event":"summary","atRest":"at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)","protocolVersion":"2025-11-25","protocolVersionMeetsTrackMinimum":true,"unauthenticatedRefused":true,"mcpAppsCardServed":true,"retractionRenderedServerSide":true,"loggingChannelDelivered":true,"loggingSetLevelHonoured":true,"fallbackCarriesPreviousValue":true,"audiencePartitionHeld":true,"blobBytes":24044,"tamperedWriteRefused":true,"subscribersNotified":1,"writeToNotificationMs":1.777,"speechWindowMs":3400,"landsMidSentence":true,"correctionApplied":true,"retractionChainsToPreviousVersion":true,"staleFactAnnouncedAge":true,"briefingSpeakableOnly":true,"fallbackExercised":true,"chainIntact":true,"verdict":"PASS"}
+{"t":"2026-09-29T06:33:46.530Z","event":"unauthenticated","status":401,"wwwAuthenticate":"Bearer realm=\"unsay\", resource_metadata=\"http://127.0.0.1:51869/.well-known/oauth-protected-resource/mcp\""}
+{"t":"2026-09-29T06:33:46.552Z","event":"initialize","capabilities":{"logging":{},"completions":{},"prompts":{},"resources":{"subscribe":true,"listChanged":true},"tools":{}},"protocolVersion":"2025-11-25"}
+{"t":"2026-09-29T06:33:46.558Z","event":"templates/list","count":2}
+{"t":"2026-09-29T06:33:46.568Z","event":"resources/list","pages":3,"uris":["care-internal://ray/adherence","care-internal://ray/gait_note","care-internal://ray/risk","care://ray/anticoagulant","care://ray/contact","care://ray/exercise","care://ray/exercise_clip","care://ray/weight_bearing","ui://unsay/echo"]}
+{"t":"2026-09-29T06:33:46.573Z","event":"resources/read","uri":"ui://unsay/echo","mimeType":"text/html+skybridge","bytes":36769}
+{"t":"2026-09-29T06:33:46.577Z","event":"completion/complete","arg":"version","context":{"domain":"weight_bearing"},"values":["v2","v1"]}
+{"t":"2026-09-29T06:33:46.580Z","event":"resources/read","uri":"care://ray/weight_bearing","audience":"user","meta":{"unsay/version":2,"unsay/versionHash":"f709337db83a57a271e69da3bb6803e278c71def53c9423cea814921101ef65a","unsay/prevHash":"8396b80c4953f86ab7f19152c9d17ab7c0eae009af783825714755b1b3f5bfc6","unsay/audience":"user","unsay/lastModified":"2026-10-06T09:14:00.000Z","unsay/stale":false,"unsay/superseded":false,"unsay/currentVersion":2}}
+{"t":"2026-09-29T06:33:46.582Z","event":"resources/read","uri":"care-internal://ray/risk","audience":"assistant","spoken":false}
+{"t":"2026-09-29T06:33:46.585Z","event":"resources/read","uri":"care://ray/exercise_clip","blob":"audio/wav","bytes":24044}
+{"t":"2026-09-29T06:33:46.593Z","event":"audience partition","uri":"care-internal://ray/risk","refusedForUserScope":true,"leakedUris":0}
+{"t":"2026-09-29T06:33:46.598Z","event":"resources/subscribe","uri":"care://ray/weight_bearing"}
+{"t":"2026-09-29T06:33:46.599Z","event":"write rejected","status":401,"reason":"one byte changed after signing"}
+{"t":"2026-09-29T06:33:46.602Z","event":"notifications/resources/updated","uri":"care://ray/weight_bearing","latencyMs":2.203,"version":3,"subscribers":1}
+{"t":"2026-09-29T06:33:46.605Z","event":"resources/read","uri":"care://ray/weight_bearing","afterCorrection":true,"value":"Full weight-bearing as tolerated.","chained":true}
+{"t":"2026-09-29T06:33:46.605Z","event":"unsay/retraction","uri":"care://ray/weight_bearing","rendered":"Wait — don’t do that. What I just told you is out of date. I said “Partial weight-bearing, about half your body weight through the operated leg.” Sarah Okafor, physio changed it just now: “Full weight-bearing as tolerated.” In plain terms, full weight-bearing as tolerated means you can put as much weight through that leg as is comfortable.","from":"src/retraction.ts"}
+{"t":"2026-09-29T06:33:46.606Z","event":"resources/read","uri":"care://ray/anticoagulant","stale":true}
+{"t":"2026-09-29T06:33:46.608Z","event":"prompts/get","name":"brief_carer","speakableOnly":true,"chars":873}
+{"t":"2026-09-29T06:33:46.611Z","event":"tools/call","tool":"whats_changed","changedCount":1,"carriesPreviousValue":true}
+{"t":"2026-09-29T06:33:46.625Z","event":"logging/setLevel","level":"emergency","logsBefore":1,"logsAfter":1,"resourceUpdatedStillDelivered":true}
+{"t":"2026-09-29T06:33:46.626Z","event":"GET /verify","intact":true,"versions":8,"sealed":0}
+{"t":"2026-09-29T06:33:46.627Z","event":"summary","atRest":"at-rest: PLAINTEXT — no envelope configured (set UNSAY_KEY_PROVIDER=local|kms)","protocolVersion":"2025-11-25","protocolVersionMeetsTrackMinimum":true,"unauthenticatedRefused":true,"mcpAppsCardServed":true,"retractionRenderedServerSide":true,"loggingChannelDelivered":true,"loggingSetLevelHonoured":true,"fallbackCarriesPreviousValue":true,"audiencePartitionHeld":true,"blobBytes":24044,"tamperedWriteRefused":true,"subscribersNotified":1,"writeToNotificationMs":2.203,"speechWindowMs":3400,"landsMidSentence":true,"correctionApplied":true,"retractionChainsToPreviousVersion":true,"staleFactAnnouncedAge":true,"briefingSpeakableOnly":true,"fallbackExercised":true,"chainIntact":true,"verdict":"PASS"}

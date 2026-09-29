@@ -686,8 +686,10 @@ Each item names where to look, so none of it has to be taken on trust.
 - **One shared write secret.** The HMAC proves that *a* holder of the write secret wrote
   this, not *which* clinician. `authorId` is claimed in the body and made immutable by the
   hash chain — that is immutability, not authenticity.
-- **Replay protection is the 300 s skew window and nothing else.** There is no nonce cache,
-  so a captured request can be re-sent inside its own window. Stated rather than hidden.
+- **Replay protection is the 300 s skew window plus an in-memory record of every signature
+  applied inside it.** A re-send gets the original answer and publishes nothing. The record
+  does not survive a restart, so a request captured before one could apply once more inside
+  its own window. Stated rather than hidden.
 - **`DEV_` secrets are used when the environment variables are unset**, and the server says so
   on stderr at every start.
 

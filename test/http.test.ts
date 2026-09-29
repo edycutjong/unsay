@@ -1088,3 +1088,133 @@ describe('a URL this server does not answer', () => {
     }
   })
 })
+
+// ── a2a r01: /write validates before it publishes, and applies a signature once ──
+
+describe('/write rejects what is not provably valid', () => {
+  let own: UnsayHttpServer
+  let ownAudit: AuditLog
+  beforeAll(async () => {
+    ownAudit = new AuditLog()
+    own = await createHttpServer({
+      store: seedDemo(new LiveResourceStore()),
+      audit: ownAudit,
+      tokenSecret: TOKEN_SECRET,
+      writeSecret: WRITE_SECRET,
+      announce: false,
+    })
+  })
+  afterAll(async () => {
+    await own.close()
+  })
+
+  const send = (raw: Buffer, timestamp = new Date().toISOString()) =>
+    fetch(`${own.baseUrl}/write`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-unsay-timestamp': timestamp,
+        'x-unsay-signature': signWriteBody(WRITE_SECRET, timestamp, raw),
+      },
+      body: raw.toString('utf8'),
+    })
+  const body = (over: Record<string, unknown>) =>
+    Buffer.from(
+      JSON.stringify({
+        patient: RAY,
+        domain: 'weight_bearing',
+        audience: 'user',
+        value: 'Full weight-bearing as tolerated.',
+        authorId: 'okafor',
+        authorLabel: 'Sarah Okafor, physio',
+        ...over,
+      }),
+    )
+  const head = () => own.store.versions(RAY, 'weight_bearing').at(-1)!
+
+  it.each([
+    ['audience "Assistant"', { audience: 'Assistant' }],
+    ['a missing audience', { audience: undefined }],
+    ['priority 5', { priority: 5 }],
+    ['staleAfter "next tuesday"', { staleAfter: 'next tuesday' }],
+    ['a zero-width domain twin', { domain: 'weight_bearing​' }],
+    ['an unknown patient', { patient: 'mallory' }],
+  ])('refuses %s, audits it, and publishes nothing', async (_, over) => {
+    const before = head().version
+    const res = await send(body({ ...over, value: `probe ${Math.random()}` }))
+    expect(res.status).toBe(401)
+    expect(ownAudit.last()!.reason).toBe('invalid_fields')
+    expect(head().version).toBe(before)
+    const uris = own.store.list({ sub: 't', scopes: [SCOPE.user, SCOPE.assistant] }).map((x) => x.uri)
+    expect(uris.some((u) => u.includes('mallory') || u.includes('​'))).toBe(false)
+  })
+
+  it('refuses a signed body of null with an audit row instead of a 500', async () => {
+    const res = await send(Buffer.from('null'))
+    expect(res.status).toBe(401)
+    expect(ownAudit.last()!.reason).toBe('malformed_body')
+  })
+
+  it('applies a captured signed write once: a replay cannot roll back a newer correction', async () => {
+    const ts = new Date().toISOString()
+    const partial = body({ value: 'Partial weight-bearing, replay probe.' })
+    expect((await send(partial, ts)).status).toBe(200)
+    expect((await send(body({ value: 'Full weight-bearing, replay probe.' }))).status).toBe(200)
+    const v = head().version
+    const replay = await send(partial, ts)
+    expect(replay.status).toBe(200)
+    expect(((await replay.json()) as { replayed?: boolean }).replayed).toBe(true)
+    expect(head().version).toBe(v)
+    expect(head().value).toBe('Full weight-bearing, replay probe.')
+    expect(ownAudit.last()!.reason).toBe('replayed')
+  })
+
+  it('publishes nothing for a body identical to the current version', async () => {
+    const v = head().version
+    const res = await send(body({ value: head().value }))
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as { unchanged?: boolean }).unchanged).toBe(true)
+    expect(head().version).toBe(v)
+  })
+})
+
+describe('a committed write is never reported as rejected', () => {
+  it('refuses to start on an audit sink it cannot append to', () => {
+    expect(() => new AuditLog({ sink: '/nonexistent-dir/unsay-audit.jsonl' })).toThrow()
+  })
+
+  it('one throwing listener does not starve the next', () => {
+    const errors: unknown[] = []
+    const store = seedDemo(new LiveResourceStore({ onListenerError: (e) => errors.push(e) }))
+    const heard: string[] = []
+    store.onUpdated(() => {
+      throw new Error('a broken session')
+    })
+    store.onUpdated((uri) => heard.push(uri))
+    store.publish({
+      subject: RAY,
+      topic: 'weight_bearing',
+      audience: 'user',
+      value: 'Full weight-bearing as tolerated.',
+      authorId: 'okafor',
+      authorLabel: 'Sarah Okafor, physio',
+      writtenAt: new Date().toISOString(),
+    })
+    expect(heard).toEqual([WB])
+    expect(errors).toHaveLength(1)
+  })
+})
+
+describe('the store hands out copies, never its own records', () => {
+  it('mutating a read result changes nothing a later read or verify sees', () => {
+    const store = seedDemo(new LiveResourceStore())
+    const both = { sub: 't', scopes: [SCOPE.user, SCOPE.assistant] }
+    const r = store.read(RISK, both)
+    ;(r as { audience: string }).audience = 'user'
+    expect(() => store.read(uriFor(RAY, 'risk', 'user'), { sub: 't', scopes: [SCOPE.user] })).toThrow()
+    const chain = store.versions(RAY, 'risk')
+    chain.push(chain[0]!)
+    expect(store.versions(RAY, 'risk')).toHaveLength(chain.length - 1)
+    expect(store.verify(RAY, 'risk').intact).toBe(true)
+  })
+})

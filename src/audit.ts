@@ -26,6 +26,10 @@ export type AuditReason =
   | 'insufficient_scope'
   | 'store_rejected'
   | 'body_too_large'
+  /** A signed write already applied inside the skew window; answered, not re-applied. */
+  | 'replayed'
+  /** Identical to the current version; nothing published, nobody interrupted. */
+  | 'unchanged'
 
 /** How the writer authenticated. Never the credential itself. */
 export type AuditVia = 'hmac' | 'bearer' | 'none'
@@ -63,6 +67,9 @@ export class AuditLog {
 
   constructor(opts: AuditOptions = {}) {
     this.#sink = opts.sink
+    // Refuse to start on a sink that cannot be appended to. Found at the first write
+    // it turned a committed revision into an HTTP 500 and a "rejected" audit row.
+    if (this.#sink) appendFileSync(this.#sink, '')
     this.#now = opts.now ?? (() => new Date())
   }
 

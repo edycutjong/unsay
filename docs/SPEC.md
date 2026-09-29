@@ -690,8 +690,12 @@ presented signature (I-14). The alternative writer path — a bearer token — m
 
 **Residual, stated plainly.**
 
-- **No nonce cache.** A captured signed write is replayable for up to 300 s. The window is
-  bounded and named; it is not zero.
+- **Replay inside the 300 s window is answered, not re-applied.** The server remembers every
+  signature it applied inside the skew window and returns the original answer to a re-send
+  (`replayed: true`, audit reason `replayed`). A restart forgets that memory; a request
+  captured before a restart and re-sent inside its window would apply once more.
+- **An identical re-publish is a no-op.** A body equal to the current version publishes
+  nothing and interrupts no one (`unchanged: true`).
 - **A live stolen key writes valid updates**, exactly as in any signed-webhook system.
   Unmitigated by design.
 - **One shared write secret**, from `UNSAY_WRITE_SECRET`, not per-author keys. `authorId` is
