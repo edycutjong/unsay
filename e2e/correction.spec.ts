@@ -22,7 +22,9 @@ test('a published revision strikes through on the Echo Show', async ({ browser, 
   // LIVE, not merely "not connecting": before the first read the screen shows the
   // committed seed, and both device projects share one server — so after the
   // desktop run the seed text is no longer the current value (flaked on CI).
-  await expect(echo.locator('#sStatusText')).toContainText('LIVE', { timeout: 15_000 })
+  // /^LIVE/, not 'LIVE': the pre-connect badge reads "SEED · NOT LIVE", which contains
+  // it — the substring check passed on the seed screen and flaked twice on CI.
+  await expect(echo.locator('#sStatusText')).toHaveText(/^LIVE/, { timeout: 15_000 })
   const before = (await echo.locator('#sFact').textContent())!.trim()
   expect(before).not.toBe('—')
 
@@ -31,7 +33,7 @@ test('a published revision strikes through on the Echo Show', async ({ browser, 
   // The screen paints the seed plan while it connects, then swaps in the live one.
   // A click during the swap lands on a card that is about to be replaced — it
   // flaked exactly that way on a CI runner — so wait for live, as a person would.
-  await expect(clin.locator('#statusText')).toContainText('live', { timeout: 15_000 })
+  await expect(clin.locator('#statusText')).toHaveText(/^live\b/, { timeout: 15_000 })
   // By field, not by text: the text is whatever the previous run left there.
   const card = clin.locator('li').filter({ hasText: /weight[ _-]?bearing/i }).filter({ hasText: before }).first()
   await card.getByRole('button').first().click()
