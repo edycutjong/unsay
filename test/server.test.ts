@@ -706,3 +706,16 @@ describe('the Agent Skill and the server say the same thing', () => {
     expect(skill).toContain('Streamable HTTP')
   })
 })
+
+describe('the version a host is told', () => {
+  it('is package.json\'s, so a release and the server it describes cannot disagree', async () => {
+    // serverInfo.version was a literal. The release workflow bumps package.json from the
+    // commit history; a second copy typed into the source would drift on the first release.
+    const { readFileSync } = await import('node:fs')
+    const { VERSION } = await import('../src/server.ts')
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+    expect(VERSION).toBe(pkg.version)
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(readFileSync(new URL('../src/server.ts', import.meta.url), 'utf8')).not.toMatch(/name: 'unsay', version: '/)
+  })
+})

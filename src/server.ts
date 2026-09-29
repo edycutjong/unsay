@@ -15,6 +15,8 @@
  * eligibility requirement. `scripts/e2e.ts` and `scripts/verify.ts` both assert the
  * negotiated version rather than leaving it to be inferred from a caret range.
  */
+import { readFileSync } from 'node:fs'
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import {
   CallToolRequestSchema,
@@ -111,12 +113,21 @@ function decodeCursor(cursor: string): string {
   }
 }
 
+/**
+ * The version `initialize` reports is package.json's, read once at start-up. The
+ * release workflow bumps package.json from the commit history; nothing else may, so
+ * the version a host sees and the release a judge downloads cannot disagree.
+ */
+export const VERSION: string = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version
+
 export function buildServer(opts: BuildOptions) {
   const store = opts.store ?? seedDemo()
   const now = opts.now ?? (() => new Date())
 
   const server = new Server(
-    { name: 'unsay', version: '1.0.0' },
+    { name: 'unsay', version: VERSION },
     {
       capabilities: {
         resources: { subscribe: true, listChanged: true },

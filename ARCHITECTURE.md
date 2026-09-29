@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-29T00:22:18.210Z_
+_Generated: 2026-09-29T00:38:21.707Z_
 
 ## Protocol
 
@@ -122,7 +122,7 @@ tools: {},
 | `src/http.ts` | `DEV_TOKEN_SECRET`, `DEV_WRITE_SECRET`, `SCOPES_SUPPORTED`, `WRITE_SKEW_MS`, `mintToken`, `TokenError`, `verifyToken`, `writeSigningMaterial`, `signWriteBody`, `urisNamedBy`, `replayAllowed`, `MemoryEventStore`, `createHttpServer` |
 | `src/retraction.ts` | `GLOSSARY`, `spokenAge`, `glossesFor`, `renderRetraction` |
 | `src/seed.ts` | `RAY`, `DEMO_NOW`, `seed`, `seedDemo`, `STAGED_REVISION` |
-| `src/server.ts` | `SERVER_INSTRUCTIONS`, `RESOURCE_PAGE_SIZE`, `BRIEF_CARER`, `buildServer` |
+| `src/server.ts` | `SERVER_INSTRUCTIONS`, `RESOURCE_PAGE_SIZE`, `BRIEF_CARER`, `VERSION`, `buildServer` |
 | `src/store.ts` | `CARE_PARTITION`, `uriFor`, `parseUri`, `LiveResourceStore` |
 | `src/types.ts` | `SCHEME`, `SCOPE` |
 | `src/ui_resource.ts` | `UI_ECHO_URI`, `UI_MIME_TYPE`, `UI_TEMPLATE_META`, `UI_FRAME_META`, `uiHtml`, `uiResourceDescriptor` |

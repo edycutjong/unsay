@@ -1,6 +1,17 @@
-# A version from the commit messages, and nothing else. `feat:` bumps the minor,
-# `fix:`/`perf:` the patch, `!` or a BREAKING CHANGE footer the major; any other push
-# releases nothing, which is the intended behaviour and not a bug to "fix".
+# Automatic semantic versioning, from the commit messages and nothing else.
+#
+#   feat: …                          → minor   1.0.0 → 1.1.0
+#   fix: … · perf: …                 → patch   1.0.0 → 1.0.1
+#   any type with `!` (feat!: …), or
+#   a `BREAKING CHANGE:` footer      → major   1.0.0 → 2.0.0
+#   docs: chore: test: ci: refactor: style: build: → no release
+#
+# v1.0.0 is the baseline — the submission build. Every release after it is computed
+# from the commits since the last `vX.Y.Z` tag, then written back so the version is
+# the same everywhere it is printed: package.json (which src/server.ts reports in
+# `initialize`), package-lock.json, and the pitch deck's folio. One commit
+# (`chore(release): vX.Y.Z`), one annotated tag, one GitHub Release with generated
+# notes. A push that releases nothing is the intended behaviour, not a bug to "fix".
 #
 # Shell, not semantic-release: one runtime dependency is the rule for this repository,
 # and the release process does not get an exemption from it.
@@ -14,50 +25,95 @@ on:
 permissions:
   contents: write
 
+# Two pushes in quick succession must not compute the same next version twice.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    # The release commit is pushed with GITHUB_TOKEN, which does not trigger workflows;
+    # this guard is the second lock on the same door.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # fetch-depth 0: a shallow checkout has no tags, so every run would compute v0.0.1.
+      # fetch-depth 0: a shallow checkout has no tags, so the next version would be
+      # computed from nothing.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
 
       - name: next version from the commits since the last tag
         id: ver
         run: |
           set -euo pipefail
-          LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -z "$LAST" ]; then RANGE=""; CUR="0.0.0"; else RANGE="${LAST}..HEAD"; CUR="${LAST#v}"; fi
-          LOG=$(git log --format=%B $RANGE)
+          LAST=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
+          if [ -z "$LAST" ]; then
+            echo "::error::No vX.Y.Z tag reachable from HEAD. v1.0.0 is the baseline; it must exist."
+            exit 1
+          fi
+          CUR="${LAST#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$PKG" != "$CUR" ]; then
+            echo "::warning::package.json says $PKG but the last tag is $LAST — the tag wins; the bump rewrites package.json."
+          fi
+
+          # Subjects and bodies of every commit since the tag, release commits excluded.
+          LOG=$(git log --format='%s%n%b' "$LAST..HEAD" --invert-grep --grep='^chore(release):')
+          if [ -z "$(echo "$LOG" | tr -d '[:space:]')" ]; then
+            echo "Nothing since $LAST."; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
           BUMP=none
-          echo "$LOG" | grep -qE '^(feat|fix|perf)(\(.+\))?!:|BREAKING CHANGE:' && BUMP=major
-          [ "$BUMP" = none ] && echo "$LOG" | grep -qE '^feat(\(.+\))?:' && BUMP=minor
-          [ "$BUMP" = none ] && echo "$LOG" | grep -qE '^(fix|perf)(\(.+\))?:' && BUMP=patch
+          echo "$LOG" | grep -qE '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE:' && BUMP=major
+          [ "$BUMP" = none ] && echo "$LOG" | grep -qE '^feat(\([^)]*\))?:' && BUMP=minor
+          [ "$BUMP" = none ] && echo "$LOG" | grep -qE '^(fix|perf)(\([^)]*\))?:' && BUMP=patch
           if [ "$BUMP" = none ]; then
-            echo "No releasable commits since ${LAST:-the beginning}."
+            echo "No feat/fix/perf/breaking commits since $LAST — nothing to release."
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
+
           IFS=. read -r MA MI PA <<< "$CUR"
           case "$BUMP" in
             major) MA=$((MA+1)); MI=0; PA=0 ;;
             minor) MI=$((MI+1)); PA=0 ;;
             patch) PA=$((PA+1)) ;;
           esac
-          NEXT="v${MA}.${MI}.${PA}"
-          echo "bump: $BUMP  ${LAST:-none} -> $NEXT"
-          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
+          NEXT="${MA}.${MI}.${PA}"
+          echo "bump: $BUMP  $LAST -> v$NEXT"
+          {
+            echo "next=$NEXT"
+            echo "bump=$BUMP"
+            echo "skip=false"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: tag and publish
+      - name: write the version back, tag, and publish
         if: steps.ver.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ steps.ver.outputs.next }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.ver.outputs.next }}" -m "${{ steps.ver.outputs.next }}"
-          git push origin "${{ steps.ver.outputs.next }}"
-          gh release create "${{ steps.ver.outputs.next }}" --generate-notes --title "${{ steps.ver.outputs.next }}"
+
+          npm version "$NEXT" --no-git-tag-version --allow-same-version
+          sed -i -E "s/Unsay · v[0-9]+\.[0-9]+\.[0-9]+/Unsay · v$NEXT/g" docs/pitch/index.html
+
+          git add package.json package-lock.json docs/pitch/index.html
+          git commit -m "chore(release): v$NEXT"
+          git tag -a "v$NEXT" -m "v$NEXT"
+
+          # If main moved while this ran, rebase the one release commit onto it and
+          # re-point the tag at the rebased commit before pushing either.
+          git pull --rebase origin main
+          git tag -f -a "v$NEXT" -m "v$NEXT"
+          git push origin HEAD:main
+          git push origin "v$NEXT"
+
+          gh release create "v$NEXT" --verify-tag --generate-notes --title "Unsay v$NEXT"

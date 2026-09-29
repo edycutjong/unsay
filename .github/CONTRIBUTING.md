@@ -55,6 +55,24 @@ write path, the OAuth scopes — the PR must add the assertion that fails withou
 change. `scripts/verify.ts` is where an *external* side effect is asserted; the suite
 is where internals are.
 
+## Versions are computed, not chosen
+
+v1.0.0 is the submission build and the baseline. After it, every release is computed by
+`.github/workflows/release.yml` from the commit subjects since the last `vX.Y.Z` tag — so
+the prefix you write is the version you get:
+
+| Commit subject | Release |
+|---|---|
+| `fix: …` · `perf: …` | patch — 1.0.0 → 1.0.1 |
+| `feat: …` | minor — 1.0.0 → 1.1.0 |
+| `feat!: …` (any type with `!`), or a `BREAKING CHANGE:` footer | major — 1.0.0 → 2.0.0 |
+| `docs:` `test:` `ci:` `chore:` `refactor:` `style:` `build:` | none |
+
+The workflow writes the version back to `package.json` (which the server reports in
+`initialize`), `package-lock.json` and the deck's folio, commits `chore(release): vX.Y.Z`,
+tags it, and publishes a GitHub Release. Do not edit a version by hand; `test/server.test.ts`
+fails if the server's version stops coming from `package.json`.
+
 ## Friction
 
 If a tool cost you time — the MCP spec, the reference SDK, an Amazon console — write
