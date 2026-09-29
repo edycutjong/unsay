@@ -7,7 +7,7 @@
 > absence cannot be parsed out of code.
 > LESSONS R6: eight prior submissions documented routes that were never built.
 
-_Generated: 2026-09-29T05:41:01.131Z_
+_Generated: 2026-09-29T06:37:53.264Z_
 
 ## Protocol
 
@@ -125,7 +125,7 @@ tools: {},
 | `src/server.ts` | `SERVER_INSTRUCTIONS`, `RESOURCE_PAGE_SIZE`, `BRIEF_CARER`, `VERSION`, `buildServer` |
 | `src/store.ts` | `CARE_PARTITION`, `uriFor`, `parseUri`, `LiveResourceStore` |
 | `src/types.ts` | `SCHEME`, `SCOPE` |
-| `src/ui_resource.ts` | `UI_ECHO_URI`, `UI_MIME_TYPE`, `UI_TEMPLATE_META`, `UI_FRAME_META`, `uiHtml`, `uiResourceDescriptor` |
+| `src/ui_resource.ts` | `UI_ECHO_URI`, `UI_MIME_TYPE`, `UI_TEMPLATE_META`, `uiToolMeta`, `UI_FRAME_META`, `uiHtml`, `uiResourceDescriptor` |
 
 ## Extracted package
 
@@ -184,9 +184,9 @@ absence cannot be parsed out of code. Stated so this document cannot imply other
   minted by `mintToken()` in the same file that verifies them.
 - **No durable storage.** The store, the event store and the audit log are in memory; the
   audit log survives only if `UNSAY_AUDIT_LOG` names a file.
-- **The MCP Apps binding is shaped, not exercised.** `ui://unsay/echo` is served and
-  read over the protocol by `npm run e2e`, but no host we can reach implements the
-  extension, so the `_meta` template binding on `whats_changed` has never been
-  rendered by one — see FRICTION.md F-013.
+- **The MCP Apps card has never been rendered in a host.** `ui://unsay/echo` is served
+  and read over the protocol by `npm run e2e` with the 2026-01-26 shapes, but the card
+  does not yet speak the host postMessage bridge, so framed without a token it shows
+  the seeded plan — see FRICTION.md F-013.
 - No ML model of any kind, by design — the reasoning model belongs to the host.
 - No blockchain, token, or payment surface.

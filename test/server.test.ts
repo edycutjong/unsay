@@ -557,6 +557,9 @@ describe('the MCP Apps card', () => {
     const tools = await client.listTools()
     const tool = tools.tools.find((t) => t.name === 'whats_changed')!
     expect((tool._meta as Record<string, unknown>)?.[UI_TEMPLATE_META]).toBe(UI_ECHO_URI)
+    // The MCP Apps standard key (2026-01-26), not only the Apps SDK alias.
+    expect((tool._meta as { ui?: { resourceUri?: string } })?.ui?.resourceUri).toBe(UI_ECHO_URI)
+    expect(UI_MIME_TYPE).toBe('text/html;profile=mcp-app')
   })
 })
 

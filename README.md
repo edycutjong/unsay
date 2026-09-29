@@ -160,12 +160,12 @@ judged path rather than described:
 | Artifact | What it is | Exercised by |
 |---|---|---|
 | [`skill/SKILL.md`](skill/SKILL.md) | An **Agent Skill**: the two-rule retraction protocol, the retraction's required shape, the never-speak rule, and the `whats_changed` fallback. The same contract the server sends in `initialize`. | `npm run e2e` reads it and prints its size; `test/server.test.ts` asserts it has not drifted from `SERVER_INSTRUCTIONS` |
-| `ui://unsay/echo` | An **MCP Apps** resource: the 1280×800 device card, served *through* the protocol as `text/html+skybridge` and bound to the `whats_changed` result. Same bytes as `/echo.html` — one file, two doors. | `npm run e2e` reads it over Streamable HTTP; `test/server.test.ts` asserts the mime type, the listing and the tool binding |
+| `ui://unsay/echo` | An **MCP Apps** resource: the 1280×800 device card, served *through* the protocol as `text/html;profile=mcp-app` and bound to the `whats_changed` result by `_meta.ui.resourceUri` (MCP Apps, stable 2026-01-26). Same bytes as `/echo.html` — one file, two doors. | `npm run e2e` reads it over Streamable HTTP; `test/server.test.ts` asserts the mime type, the listing and the tool binding |
 | MCP `2025-11-25` | The track's one hard eligibility requirement, over Streamable HTTP with `Last-Event-ID` resume. | asserted at runtime by `npm run e2e` and `npm run verify` §6 |
 
-The `_meta` binding that tells a host to render a tool result *into* the card is **shaped and
-unexercised** — no host we can reach implements the extension. That is F-013, and it is disclosed
-here for the same reason the KMS provider is.
+The card has **never been rendered inside an MCP Apps host**, and it does not yet speak the
+spec's host postMessage bridge — framed without a token it shows the seeded plan, not live data.
+That is F-013, and it is disclosed here for the same reason the KMS provider is.
 
 ## 📊 Engineering Rigor
 
@@ -186,14 +186,14 @@ write path, and the retraction rendered server-side:
 ```
   protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html+skybridge · 36769 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html;profile=mcp-app · 36769 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.93 ms
+  notifications/resources/updated  1.49 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.93 ms` will differ on your machine and between two runs on this one;
+The `1.49 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 

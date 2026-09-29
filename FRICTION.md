@@ -502,37 +502,41 @@ exactly one when a new domain appears.
 makes the suppression window uniform across implementations and, more importantly, makes it
 observable — which is the difference between a guard and a comment.
 
-## F-013 · MCP Apps extension · the tool→template binding key is vendor-namespaced, with no registry
+## F-013 · MCP Apps · two shapes for one card, and the older one is the one a builder finds first
 
-**Date:** 2026-09-04 · **Severity:** Medium (3 h) · **Tool:** MCP Apps extension (`apps.extensions.modelcontextprotocol.io`)
+**Date:** 2026-09-04 · **Corrected:** 2026-09-29 · **Severity:** Medium (3 h) · **Tool:** MCP Apps extension (`modelcontextprotocol/ext-apps`)
 
 **Task attempted.** Publish Ray's Echo Show card as an MCP resource rather than as an HTTP static
 route, so a host renders the card *through* the protocol — the "media support (cards, carousels),
 MCP Apps" bar the Alexa+ track names — and bind it to the `whats_changed` tool result.
 
 **Steps taken.** Served the card at `ui://unsay/echo` with mime type `text/html+skybridge`, put the
-preferred frame size in `_meta` under the extension's `mcpui.dev/` namespace, and named the template
-on the tool descriptor's `_meta`.
+preferred frame size in `_meta` under the `mcpui.dev/` namespace, and named the template on the tool
+descriptor's `_meta` as `openai/outputTemplate` — the Apps SDK shapes, which is where the examples we
+started from came from.
 
-**Expected vs actual.** Expected one normative key for "render this result into that template", in
-the `mcp/` namespace the rest of the protocol uses. Found `openai/outputTemplate` — a key carrying
-one vendor's prefix, inherited from the Apps SDK the extension grew out of, sitting next to a frame
-hint under a *second*, different third-party namespace (`mcpui.dev/`). Two vendor namespaces and no
-registry means a server cannot tell, by reading, whether a host will look for its template at all.
-There is also no capability a host declares for this, so there is nothing to negotiate against and
-nothing to probe: the binding either works in a given host or is silently ignored.
+**Expected vs actual.** Expected one set of shapes. There are two. The stable MCP Apps specification
+(2026-01-26) already defines all three things this entry originally said were missing: the mime type
+`text/html;profile=mcp-app`, the tool → resource link `_meta.ui.resourceUri`, and a capability a host
+declares, `capabilities.extensions["io.modelcontextprotocol/ui"]`. The Apps SDK shapes
+(`text/html+skybridge`, `openai/outputTemplate`) are not mentioned by the spec at all, and nothing in
+the Apps SDK material we started from pointed to it. **The first version of this entry was wrong**:
+it described the Apps SDK shapes as the extension's, and said no host implements it — the ext-apps
+README lists Claude, ChatGPT, VS Code, Goose, Postman and MCPJam among others. A reviewer found it;
+it is corrected here rather than deleted.
 
-**Workaround.** Ship both doors. The card is an MCP resource *and* an HTTP route (`/echo.html`), read
-from one file so the two cannot drift, and the extension `_meta` keys are named once in
-`src/ui_resource.ts` so the day they are settled is a one-line change. `npm run e2e` asserts the
-resource itself is served and readable over Streamable HTTP; it cannot assert that a host honours the
-binding, because we have no host that implements the extension. **Read the binding as shaped, not
-exercised** — the same posture as the KMS provider under F-004, and disclosed in the same places.
+**Workaround.** The server now publishes the standard shapes (`text/html;profile=mcp-app`,
+`_meta.ui.resourceUri`) and keeps `openai/outputTemplate` as an alias, named once in
+`src/ui_resource.ts`. The card is still also an HTTP route (`/echo.html`), from one file. **Not done:**
+the card does not speak the spec's host postMessage bridge (`ui/initialize` → tool result), so inside
+a host's sandboxed frame, with no token and no network, it shows the seeded plan — and it has never
+been rendered in any host.
 
-**Actionable suggestion.** Register the binding key under `mcp/` — `_meta["mcp/outputTemplate"]` —
-keep the vendor key as an alias for one revision, and add a `capabilities.experimental.apps` (or
-equivalent) a host declares, so a server can negotiate instead of guessing. A rendering contract that
-cannot be probed is a rendering contract a server ships blind.
+**Actionable suggestion.** Publish, in the MCP Apps extension itself, a short migration table from
+the Apps SDK shapes to the spec's (`text/html+skybridge` → `text/html;profile=mcp-app`,
+`openai/outputTemplate` → `_meta.ui.resourceUri`), and have the extension's server helpers warn when a
+`ui://` resource is served with the older mime type. A builder who starts from the older examples
+ships the older shapes and learns otherwise only from someone else.
 
 ---
 
@@ -654,8 +658,8 @@ Each item names where to look, so none of it has to be taken on trust.
 
 ### Deployment and AWS
 
-- **Nothing is hosted.** `npm start` runs the server on your machine. There is no URL a
-  judge can open without cloning. No Lambda, no API Gateway, no DynamoDB.
+- **Hosted as one in-memory process on Railway** (`api.unsay.edycu.dev`, us-west2). A
+  restart resets it to the seed. No Lambda, no API Gateway, no DynamoDB.
 - **The KMS path has never run against a live CMK.** `KmsKeyProvider` in `src/envelope.ts`
   builds real SigV4-signed `GenerateDataKey` / `Decrypt` requests over `fetch` with no AWS
   SDK, and the tests assert the canonical request, the signed-header list, the endpoint and
@@ -781,9 +785,12 @@ Each item names where to look, so none of it has to be taken on trust.
   initialize, cursor pagination, subscribe, the SSE framer, a signed write, the resulting
   `notifications/resources/updated`, and the corrected re-read. The bytes the browser runs are
   the bytes the suite runs. `clinician.html`'s copy is still covered only by its signature tests.
-- **Rendering is not verified.** Layout, animation timing, the 1280×800 device fit and the
-  contrast tokens were checked by eye and by hand-computed WCAG ratios, not by a headless
-  browser. There are no committed screenshots of the running screens, and the README says so.
+- **Rendering is verified in Chromium, not pixel by pixel.** CI runs Playwright
+  (`npm run e2e:browser`): every page loads with no console error and no third-party request,
+  nothing overflows horizontally at phone widths, a published revision strikes through on the
+  Echo Show card, and a planted base URL never receives a token. What it does not check is
+  animation timing, pixel fidelity or the contrast tokens (hand-computed WCAG ratios). The README
+  carries one committed photograph of the running card, `docs/img/echo-retraction.png`.
 - **The landing page's `og:image` was an SVG until the asset suite landed.** `docs/og.svg` was a
   real 1200×630 card, but most link-preview scrapers will not rasterise SVG, so a shared link
   degraded to a text-only preview. It is now a 2400×1260 PNG (`docs/assets/og-image.png`,
@@ -801,12 +808,12 @@ Each item names where to look, so none of it has to be taken on trust.
 
 ### The Alexa+ surfaces
 
-- **The MCP Apps `_meta` binding is shaped, not exercised.** `ui://unsay/echo` is a real MCP
-  resource: listed, read over Streamable HTTP by `npm run e2e`, asserted by `test/server.test.ts`.
-  What has never happened is a host *rendering a tool result into it*, because no host we can
-  reach implements the extension. See **F-013**, which is also where the two vendor-prefixed
-  `_meta` keys we had to choose are argued about. Read the binding exactly as the KMS provider is
-  read: correctly shaped, never executed.
+- **The MCP Apps card has never been rendered in a host.** `ui://unsay/echo` is a real MCP
+  resource with the stable 2026-01-26 shapes (`text/html;profile=mcp-app`, `_meta.ui.resourceUri`):
+  listed, read over Streamable HTTP by `npm run e2e`, asserted by `test/server.test.ts`. The spec's
+  supported hosts include Claude, ChatGPT, VS Code, Goose, Postman and MCPJam; none has been run
+  against it. The card also does not yet speak the host postMessage bridge, so inside a host's
+  sandboxed frame it would show the seeded plan, not live data. See **F-013**.
 - **The gating probe has not been run.** Whether Alexa+ itself declares
   `capabilities.resources.subscribe` is unknown to us, and it decides which of the two paths in
   `skill/SKILL.md` a real host takes. That is why the `whats_changed` fallback is built, carries

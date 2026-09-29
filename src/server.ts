@@ -39,7 +39,7 @@ import {
   UI_ECHO_URI,
   UI_FRAME_META,
   UI_MIME_TYPE,
-  UI_TEMPLATE_META,
+  uiToolMeta,
   uiHtml,
   uiResourceDescriptor,
 } from './ui_resource.ts'
@@ -599,9 +599,9 @@ export function buildServer(opts: BuildOptions) {
           },
           required: ['changed'],
         },
-        // MCP Apps: the template a host may render this result into. Shaped and
-        // unexercised — no host we can reach implements the extension (F-013).
-        _meta: { [UI_TEMPLATE_META]: UI_ECHO_URI },
+        // MCP Apps (2026-01-26): the card a host may render this result into, by the
+        // standard key and the Apps SDK alias. Never yet rendered in a host (F-013).
+        _meta: uiToolMeta(),
       },
     ],
   }))

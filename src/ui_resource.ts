@@ -13,10 +13,12 @@
  * `resources/read ui://unsay/echo` for a host. There is no second copy of the card
  * to drift — `uiHtml()` reads the same file `src/http.ts` serves.
  *
- * What is NOT proven here, and is filed as FRICTION F-013: no host we can reach
- * implements the extension, so the `_meta` template binding below is shaped and
- * unexercised — the same posture as the KMS provider (F-004). The resource itself
- * is exercised: `npm run e2e` reads it over Streamable HTTP and asserts the bytes.
+ * Shapes follow the stable MCP Apps specification (2026-01-26): the resource is
+ * `text/html;profile=mcp-app`, and a tool names it in `_meta.ui.resourceUri`.
+ * What is NOT proven, and is filed as FRICTION F-013: the card has never been
+ * rendered inside a host, and it does not yet speak the host postMessage bridge the
+ * spec defines — framed without a token it shows the seeded plan, not live data.
+ * The resource itself is exercised: `npm run e2e` reads it over Streamable HTTP.
  */
 import { readFileSync } from 'node:fs'
 
@@ -26,20 +28,21 @@ import type { Audience } from './types.ts'
 export const UI_ECHO_URI = 'ui://unsay/echo'
 
 /**
- * The mime type the MCP Apps extension uses to mark HTML a host may render in a
- * sandboxed frame, rather than text it may read aloud. A host that does not know
- * the type sees an unknown mime type and ignores the resource — which is the
- * correct failure, and the reason the card is also on an HTTP route.
+ * MCP Apps (stable 2026-01-26): the one mime type a host renders in a sandboxed
+ * frame, rather than text it may read aloud. A host that does not know the type
+ * ignores the resource — the correct failure, and the reason the card is also on
+ * an HTTP route. This was `text/html+skybridge`, the Apps SDK's type (F-013).
  */
-export const UI_MIME_TYPE = 'text/html+skybridge'
+export const UI_MIME_TYPE = 'text/html;profile=mcp-app'
 
 /**
- * The key that binds a tool result to a template. It carries a vendor prefix
- * inherited from the Apps SDK rather than a `mcp/` one, which is exactly the thing
- * FRICTION F-013 asks the extension to settle before servers commit to it. Named
- * here once so there is a single place to change when it is settled.
+ * The Apps SDK's tool → template key, kept as an alias beside the standard
+ * `_meta.ui.resourceUri` for hosts that predate MCP Apps (F-013).
  */
 export const UI_TEMPLATE_META = 'openai/outputTemplate'
+
+/** A tool's `_meta` naming the card: the MCP Apps key, with the Apps SDK alias. */
+export const uiToolMeta = () => ({ ui: { resourceUri: UI_ECHO_URI }, [UI_TEMPLATE_META]: UI_ECHO_URI })
 
 /** Preferred frame size, in the extension's `_meta` namespace. An Echo Show is 1280×800. */
 export const UI_FRAME_META = 'mcpui.dev/ui-preferred-frame-size'
