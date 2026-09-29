@@ -513,8 +513,8 @@ export async function createHttpServer(
       })
     }
 
-    // Which build is answering. Railway does not deploy on push, so the repo and the
-    // live server can drift; this is how a judge (and the nightly check) can tell.
+    // Which build is answering, so a judge (and the nightly live-version check) can tell
+    // whether the deploy that follows every push to main actually landed.
     if (path === '/health') {
       return json(res, 200, {
         ok: true,

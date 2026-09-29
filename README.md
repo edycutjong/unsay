@@ -350,7 +350,7 @@ never started, which is why this header carried no CI badge until there was a gr
 |---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | the suite, `tsc --strict`, and the four scripts — `verify`, `e2e`, `probe`, `probe:resume` — against a real server; the pages in Chromium (`npm run e2e:browser`); Lighthouse with accessibility as an error gate (`npm run lighthouse`) |
 | [`fresh-clone.yml`](.github/workflows/fresh-clone.yml) | nightly: `./scripts/fresh_clone_check.sh` — an empty clone, a cold install, every command in [`DEMO.md`](DEMO.md) including the `curl` walkthrough, and no drift allowed in any block a script wrote |
-| [`live-version.yml`](.github/workflows/live-version.yml) | nightly: asks `api.unsay.edycu.dev/health` which version it runs and fails if it is not the released one — the server is deployed by hand, so the two can drift |
+| [`live-version.yml`](.github/workflows/live-version.yml) | nightly: asks `api.unsay.edycu.dev/health` which version it runs and fails if it is not the released one — Railway deploys on every push to `main`, and this catches a deploy that failed or stalled |
 | [`codeql.yml`](.github/workflows/codeql.yml) | static analysis, `security-extended`, over the HMAC check, the SigV4 signer, the token verifier and the markdown renderer |
 | [`gitleaks.yml`](.github/workflows/gitleaks.yml) | secrets across the **whole history**, not just the tip |
 | [`release.yml`](.github/workflows/release.yml) | a semver tag and GitHub Release from `feat:` / `fix:` commit prefixes; any other push releases nothing |

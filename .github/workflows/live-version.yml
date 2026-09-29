@@ -1,7 +1,8 @@
-# The live server is deployed by hand (`railway up`), not on push, so the repository and
-# api.unsay.edycu.dev can drift without anything noticing — a2a round 1 found exactly
-# that. This asks the deployment which version it runs and fails when it is not the
-# version the repository has released.
+# Railway deploys api.unsay.edycu.dev from `main` on every push (connected 2026-09-29).
+# Before that it was deployed by hand and drifted from the repository without anything
+# noticing — a2a round 1 found exactly that. This asks the deployment which version it
+# runs and fails when it is not the version the repository has released, so a failed or
+# stalled deploy is caught the same way.
 name: live-version
 
 on:
