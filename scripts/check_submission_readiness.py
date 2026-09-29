@@ -92,9 +92,11 @@ try:
     report = Path(tempfile.mkdtemp()) / "vitest.json"
     subprocess.run(["npx", "vitest", "run", "--reporter=json", f"--outputFile={report}"],
                    cwd=ROOT, capture_output=True, text=True, timeout=300)
-    actual = json.loads(report.read_text()).get("numTotalTests")
+    rep = json.loads(report.read_text())
+    actual = rep.get("numTotalTests")
+    failed = rep.get("numFailedTests")
 except Exception as e:                                   # noqa: BLE001
-    actual = None
+    actual = failed = None
     warns.append(f"could not run vitest ({e})")
 check("README states an exact test count", declared is not None, f"declared {declared}")
 check("README carries a vitest badge with a count", badged is not None, f"badge {badged}")
@@ -102,6 +104,8 @@ check("declared test count matches the suite", declared == actual,
       f"README {declared} vs actual {actual}")
 check("the test badge matches the suite", badged == actual,
       f"badge {badged} vs actual {actual}")
+# A count is not a pass. c9275ee shipped "304 tests, all passing" with two red.
+check("the suite passes", failed == 0, f"{failed} failing")
 
 bench = read("docs/proof/bench.txt") or ""
 check("bench receipt records the speech-window verdict",
@@ -150,6 +154,10 @@ check("bench receipt confirms a host was subscribed for every run",
 
 # ── the safety property actually holds ────────────────────────────────────────
 print("\nsafety property")
+# verify / e2e / probe:resume rewrite the receipts. When the gate starts from
+# committed receipts it puts them back, so its own run is never half-committed.
+RECEIPTS = ["README.md", "DEMO.md", "docs/proof"]
+receipts_clean = subprocess.run(["git", "diff", "--quiet", "--", *RECEIPTS], cwd=ROOT).returncode == 0
 for name, script in [("npm run verify exits 0", "verify"),
                      ("npm run e2e exits 0", "e2e"),
                      ("npm run probe:resume exits 0", "probe:resume"),
@@ -160,6 +168,8 @@ for name, script in [("npm run verify exits 0", "verify"),
     except Exception:                                     # noqa: BLE001
         rc = 1
     check(name, rc == 0)
+if receipts_clean:
+    subprocess.run(["git", "checkout", "--", *RECEIPTS], cwd=ROOT)
 
 # ── ARCHITECTURE.md has not drifted from the code it is generated from ───────
 # R6: eight prior submissions documented routes that were never built. The doc is
