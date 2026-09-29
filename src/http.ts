@@ -1126,7 +1126,9 @@ const REPO_FILES: Record<string, string> = {
   '/docs/proof/live_run.jsonl': 'docs/proof/live_run.jsonl',
   '/docs/proof/probe_subscribe.json': 'docs/proof/probe_subscribe.json',
   '/docs/proof/resume.json': 'docs/proof/resume.json',
-  '/skill/SKILL.md': 'skill/SKILL.md',
+  '/skills/unsay-care-plan/SKILL.md': 'skills/unsay-care-plan/SKILL.md',
+  // The skill's old path, kept so links already shared keep answering.
+  '/skill/SKILL.md': 'skills/unsay-care-plan/SKILL.md',
   '/icon.svg': 'docs/assets/icon.svg',
   // The raster card. No scraper renders an SVG og:image, so this is what the meta
   // tag names: the 1200×630 card exported at 2× from the asset pipeline. web/web.test.ts

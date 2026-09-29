@@ -494,6 +494,7 @@ describe('the three pages are served from this process', () => {
       ['/DEMO.md', 'npm run verify'],
       ['/FRICTION.md', 'F-002'],
       ['/LICENSE', 'MIT'],
+      ['/skills/unsay-care-plan/SKILL.md', 'unsay-care-plan'],
       ['/skill/SKILL.md', 'unsay-care-plan'],
       ['/docs/proof/bench.txt', 'lands mid-sentence'],
       ['/docs/proof/bench.remote.txt', 'public internet'],

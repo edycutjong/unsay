@@ -103,7 +103,7 @@ printf '  %-34s' "npm run e2e | ui:// + agent skill"
 npm run --silent e2e >/tmp/unsay_fc.log 2>&1 || true
 if grep -qE 'ui://unsay/echo' /tmp/unsay_fc.log &&
    grep -q 'agent skill' /tmp/unsay_fc.log &&
-   grep -q 'name: unsay-care-plan' skill/SKILL.md; then
+   grep -q 'name: unsay-care-plan' skills/unsay-care-plan/SKILL.md; then
   echo "PASS"
 else
   echo "FAIL"; fail=1

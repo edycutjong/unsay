@@ -210,7 +210,7 @@ describe('the counts in the documents are the counts', () => {
      * FRICTION.md F-005 quoted `[STALE — last changed 4 days ago by Dr Mensah, GP;
      * say this age aloud]` in the entry arguing that the SDK silently drops the
      * annotation this header exists to replace. Four other copies of the same
-     * string — DEMO.md twice, skill/SKILL.md, and docs/proof/verify.json — said 9.
+     * string — DEMO.md twice, skills/unsay-care-plan/SKILL.md, and docs/proof/verify.json — said 9.
      * The header reports the record's AGE, not its staleness overshoot, so "4 days
      * ago" is a shape `src/server.ts` cannot emit for that record: the friction log
      * caught transcribing, in the document that buys the project its credibility.
@@ -225,7 +225,7 @@ describe('the counts in the documents are the counts', () => {
     expect(printed, 'the verify receipt no longer carries a live staleness header').toBeTypeOf('string')
     expect(printed).toMatch(/^\[STALE — last changed \d+ days? ago by .+; say this age aloud\]$/)
 
-    for (const file of ['README.md', 'DEMO.md', 'FRICTION.md', 'skill/SKILL.md', 'docs/SPEC.md']) {
+    for (const file of ['README.md', 'DEMO.md', 'FRICTION.md', 'skills/unsay-care-plan/SKILL.md', 'docs/SPEC.md']) {
       // Unwrapped first: FRICTION.md breaks the header across a line.
       const quoted = read(file).replace(/\n\s*/g, ' ').match(/\[STALE[^\]]*\]/g) ?? []
       for (const q of quoted) {
@@ -331,9 +331,9 @@ describe('the judge-facing pointers land on something', () => {
   })
 
   it('links the two Alexa+ artifacts that only exist because of the track', () => {
-    expect(README).toContain('skill/SKILL.md')
+    expect(README).toContain('skills/unsay-care-plan/SKILL.md')
     expect(README).toContain('ui://unsay/echo')
-    expect(read('skill/SKILL.md')).toContain('name: unsay-care-plan')
+    expect(read('skills/unsay-care-plan/SKILL.md')).toContain('name: unsay-care-plan')
   })
 })
 

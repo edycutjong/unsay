@@ -32,7 +32,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/edycutjong/unsay?style=flat&color=F2A93B)](https://github.com/edycutjong/unsay/releases/latest)
 
-[**For judges**](JUDGE.md) · [**Devpost**](https://devpost.com/software/unsay-sgb8rf) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
+[**For judges**](JUDGE.md) · [**Devpost**](https://devpost.com/software/unsay-sgb8rf) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skills/unsay-care-plan/SKILL.md)
 
 </div>
 
@@ -43,7 +43,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 
 Built for the **Alexa+** track of the Amazon Developer Hackathon (Build, Ship, Shape):
 a **self-hosted MCP server implementing spec `2025-11-25` over Streamable HTTP**, plus an
-**Agent Skill** ([`skill/SKILL.md`](skill/SKILL.md)) and an **MCP Apps** card served as a
+**Agent Skill** ([`skills/unsay-care-plan/SKILL.md`](skills/unsay-care-plan/SKILL.md)) and an **MCP Apps** card served as a
 resource at `ui://unsay/echo`. `npm run e2e` and `npm run verify` both assert the negotiated
 protocol version and exit non-zero below that floor, so the eligibility requirement is checked
 rather than claimed.
@@ -159,7 +159,7 @@ judged path rather than described:
 
 | Artifact | What it is | Exercised by |
 |---|---|---|
-| [`skill/SKILL.md`](skill/SKILL.md) | An **Agent Skill**: the two-rule retraction protocol, the retraction's required shape, the never-speak rule, and the `whats_changed` fallback. The same contract the server sends in `initialize`. | `npm run e2e` reads it and prints its size; `test/server.test.ts` asserts it has not drifted from `SERVER_INSTRUCTIONS` |
+| [`skills/unsay-care-plan/SKILL.md`](skills/unsay-care-plan/SKILL.md) | An **Agent Skill**: the two-rule retraction protocol, the retraction's required shape, the never-speak rule, and the `whats_changed` fallback. The same contract the server sends in `initialize`. | `npm run e2e` reads it and prints its size; `test/server.test.ts` asserts it has not drifted from `SERVER_INSTRUCTIONS` |
 | `ui://unsay/echo` | An **MCP Apps** resource: the 1280×800 device card, served *through* the protocol as `text/html;profile=mcp-app` and bound to the `whats_changed` result by `_meta.ui.resourceUri` (MCP Apps, stable 2026-01-26). Same bytes as `/echo.html` — one file, two doors. | `npm run e2e` reads it over Streamable HTTP; `test/server.test.ts` asserts the mime type, the listing and the tool binding |
 | MCP `2025-11-25` | The track's one hard eligibility requirement, over Streamable HTTP with `Last-Event-ID` resume. | asserted at runtime by `npm run e2e` and `npm run verify` §6 |
 
@@ -193,7 +193,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.49 ms
+  notifications/resources/updated  1.41 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.49 ms` will differ on your machine and between two runs on this one;
+The `1.41 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 

@@ -55,7 +55,7 @@ const LINK_ROUTES: Record<string, string> = {
   'web/index.html': '/index.html',
   'web/echo.html': '/echo.html',
   'web/clinician.html': '/clinician.html',
-  'skill/SKILL.md': '/skill/SKILL.md',
+  'skills/unsay-care-plan/SKILL.md': '/skills/unsay-care-plan/SKILL.md',
   'LICENSE': '/LICENSE',
   'docs/assets/icon.svg': '/icon.svg',
   'docs/assets/og-image.png': '/og.png',

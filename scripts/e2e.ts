@@ -62,7 +62,7 @@ const rec = (event: string, data: Record<string, unknown>) => {
 }
 
 /** The Agent Skill shipped alongside the server — the other Alexa+ deliverable. */
-const skillBytes = readFileSync(new URL('../skill/SKILL.md', import.meta.url)).length
+const skillBytes = readFileSync(new URL('../skills/unsay-care-plan/SKILL.md', import.meta.url)).length
 
 /**
  * Every line printed, kept so the run can write its own quote into the documents.
@@ -222,7 +222,7 @@ const cardPart = card.contents[0] as { mimeType?: string; text?: string }
 const uiOk = cardPart?.mimeType === UI_MIME_TYPE && (cardPart.text ?? '').includes('<!doctype html>')
 rec('resources/read', { uri: UI_ECHO_URI, mimeType: cardPart?.mimeType, bytes: (cardPart.text ?? '').length })
 sayq(`  read  ${UI_ECHO_URI}   ← ${cardPart?.mimeType} · ${(cardPart.text ?? '').length} bytes · MCP Apps card`)
-say(`  agent skill               skill/SKILL.md — ${skillBytes} bytes, the same two rules as instructions`)
+say(`  agent skill               skills/unsay-care-plan/SKILL.md — ${skillBytes} bytes, the same two rules as instructions`)
 
 // 3 — completion using context.arguments (the near-unused surface)
 const comp = await client.complete({

@@ -816,10 +816,10 @@ Each item names where to look, so none of it has to be taken on trust.
   sandboxed frame it would show the seeded plan, not live data. See **F-013**.
 - **The gating probe has not been run.** Whether Alexa+ itself declares
   `capabilities.resources.subscribe` is unknown to us, and it decides which of the two paths in
-  `skill/SKILL.md` a real host takes. That is why the `whats_changed` fallback is built, carries
+  `skills/unsay-care-plan/SKILL.md` a real host takes. That is why the `whats_changed` fallback is built, carries
   `previousValue` so a retraction is possible on it, and is exercised by `npm run e2e` — not
   because we know the fallback is needed, but because we cannot yet know that it is not.
-- **`skill/SKILL.md` has not been installed in a host.** It is a file with front matter and the
+- **`skills/unsay-care-plan/SKILL.md` has not been installed in a host.** It is a file with front matter and the
   correct contract; nobody has watched Alexa+ load it.
 
 ### Not started

@@ -7,7 +7,7 @@
  * the server never issued, a prompt that could leak reasoning-only text.
  */
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -656,17 +656,17 @@ describe('a notification is re-authorized at send time', () => {
 
 describe('the Agent Skill and the server say the same thing', () => {
   /**
-   * `skill/SKILL.md` is the Alexa+ track's other first-class deliverable, and it is
+   * `skills/unsay-care-plan/SKILL.md` is the Alexa+ track's other first-class deliverable, and it is
    * a SECOND copy of the contract the server already sends in `instructions`. Two
    * copies of a contract drift; this is what stops them. Not a byte comparison —
    * one is a Markdown skill with front matter, the other is a paragraph in an
    * `initialize` result — but every load-bearing claim in one has to be in the other.
    */
-  const skill = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../skill/SKILL.md'), 'utf8')
+  const skill = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../skills/unsay-care-plan/SKILL.md'), 'utf8')
 
   it('declares the front matter a skill needs to be loaded at all', () => {
     expect(skill.startsWith('---\n')).toBe(true)
-    for (const field of ['name: unsay-care-plan', 'description:', 'trigger:']) {
+    for (const field of ['name: unsay-care-plan', 'description:', 'license: MIT']) {
       expect(skill, field).toContain(field)
     }
   })
@@ -685,7 +685,7 @@ describe('the Agent Skill and the server say the same thing', () => {
       ['say the age of a stale fact', /past its review date|say the age|STALE/i],
     ]
     for (const [what, pattern] of claims) {
-      expect(pattern.test(skill), `skill/SKILL.md drops: ${what}`).toBe(true)
+      expect(pattern.test(skill), `skills/unsay-care-plan/SKILL.md drops: ${what}`).toBe(true)
       expect(
         pattern.test(SERVER_INSTRUCTIONS) || /never be spoken|say its age aloud/i.test(SERVER_INSTRUCTIONS),
         `SERVER_INSTRUCTIONS drops: ${what}`,
@@ -839,5 +839,28 @@ describe('list_changed never signals an internal chain to a user-scoped host', (
     })
     await flush()
     expect(h.listChanged.count).toBe(0)
+  })
+})
+
+describe('the Agent Skill passes the Agent Skills specification', () => {
+  const path = resolve(dirname(fileURLToPath(import.meta.url)), '../skills/unsay-care-plan/SKILL.md')
+  const text = readFileSync(path, 'utf8')
+  const front = text.slice(4, text.indexOf('\n---\n', 4))
+  const keys = [...front.matchAll(/^([a-z-]+):/gm)].map((m) => m[1]!)
+
+  it('uses only the six frontmatter fields the specification allows', () => {
+    const allowed = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools'])
+    expect(keys.filter((k) => !allowed.has(k))).toEqual([])
+  })
+
+  it('names itself after its directory, in the allowed alphabet', () => {
+    const name = /^name: (.+)$/m.exec(front)![1]!.trim()
+    expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+    expect(name).toBe(basename(dirname(path)))
+  })
+
+  it('keeps its description within 1024 characters', () => {
+    const desc = front.slice(front.indexOf('description:'), front.indexOf('\nlicense:'))
+    expect(desc.replace(/^description: >-\n/, '').replace(/\s+/g, ' ').trim().length).toBeLessThanOrEqual(1024)
   })
 })

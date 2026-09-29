@@ -4,12 +4,12 @@ description: >-
   Answer a patient's questions about their own post-operative care plan from the
   Unsay MCP server, and retract out loud the moment a clinician changes a fact
   mid-answer. Use whenever the person asks what they may do, how much weight they
-  may put through a leg, which medication they are on, when to stop it, or who to
-  call — and whenever a care-plan resource changes while you are still speaking.
-trigger: >-
-  care plan · weight bearing · can I walk on it · my exercises · my tablets ·
-  anticoagulant · when do I stop · who do I call · physio said · notifications/resources/updated
-  on a care:// resource
+  may put through a leg (weight bearing, can I walk on it), their exercises, which
+  medication or anticoagulant they are on, when to stop it, or who to call, or says
+  the physio changed something — and whenever notifications/resources/updated
+  arrives for a care:// resource while you are still speaking.
+license: MIT
+compatibility: Needs an MCP host connected to the Unsay server (MCP 2025-11-25, Streamable HTTP).
 ---
 
 # Unsay — the care plan that can be corrected mid-sentence

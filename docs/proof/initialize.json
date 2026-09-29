@@ -6,7 +6,7 @@
 
   "question": "Does the Alexa+ host, at initialize, declare capabilities.resources with { subscribe: true, listChanged: true } — and, having subscribed, does it re-read the resource when it receives notifications/resources/updated mid-utterance?",
 
-  "whyItGates": "It decides which of the two paths in skill/SKILL.md a real host takes. With subscribe, the correction is pushed and the retraction interrupts the sentence. Without it, nothing is pushed and the retraction can only happen when the host next calls a tool — which is what whats_changed exists for. Unsay's server declares both capabilities and the reference client negotiates them (docs/proof/probe_subscribe.json); what is unknown is what Alexa+ declares back.",
+  "whyItGates": "It decides which of the two paths in skills/unsay-care-plan/SKILL.md a real host takes. With subscribe, the correction is pushed and the retraction interrupts the sentence. Without it, nothing is pushed and the retraction can only happen when the host next calls a tool — which is what whats_changed exists for. Unsay's server declares both capabilities and the reference client negotiates them (docs/proof/probe_subscribe.json); what is unknown is what Alexa+ declares back.",
 
   "blockedBy": {
     "friction": "F-004",
@@ -45,7 +45,7 @@
   "notClaimedAsAResult": [
     "That Alexa+ subscribes to MCP resources.",
     "That a retraction has ever interrupted a real Alexa+ utterance.",
-    "That skill/SKILL.md has been loaded by any host — it is a file with the correct front matter and contract that nobody has watched Alexa+ read.",
+    "That skills/unsay-care-plan/SKILL.md has been loaded by any host — it is a file with the correct front matter and contract that nobody has watched Alexa+ read.",
     "That the measured mid-sentence latency (docs/proof/bench.txt) describes anything other than a loopback path in one process."
   ],
 
