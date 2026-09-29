@@ -413,8 +413,20 @@ export function buildServer(opts: BuildOptions) {
   server.setRequestHandler(SubscribeRequestSchema, async (req) => {
     // Authorize FIRST. The notifier cannot do this for us — only the store knows
     // whether this principal is allowed to learn that the URI exists at all.
-    store.read(req.params.uri, opts.principal())
-    notifier.subscribe(req.params.uri)
+    const { uri } = req.params
+    store.read(uri, opts.principal())
+    // publish() notifies the canonical URI only. parseUri() still authorizes a
+    // trailing slash, a double slash or a /vN suffix — each of which used to be
+    // acknowledged with {} and then never notified. Refuse them loudly instead.
+    const p = parseUri(uri)! // non-null: read() above refused anything it cannot parse
+    const canonical = uriFor(p.subject, p.topic, p.audience)
+    if (uri !== canonical) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Subscribe to ${canonical}${p.version === undefined ? '' : ' — a version never changes'}`,
+      )
+    }
+    notifier.subscribe(canonical)
     return {}
   })
   server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {

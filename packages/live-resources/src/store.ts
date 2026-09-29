@@ -183,8 +183,8 @@ export class LiveResourceStore {
 
     this.#chains.set(key, [...chain, record])
 
+    const uri = this.#partition.uriFor(input.subject, input.topic, input.audience)
     if (prev) {
-      const uri = this.#partition.uriFor(input.subject, input.topic, input.audience)
       for (const fn of this.#updated) {
         try {
           fn(uri)
@@ -195,9 +195,9 @@ export class LiveResourceStore {
     } else {
       for (const fn of this.#listChanged) {
         try {
-          fn()
+          fn(uri)
         } catch (e) {
-          this.#onListenerError(e, null)
+          this.#onListenerError(e, uri)
         }
       }
     }

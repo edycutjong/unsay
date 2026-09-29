@@ -443,7 +443,8 @@ export async function createHttpServer(
   const stats = { sseOpens: 0, sseResumes: 0, lastResumeAt: 0, writesAccepted: 0, writesRejected: 0 }
 
   const http = createServer((req, res) => {
-    void route(req, res).catch(() => {
+    void route(req, res).catch((e: unknown) => {
+      console.error('[unsay] unhandled', req.method, req.url, e)
       if (!res.headersSent) json(res, 500, { error: 'internal_error' })
       else res.end()
     })

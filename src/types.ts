@@ -22,7 +22,7 @@ export type CareRecord = LiveRecord
  * URI scheme carries the audience. This is the enforcement primitive: the scheme
  * is decided server-side from the record, never from a client hint, so a client
  * that ignores `annotations.audience` still cannot reach assistant-only content —
- * it is never sent a `care-internal://` URI it has scope for.
+ * it is never sent a `care-internal://` URI it has no scope for.
  *
  * See FRICTION.md F-002: the spec places no obligation on a client to honour
  * `audience`, so it cannot be the control for a safety boundary.

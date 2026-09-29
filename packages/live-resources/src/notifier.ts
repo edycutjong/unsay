@@ -89,8 +89,10 @@ export class ResourceNotifier {
       opts.onRevision?.(uri)
     })
 
-    this.#offListChanged = opts.store.onListChanged(() => {
-      if (this.#listServed) this.#send(this.#target.sendResourceListChanged(), null)
+    // A new chain in a lane this principal cannot read is not a change to ITS list;
+    // signalling it would leak that internal content exists (SPEC I-2).
+    this.#offListChanged = opts.store.onListChanged((uri) => {
+      if (this.#listServed && this.#canNotify(uri)) this.#send(this.#target.sendResourceListChanged(), null)
     })
   }
 

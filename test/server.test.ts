@@ -805,3 +805,36 @@ describe('retractions follow what this session heard', () => {
     expect(retractionOf(res)).toBeUndefined()
   })
 })
+
+describe('subscribe takes only the URI it will notify', () => {
+  it.each([`${WB}/`, WB.replace('ray/', 'ray//'), `${WB}/v2`])('refuses %s with -32602', async (uri) => {
+    const { client } = await harness()
+    await expect(client.subscribeResource({ uri })).rejects.toMatchObject({ code: -32602 })
+  })
+
+  it('a canonical subscription hears exactly one update per revision', async () => {
+    const h = await harness()
+    await h.client.subscribeResource({ uri: WB })
+    h.store.publish({ ...STAGED_REVISION, writtenAt: DEMO_NOW.toISOString() })
+    await flush()
+    expect(h.updated).toEqual([WB])
+  })
+})
+
+describe('list_changed never signals an internal chain to a user-scoped host', () => {
+  it('stays silent for a new care-internal chain', async () => {
+    const h = await harness(USER_ONLY)
+    await h.client.listResources()
+    h.store.publish({
+      subject: RAY,
+      topic: 'discharge_note',
+      audience: 'assistant',
+      value: 'Internal only.',
+      authorId: 'dr-adeyemi',
+      authorLabel: 'Mr Adeyemi',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    await flush()
+    expect(h.listChanged.count).toBe(0)
+  })
+})

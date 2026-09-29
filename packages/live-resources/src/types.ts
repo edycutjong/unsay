@@ -105,6 +105,7 @@ export interface AtRestReceipt {
 }
 
 export type UpdatedListener = (uri: string) => void
-export type ListChangedListener = () => void
+/** Receives the new chain's unversioned URI, so a notifier can withhold it from a principal without scope. */
+export type ListChangedListener = (uri: string) => void
 /** Every `on*` subscription returns its own unsubscribe. */
 export type Unsubscribe = () => void
