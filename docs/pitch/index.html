@@ -233,7 +233,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <div class="speech"><s>“You can put about half your weight on it—”</s><span>“Wait — don’t do that.”</span></div>
   </div>
   <aside class="speaker-notes">Unsay is an MCP server for the Alexa+ track. The one thing it does: when a clinician changes Ray's care plan while Alexa is still reading it to him, Alexa stops and takes the sentence back. Watch the chart — that line is struck while it is being spoken.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>01</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>01</b> / 10</span></p>
 </section>
 
 <section class="slide s2" aria-label="Hook">
@@ -242,7 +242,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   <p class="who">Ray Dunn, 68 · after a hip replacement</p>
   <p class="body">Alexa reads him <b>version 2</b>. His physio is writing <b>version 3</b>.</p>
   <aside class="speaker-notes">This is Ray's real question from the demo seed. The plan Alexa is reading was written two days ago by the surgical team. Sarah, his physio, has just changed it. Most assistants would finish the old sentence.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>02</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>02</b> / 10</span></p>
 </section>
 
 <section class="slide s3" aria-label="Problem">
@@ -259,7 +259,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   </div>
   </div>
   <aside class="speaker-notes">Two versions, two authors: Mr Adeyemi from the surgical team wrote v2, Sarah the physio writes v3. The gap between them is where a patient gets hurt — or, here, held back from walking. The fix has to reach the speaker before the sentence ends.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>03</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>03</b> / 10</span></p>
 </section>
 
 <section class="slide s4" aria-label="It stops mid-sentence">
@@ -277,7 +277,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   </div>
   </div>
   <aside class="speaker-notes">This is the real Echo Show screen, captured from the running server. One: the old instruction is struck, never erased. Two: the new one stands. Three: it names who changed it and how long ago — which is what makes the retraction trustworthy.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>04</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>04</b> / 10</span></p>
 </section>
 
 <section class="slide s5" aria-label="How it works">
@@ -308,7 +308,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   </svg>
   </div>
   <aside class="speaker-notes">The clinician's write is HMAC-signed over the raw body. The server appends v3 to a hash chain and fires notifications/resources/updated over Streamable HTTP. The host re-reads and speaks. The private lane never answers a user-scope token — it gets -32002, the same as a URI that doesn't exist.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>05</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>05</b> / 10</span></p>
 </section>
 
 <section class="slide s6" aria-label="Never spoken">
@@ -323,7 +323,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   <div class="answer"><q>Take it slowly the first time, and have someone nearby.</q>← shaped by the risk note, never spoken</div>
   </div>
   <aside class="speaker-notes">A care chart holds what the patient should hear and what only his carers should know. Unsay splits them into two URI schemes behind two scopes, enforced where the server reads. The assistant still uses the risk note — it just never says it.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>06</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>06</b> / 10</span></p>
 </section>
 
 <section class="slide s7" aria-label="Measured">
@@ -339,7 +339,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   </div>
   </div>
   <aside class="speaker-notes">Two hundred signed writes against the live server at api.unsay.edycu.dev, client in Indonesia, server in us-west2. Every correction landed inside the sentence — even the worst run lands in its first fifth. Receipts in docs/proof/bench.remote.txt; 34 of 34 safety assertions pass.</aside>
-  <p class="folio"><span>Unsay · v1.0.0 · docs/proof/bench.remote.txt</span><span>Sheet <b>07</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1 · docs/proof/bench.remote.txt</span><span>Sheet <b>07</b> / 10</span></p>
 </section>
 
 <section class="slide s8" aria-label="Built for Alexa+">
@@ -358,7 +358,7 @@ notifications     <span class="a">resources/updated</span></div>
   </div>
   </div>
   <aside class="speaker-notes">Ten request handlers and three notification senders on the official SDK. The track's rubric names MCP Apps and Agent Skills as creative — both ship. If a host never subscribes, the whats_changed tool carries the previous value, so the fallback can still retract.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>08</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>08</b> / 10</span></p>
 </section>
 
 <section class="slide s9" aria-label="Honest by design">
@@ -372,7 +372,7 @@ notifications     <span class="a">resources/updated</span></div>
   </div>
   </div>
   <aside class="speaker-notes">The repo says what isn't done. No Alexa+ host has been reachable yet, so the fallback is built and exercised. The AWS path is written but never run against a live key, because of an account hold. And Unsay only relays what a clinician wrote.</aside>
-  <p class="folio"><span>Unsay · v1.0.0</span><span>Sheet <b>09</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1</span><span>Sheet <b>09</b> / 10</span></p>
 </section>
 
 <section class="slide s10" aria-label="The ask">
@@ -393,7 +393,7 @@ notifications     <span class="a">resources/updated</span></div>
     </div>
   </div>
   <aside class="speaker-notes">Open unsay.edycu.dev, press Connect, and be Sarah: change the plan and watch the Echo Show take it back. It's MIT-licensed, and the reusable half is packaged separately. We're asking to be judged on the one flow, done all the way through.</aside>
-  <p class="folio"><span>Unsay · v1.0.0 · MIT</span><span>Sheet <b>10</b> / 10</span></p>
+  <p class="folio"><span>Unsay · v1.0.1 · MIT</span><span>Sheet <b>10</b> / 10</span></p>
 </section>
 
 </div></div>
