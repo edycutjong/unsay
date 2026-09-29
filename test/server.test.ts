@@ -678,6 +678,8 @@ describe('the Agent Skill and the server say the same thing', () => {
       ['name what changed, who and when', /who changed it|its author and its age/i],
       // rule 2 — the fallback
       ['the whats_changed fallback', /whats_changed/],
+      ['the fallback cursor is asOf', /asOf/],
+      ['no retraction means carry on', /carry on/],
       // the never-speak rule
       ['audience:assistant is never spoken', /audience:\s*\["?assistant"?\]|`care-internal:\/\/`/],
       ['never speak it', /never be spoken|Never speak/i],
@@ -862,5 +864,63 @@ describe('the Agent Skill passes the Agent Skills specification', () => {
   it('keeps its description within 1024 characters', () => {
     const desc = front.slice(front.indexOf('description:'), front.indexOf('\nlicense:'))
     expect(desc.replace(/^description: >-\n/, '').replace(/\s+/g, ' ').trim().length).toBeLessThanOrEqual(1024)
+  })
+})
+
+/** a2a r02: the fallback's cursor is the server's, and same words are never retracted. */
+describe('whats_changed is anchored to the server, not to when the host spoke', () => {
+  it('asOf catches a correction written while the host was still speaking', async () => {
+    let clock = DEMO_NOW
+    const store = seedDemo()
+    const built = buildServer({ store, principal: () => ({ sub: 't', scopes: BOTH }), now: () => clock })
+    const { client } = await attach(built)
+    await client.listTools()
+    await client.readResource({ uri: WB }) // hears v2
+    const first = await client.callTool({ name: 'whats_changed', arguments: {} })
+    const asOf = (first.structuredContent as { asOf: string }).asOf
+    expect(asOf).toBe(DEMO_NOW.toISOString())
+    // The host speaks; the physio writes mid-answer; the host finishes a minute later.
+    store.publish({ ...STAGED_REVISION, writtenAt: new Date(DEMO_NOW.getTime() + 20_000).toISOString() })
+    clock = new Date(DEMO_NOW.getTime() + 60_000)
+    const next = await client.callTool({ name: 'whats_changed', arguments: { since: asOf } })
+    const item = (next.structuredContent as { changed: Record<string, unknown>[] }).changed.find(
+      (c) => c.uri === WB,
+    )!
+    expect(item.previousValue).toContain('about half your body weight')
+    expect(item.retraction).toBeDefined()
+  })
+
+  it('refuses a since ahead of the server clock instead of answering nothing changed', async () => {
+    const { client } = await harness()
+    await client.listTools()
+    const res = await client.callTool({
+      name: 'whats_changed',
+      arguments: { since: new Date(DEMO_NOW.getTime() + 60_000).toISOString() },
+    })
+    expect(res.isError).toBe(true)
+  })
+})
+
+describe('a re-confirmation in the same words carries no retraction', () => {
+  it('a new review date re-reads without a retraction and without STALE', async () => {
+    const h = await harness()
+    const ANTI = uriFor(RAY, 'anticoagulant', 'user')
+    const before = await h.client.readResource({ uri: ANTI })
+    const text = (before.contents[0] as { text: string }).text
+    expect(text.startsWith('[STALE')).toBe(true)
+    const value = text.slice(text.indexOf('\n') + 1)
+    h.store.publish({
+      subject: RAY,
+      topic: 'anticoagulant',
+      audience: 'user',
+      value,
+      authorId: 'gp.mensah',
+      authorLabel: 'Dr Mensah, GP',
+      writtenAt: DEMO_NOW.toISOString(),
+      staleAfter: new Date(DEMO_NOW.getTime() + 14 * 86_400_000).toISOString(),
+    })
+    const after = await h.client.readResource({ uri: ANTI })
+    expect(after.contents[0]!._meta?.['unsay/retraction']).toBeUndefined()
+    expect((after.contents[0] as { text: string }).text.startsWith('[STALE')).toBe(false)
   })
 })

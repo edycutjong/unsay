@@ -34,14 +34,17 @@ from. If `notifications/resources/updated` arrives **while you are answering**:
 - say the retraction. `_meta["unsay/retraction"]` on that read carries wording
   built from both versions — the value you withdrew, the value that replaced it,
   who changed it and how long ago. Say that, or say the same four things yourself.
+- if the re-read carries no `_meta["unsay/retraction"]`, the words you were saying
+  did not change (a re-confirmation, or a new review date): carry on.
 
 **2 · If you cannot subscribe, call `whats_changed` first.**
 
 Before answering *any* question about the care plan, call the `whats_changed`
-tool. Pass `since` = when you last spoke about the plan. Each entry revised since
-then carries `previousValue` as well as `value` — so a retraction is possible on this
-path too, not merely a restatement. Without `since` there is nothing known to have
-been said, so there is no retraction to say.
+tool. Pass `since` = the `asOf` your previous `whats_changed` call returned; omit it
+the first time. Not the time you spoke — a correction that lands while you are
+speaking is written before you finish. Each entry revised since then carries
+`previousValue` as well as `value` — so a retraction is possible on this path too,
+not merely a restatement.
 
 ## What a retraction has to contain
 

@@ -442,6 +442,8 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
   // ── connect ──────────────────────────────────────────────────────────────
   /** Set when the server refuses the link's token as expired — see rpc() above. */
   let expiredLink = false
+  /** Framed without a token: no seeded instruction is shown (see connect()). */
+  let framedNoToken = false
 
   async function connect() {
     const gen = ++generation
@@ -449,6 +451,13 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
     mcp.sid = null; mcp.id = 0; mcp.lastEventId = null; mcp.streaming = false
     live = false; path = 'none'; corrected = null
 
+    if (!token() && window.parent !== window) {
+      // Framed by a host with no token and no bridge yet (F-013). The seeded plan here would
+      // put a possibly superseded instruction beside a result that says it changed. Show none.
+      facts = []; framedNoToken = true
+      chips(); paint('inside a host this card is not live yet — open it on the device')
+      return
+    }
     if (!token()) {
       facts = SEED.slice(); clockIso = SEED_NOW
       chips(); paint('no token — showing the seed record')
@@ -554,17 +563,17 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
 
   /** The designed fallback, actually exercised — not merely built. */
   async function pollFallback(gen) {
-    let since = current ? current.lastModified : new Date(Date.now() - 60000).toISOString()
+    // Server-issued cursor only: a timestamp off this device's clock can run ahead of the server's.
+    let since = current ? current.lastModified : undefined
     while (gen === generation) {
       await new Promise((r) => setTimeout(r, 1500))
       if (gen !== generation) return
       try {
-        const out = await rpc('tools/call', { name: 'whats_changed', arguments: { since } })
-        const changed = (out.structuredContent && out.structuredContent.changed) || []
-        if (changed.length) {
-          since = changed.reduce((a, c) => (c.changedAt > a ? c.changedAt : a), since)
-          for (const c of changed) await refresh(gen, c.uri)
-        }
+        const out = await rpc('tools/call', { name: 'whats_changed', arguments: since ? { since } : {} })
+        const sc = out.structuredContent || {}
+        const changed = sc.changed || []
+        if (sc.asOf) since = sc.asOf
+        for (const c of changed) await refresh(gen, c.uri)
       } catch { /* transient; the next tick tries again */ }
     }
   }
@@ -617,7 +626,11 @@ body.present .present-note{display:block; position:fixed; left:50%; top:14px; tr
       ? (path === 'subscription' ? 'notifications/resources/updated over SSE' : 'polling the whats_changed tool')
       : (expiredLink ? 'token expired' : 'not connected') + (reason ? ' — ' + reason : '')
 
-    if (!current) { $('sFact').textContent = 'No speakable resource'; return }
+    if (!current) {
+      if (framedNoToken) $('sLabel').textContent = ''
+      $('sFact').textContent = framedNoToken ? 'Not live inside a host yet — open it on the device.' : 'No speakable resource'
+      return
+    }
     $('sLabel').textContent = current.domain.replace(/_/g, ' ')
 
     const fact = $('sFact')

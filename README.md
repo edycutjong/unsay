@@ -186,14 +186,14 @@ write path, and the retraction rendered server-side:
 ```
   protocolVersion           2025-11-25 ≥ 2025-11-25 — Alexa+ track minimum
   resources/list            9 resources over 3 cursor page(s)
-  read  ui://unsay/echo   ← text/html;profile=mcp-app · 36769 bytes · MCP Apps card
+  read  ui://unsay/echo   ← text/html;profile=mcp-app · 37393 bytes · MCP Apps card
 
   Ray's own host reads care-internal://ray/risk
         -32002 Resource not found — same answer as for a URI that does not exist
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.41 ms
+  notifications/resources/updated  1.44 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.41 ms` will differ on your machine and between two runs on this one;
+The `1.44 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -350,6 +350,7 @@ never started, which is why this header carried no CI badge until there was a gr
 |---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | the suite, `tsc --strict`, and the four scripts — `verify`, `e2e`, `probe`, `probe:resume` — against a real server; the pages in Chromium (`npm run e2e:browser`); Lighthouse with accessibility as an error gate (`npm run lighthouse`) |
 | [`fresh-clone.yml`](.github/workflows/fresh-clone.yml) | nightly: `./scripts/fresh_clone_check.sh` — an empty clone, a cold install, every command in [`DEMO.md`](DEMO.md) including the `curl` walkthrough, and no drift allowed in any block a script wrote |
+| [`live-version.yml`](.github/workflows/live-version.yml) | nightly: asks `api.unsay.edycu.dev/health` which version it runs and fails if it is not the released one — the server is deployed by hand, so the two can drift |
 | [`codeql.yml`](.github/workflows/codeql.yml) | static analysis, `security-extended`, over the HMAC check, the SigV4 signer, the token verifier and the markdown renderer |
 | [`gitleaks.yml`](.github/workflows/gitleaks.yml) | secrets across the **whole history**, not just the tip |
 | [`release.yml`](.github/workflows/release.yml) | a semver tag and GitHub Release from `feat:` / `fix:` commit prefixes; any other push releases nothing |

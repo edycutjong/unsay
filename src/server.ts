@@ -54,10 +54,13 @@ Facts change while you are answering. Two rules:
 
 1. If you have subscribed to a resource and receive notifications/resources/updated
    mid-response, STOP, re-read it, and correct yourself out loud — name what changed,
-   how long ago, and who changed it.
+   how long ago, and who changed it. If the re-read carries no "unsay/retraction", the
+   words you were saying did not change (a re-confirmation or a new review date): carry on.
 2. If you cannot subscribe, call the "whats_changed" tool before answering any question
-   about the care plan. Pass "since" = when you last spoke about the plan; it returns what
-   has been revised since then, and what each revision replaced.
+   about the care plan. Pass "since" = the "asOf" your previous whats_changed call returned;
+   omit it the first time. Not the time you spoke: a correction that lands while you are
+   speaking is written before you finish. It returns what has been revised since then, and
+   what each revision replaced.
 
 Resources annotated audience:["assistant"] are for your reasoning ONLY. Never speak them,
 quote them, or paraphrase them to the patient. They exist to shape your answer, not to be
@@ -370,7 +373,9 @@ export function buildServer(opts: BuildOptions) {
       'unsay/stale': s.stale,
       'unsay/superseded': superseded,
       'unsay/currentVersion': head.version,
-      ...(previous
+      // Same words, new metadata (a re-confirmation, a new review date) is not a
+      // correction: no previous value, no retraction — on this path as on whats_changed.
+      ...(previous && previous.value !== record.value
         ? {
             'unsay/previousVersion': previous.version,
             'unsay/previousValue': previous.value,
@@ -567,8 +572,9 @@ export function buildServer(opts: BuildOptions) {
             since: {
               type: 'string',
               description:
-                'ISO 8601 — when you last spoke about the care plan. Omit for the last 24 hours; ' +
-                'without it no retraction is rendered, because nothing is known to have been said.',
+                'The "asOf" returned by your previous whats_changed call; omit it the first time ' +
+                '(the last 24 hours). Not the time you spoke — a correction that lands while you ' +
+                'are speaking is written before you finish.',
             },
           },
         },
@@ -596,8 +602,10 @@ export function buildServer(opts: BuildOptions) {
                 required: ['uri', 'audience', 'value', 'author', 'changedAt', 'ageSeconds'],
               },
             },
+            // Server clock at the call, before the host speaks: the next `since`.
+            asOf: { type: 'string' },
           },
-          required: ['changed'],
+          required: ['changed', 'asOf'],
         },
         // MCP Apps (2026-01-26): the card a host may render this result into, by the
         // standard key and the Apps SDK alias. Never yet rendered in a host (F-013).
@@ -621,23 +629,36 @@ export function buildServer(opts: BuildOptions) {
         ],
       }
     }
-    const since = rawSince === undefined ? new Date(now().getTime() - 86_400_000) : new Date(rawSince)
-    const p = opts.principal()
     const at = now()
+    // `since` is compared with SERVER-clock writtenAt. A host clock running ahead would
+    // hide every recent revision and answer "nothing changed"; refuse it instead.
+    if (rawSince !== undefined && Date.parse(rawSince) > at.getTime() + 5_000) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text' as const,
+            text: '"since" is ahead of the server clock; pass the "asOf" from your previous whats_changed result',
+          },
+        ],
+      }
+    }
+    const since = rawSince === undefined ? new Date(at.getTime() - 86_400_000) : new Date(rawSince)
     const changed = store
-      .list(p)
+      .list(opts.principal())
       .filter(({ record }) => new Date(record.writtenAt) > since)
       .map(({ record, uri }) => {
         const parsed = parseUri(uri)!
-        // What was current at `since` is what a host that last spoke at `since` said.
-        // Without `since` nothing is known to have been said, so nothing is retracted.
+        const chain = store.versions(parsed.subject, parsed.topic)
+        // What THIS session was served is exact; the version current at `since` is the
+        // fallback. Without either, nothing is known to have been said.
+        const seen = heard.get(uri)
         const previous =
-          rawSince === undefined
-            ? undefined
-            : store
-                .versions(parsed.subject, parsed.topic)
-                .filter((r) => new Date(r.writtenAt) <= since)
-                .at(-1)
+          seen !== undefined && seen < record.version
+            ? chain.find((r) => r.version === seen)
+            : rawSince === undefined
+              ? undefined
+              : chain.filter((r) => new Date(r.writtenAt) <= since).at(-1)
         heard.set(uri, record.version)
         return {
           uri,
@@ -657,7 +678,9 @@ export function buildServer(opts: BuildOptions) {
             : {}),
         }
       })
-    const payload = { changed }
+    // Server clock at the call, i.e. before the host speaks. Handed back as the next
+    // `since`, it catches a correction written while the host was still talking.
+    const payload = { changed, asOf: at.toISOString() }
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
       structuredContent: payload,
