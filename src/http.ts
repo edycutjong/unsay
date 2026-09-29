@@ -496,7 +496,7 @@ export async function createHttpServer(
       const page = STATIC_PAGES[path === '/' ? '/index.html' : path]
       if (page) return sendPage(res, page, req.method === 'HEAD')
       const doc = DOC_PAGES[path]
-      if (doc) return sendDoc(res, path, doc.file, doc.title, req.method === 'HEAD')
+      if (doc) return sendDoc(res, path, doc.file, doc.title, req.method === 'HEAD', baseUrl)
       const repoFile = REPO_FILES[path]
       if (repoFile) return sendFile(res, repoFile, REPO_FILE_TYPE(repoFile), req.method === 'HEAD')
     }
@@ -1198,7 +1198,14 @@ function sendFile(res: ServerResponse, rel: string, contentType: string, headOnl
  * See src/docpage.ts for why: `text/plain` markdown was the judge experience
  * behind every footer link and two of the Proof cards.
  */
-function sendDoc(res: ServerResponse, path: string, file: string, title: string, headOnly: boolean) {
+function sendDoc(
+  res: ServerResponse,
+  path: string,
+  file: string,
+  title: string,
+  headOnly: boolean,
+  origin: string,
+) {
   const key = `doc:${path}`
   let body = pageCache.get(key)
   if (!body) {
@@ -1208,7 +1215,7 @@ function sendDoc(res: ServerResponse, path: string, file: string, title: string,
     } catch {
       return json(res, 404, { error: 'not_found' })
     }
-    body = Buffer.from(renderDocPage(md, { title, path, rawPath: `/${file}` }), 'utf8')
+    body = Buffer.from(renderDocPage(md, { title, path, rawPath: `/${file}`, origin }), 'utf8')
     pageCache.set(key, body)
   }
   sendBuffer(res, body, 'text/html; charset=utf-8', headOnly)

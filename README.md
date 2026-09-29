@@ -27,7 +27,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat)
 ![Node 22](https://img.shields.io/badge/Node-22-339933?style=flat)
-![tests](https://img.shields.io/badge/vitest-344%20passing-3F9E63?style=flat)
+![tests](https://img.shields.io/badge/vitest-345%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/edycutjong/unsay?style=flat&color=F2A93B)](https://github.com/edycutjong/unsay/releases/latest)
@@ -193,7 +193,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.35 ms
+  notifications/resources/updated  2.09 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.35 ms` will differ on your machine and between two runs on this one;
+The `2.09 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -335,7 +335,7 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**344 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**345 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 30 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and

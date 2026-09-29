@@ -1221,3 +1221,12 @@ describe('the store hands out copies, never its own records', () => {
     expect(store.verify(RAY, 'risk').intact).toBe(true)
   })
 })
+
+describe('/judge carries a link card', () => {
+  it('serves an absolute og:image and a summary_large_image card', async () => {
+    const html = await (await fetch(`${srv.baseUrl}/judge`)).text()
+    expect(html).toMatch(/<meta property="og:image" content="https?:\/\/[^"]+\/og\.png\?v=2">/)
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">')
+    expect(html).toContain(`<meta property="og:url" content="${srv.baseUrl}/judge">`)
+  })
+})

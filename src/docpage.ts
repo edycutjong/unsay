@@ -356,7 +356,31 @@ export function describeDoc(markdown: string): string {
   return text.slice(0, 157).replace(/\s+\S*$/, '') + '…'
 }
 
-export function renderDocPage(markdown: string, opts: { title: string; path: string; rawPath: string }): string {
+export function renderDocPage(
+  markdown: string,
+  opts: { title: string; path: string; rawPath: string; origin?: string },
+): string {
+  // Link cards. /judge is the URL printed in the submission and shared in posts; without
+  // these a shared link rendered as bare text on X and Slack. Absolute, because scrapers
+  // do not resolve a relative og:image.
+  const origin = opts.origin ?? ''
+  const desc = esc(describeDoc(markdown))
+  const card = origin
+    ? `<meta property="og:type" content="website">
+<meta property="og:site_name" content="Unsay">
+<meta property="og:title" content="${esc(opts.title)}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${esc(origin + opts.path)}">
+<meta property="og:image" content="${esc(origin)}/og.png?v=2">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(opts.title)}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${esc(origin)}/og.png?v=2">
+`
+    : ''
   const nav = NAV.map(([href, label]) =>
     `<a href="${href}"${href === opts.path ? ' aria-current="page"' : ''}>${label}</a>`,
   ).join('')
@@ -366,8 +390,8 @@ export function renderDocPage(markdown: string, opts: { title: string; path: str
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)}</title>
-<meta name="description" content="${esc(describeDoc(markdown))}">
-<meta name="author" content="Edy Cu">
+<meta name="description" content="${desc}">
+${card}<meta name="author" content="Edy Cu">
 <meta name="color-scheme" content="dark light">
 <meta name="robots" content="index, follow">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
