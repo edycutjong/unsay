@@ -16,6 +16,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 [![Friction log](https://img.shields.io/badge/Friction%20log-14%20entries-DE8F13?style=for-the-badge)](FRICTION.md)
 [![Hackathon](https://img.shields.io/badge/Amazon%20Developer-Alexa%2B%20track-5B8DEF?style=for-the-badge)](https://amazonappdev2026.devpost.com/)
 
+[![Devpost](https://img.shields.io/badge/Devpost-submission-003E54?style=for-the-badge&logo=devpost&logoColor=white)](https://devpost.com/software/unsay-sgb8rf)
 [![Demo video](https://img.shields.io/badge/Demo%20video-2%3A49-E0402E?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/jJM5LWHONDU)
 [![Landing](https://img.shields.io/badge/Landing-unsay.edycu.dev-DE8F13?style=for-the-badge)](https://unsay.edycu.dev/)
 [![Live](https://img.shields.io/badge/Live-api.unsay.edycu.dev-3F9E63?style=for-the-badge)](https://api.unsay.edycu.dev/)
@@ -31,7 +32,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/edycutjong/unsay?style=flat&color=F2A93B)](https://github.com/edycutjong/unsay/releases/latest)
 
-[**For judges**](JUDGE.md) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
+[**For judges**](JUDGE.md) · [**Devpost**](https://devpost.com/software/unsay-sgb8rf) · [**Demo video**](https://youtu.be/jJM5LWHONDU) · [**Reproduce it**](DEMO.md) · [**Architecture**](ARCHITECTURE.md) · [**Spec & threat model**](docs/SPEC.md) · [**Friction log**](FRICTION.md) · [**Agent Skill**](skill/SKILL.md)
 
 </div>
 
@@ -192,7 +193,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.88 ms
+  notifications/resources/updated  2.20 ms
   ALEXA "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -209,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.88 ms` will differ on your machine and between two runs on this one;
+The `2.20 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 

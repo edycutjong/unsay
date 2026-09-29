@@ -72,6 +72,7 @@ nothing Unsay does needs one — the server it tests is the server that is deplo
 
 ## Links
 
+- Devpost submission: [devpost.com/software/unsay-sgb8rf](https://devpost.com/software/unsay-sgb8rf)
 - Demo video (2:49): [youtu.be/jJM5LWHONDU](https://youtu.be/jJM5LWHONDU)
 - Landing page and pitch deck: [unsay.edycu.dev](https://unsay.edycu.dev/) · [unsay.edycu.dev/pitch](https://unsay.edycu.dev/pitch/)
 - Live: [api.unsay.edycu.dev/](https://api.unsay.edycu.dev/)
