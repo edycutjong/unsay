@@ -139,3 +139,25 @@ describe('renderRetraction refuses never-speak content', () => {
     expect(() => renderRetraction(prev as never, next as never)).toThrow(/assistant-audience/)
   })
 })
+
+/** a2a r02: a word list cannot catch every negation; position decides the permission gloss. */
+describe('a weight-bearing gloss only when the value opens with its term', () => {
+  it.each([
+    'Stop full weight-bearing as tolerated; back to the frame.',
+    'Wait for the X-ray before full weight-bearing as tolerated.',
+    'Full weight-bearing as tolerated is cancelled.',
+    'Hold off full weight-bearing as tolerated.',
+  ])('does not gloss %s', (text) => {
+    expect(glossesFor(text).filter((g) => g.label.includes('weight'))).toEqual([])
+  })
+
+  it('keeps every seeded gloss', () => {
+    const labels = (t: string) => glossesFor(t).map((g) => g.label)
+    expect(labels('Full weight-bearing as tolerated.')).toEqual(['full weight-bearing as tolerated'])
+    expect(labels('Partial weight-bearing, about half your body weight through the operated leg.')).toEqual([
+      'partial weight-bearing',
+    ])
+    expect(labels('No weight through the operated leg. Transfers with the frame only.')).toEqual(['non-weight-bearing'])
+    expect(labels('Rivaroxaban 10mg once daily. Stop date: 25 September 2026.')).toEqual(['rivaroxaban'])
+  })
+})

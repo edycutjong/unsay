@@ -97,11 +97,22 @@ const WEIGHT_BEARING = new Set(['full weight-bearing as tolerated', 'partial wei
  * none, when the sentence negates or conditions its instruction, or names more than
  * one weight-bearing level (a gloss per term would read as two instructions).
  */
+/** Words that put a weight-bearing term under another verb, so the term is not the instruction. */
+const ACTION =
+  /\b(?:stop\w*|hold\w*|wait\w*|before|after|cancel\w*|withdraw\w*|suspend\w*|paus\w*|revok\w*|revers\w*|delay\w*)\b/i
+
 export function glossesFor(text: string): { label: string; gloss: string }[] {
   if (QUALIFIED.test(text)) return []
   const hits = GLOSSARY.filter((g) => g.term.test(text))
   if (hits.filter((g) => WEIGHT_BEARING.has(g.label)).length > 1) return []
-  return hits.map(({ label, gloss }) => ({ label, gloss }))
+  // A weight-bearing gloss is worded as permission, and no word list catches every
+  // negation ("Hold off…", "…is cancelled"). Position does: gloss only a value that
+  // OPENS with the term, with no action word over it. Definitions are unaffected.
+  const opens = (g: (typeof GLOSSARY)[number]) =>
+    new RegExp(`^\\s*(?:${g.term.source})`, g.term.flags).test(text)
+  return hits
+    .filter((g) => !WEIGHT_BEARING.has(g.label) || (opens(g) && !ACTION.test(text)))
+    .map(({ label, gloss }) => ({ label, gloss }))
 }
 
 const quote = (s: string) => `“${s.replace(/\s+$/, '').replace(/\.$/, '')}.”`
