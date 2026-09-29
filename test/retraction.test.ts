@@ -104,3 +104,38 @@ describe('the server hands the sentence to the host', () => {
     expect(renderRetraction(prev, next).length).toBeGreaterThan(80)
   })
 })
+
+/** a2a r01: the gloss is worded as an instruction, so it must never gloss a prohibition. */
+describe('gloss fails safe on a qualified instruction', () => {
+  it('does not gloss a negated instruction', () => {
+    expect(glossesFor('Do NOT progress to full weight-bearing as tolerated until the X-ray is reviewed.')).toEqual([])
+  })
+  it('does not gloss a conditional progression across two levels', () => {
+    expect(glossesFor('Stay partial weight-bearing until review, then full weight-bearing as tolerated.')).toEqual([])
+    expect(glossesFor('Partial weight-bearing this week; full weight-bearing as tolerated next week.')).toEqual([])
+  })
+  it('still glosses the staged revision', () => {
+    expect(glossesFor('Full weight-bearing as tolerated.').map((g) => g.label)).toEqual([
+      'full weight-bearing as tolerated',
+    ])
+  })
+})
+
+describe('renderRetraction refuses never-speak content', () => {
+  it('throws on an assistant-audience record', () => {
+    const base = {
+      subject: 'ray',
+      topic: 'risk',
+      version: 1,
+      value: 'Fall risk: HIGH.',
+      authorId: 'a',
+      authorLabel: 'A',
+      writtenAt: '2026-10-08T09:00:00Z',
+      prevHash: null,
+      versionHash: 'x',
+    }
+    const prev = { ...base, audience: 'assistant' as const }
+    const next = { ...base, version: 2, value: 'Fall risk: LOW.', audience: 'assistant' as const }
+    expect(() => renderRetraction(prev as never, next as never)).toThrow(/assistant-audience/)
+  })
+})

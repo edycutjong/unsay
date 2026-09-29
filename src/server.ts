@@ -56,7 +56,8 @@ Facts change while you are answering. Two rules:
    mid-response, STOP, re-read it, and correct yourself out loud — name what changed,
    how long ago, and who changed it.
 2. If you cannot subscribe, call the "whats_changed" tool before answering any question
-   about the care plan. It returns what has been revised since a given timestamp.
+   about the care plan. Pass "since" = when you last spoke about the plan; it returns what
+   has been revised since then, and what each revision replaced.
 
 Resources annotated audience:["assistant"] are for your reasoning ONLY. Never speak them,
 quote them, or paraphrase them to the patient. They exist to shape your answer, not to be
@@ -125,6 +126,13 @@ export const VERSION: string = JSON.parse(
 export function buildServer(opts: BuildOptions) {
   const store = opts.store ?? seedDemo()
   const now = opts.now ?? (() => new Date())
+  /**
+   * What THIS session was served: canonical URI → the version it last read.
+   * A retraction withdraws a sentence the host actually said. "Version minus one"
+   * is a sentence it may never have heard — on a first read, or after a resume
+   * that skipped a revision — and docs/SPEC.md names exactly that failure.
+   */
+  const heard = new Map<string, number>()
 
   const server = new Server(
     { name: 'unsay', version: VERSION },
@@ -319,7 +327,15 @@ export function buildServer(opts: BuildOptions) {
     // Non-null: store.read() above already refused anything parseUri() cannot parse.
     const parsed = parseUri(uri)
 
-    const header = s.stale
+    const chain = store.versions(parsed!.subject, parsed!.topic)
+    const head = chain.at(-1)!
+    // A versioned URI can name a revision that has since been replaced. It says so
+    // in its TEXT — annotations do not survive a read (SPEC I-4) — and it never
+    // carries a retraction, because it is not what the host should say now.
+    const superseded = record.version !== head.version
+    const header = superseded
+      ? `[SUPERSEDED — v${record.version}, replaced by v${head.version}; historical record, never speak it as current]\n`
+      : s.stale
       ? `[STALE — last changed ${ageDays} day${ageDays === 1 ? '' : 's'} ago by ${record.authorLabel}; say this age aloud]\n`
       : `[changed ${ageDays === 0 ? 'today' : `${ageDays}d ago`} by ${record.authorLabel}]\n`
 
@@ -337,8 +353,13 @@ export function buildServer(opts: BuildOptions) {
      * RETRACT, which is the one thing this product is named for. `prevHash` proves
      * the link; `previousValue` is what a sentence can be built out of.
      */
-    const chain = store.versions(parsed!.subject, parsed!.topic)
-    const previous = record.version > 1 ? chain.find((r) => r.version === record.version - 1) : undefined
+    const key = uriFor(parsed!.subject, parsed!.topic, record.audience)
+    const lastHeard = heard.get(key)
+    const previous =
+      !superseded && lastHeard !== undefined && lastHeard < record.version
+        ? chain.find((r) => r.version === lastHeard)
+        : undefined
+    if (!superseded) heard.set(key, record.version)
 
     const meta: Record<string, unknown> = {
       'unsay/version': record.version,
@@ -347,6 +368,8 @@ export function buildServer(opts: BuildOptions) {
       'unsay/audience': record.audience,
       'unsay/lastModified': record.writtenAt,
       'unsay/stale': s.stale,
+      'unsay/superseded': superseded,
+      'unsay/currentVersion': head.version,
       ...(previous
         ? {
             'unsay/previousVersion': previous.version,
@@ -354,7 +377,11 @@ export function buildServer(opts: BuildOptions) {
             // The words themselves, rendered server-side from both versions
             // (src/retraction.ts). Offered, never imposed: MCP settles the
             // notification's delivery and not its consequence (FRICTION F-003).
-            'unsay/retraction': renderRetraction(previous, record, { now: now() }),
+            // Only for speakable content: the server never writes a sentence out
+            // of a record the instructions say must never be spoken.
+            ...(record.audience === 'user'
+              ? { 'unsay/retraction': renderRetraction(previous, record, { now: now() }) }
+              : {}),
           }
         : {}),
     }
@@ -525,7 +552,12 @@ export function buildServer(opts: BuildOptions) {
         inputSchema: {
           type: 'object',
           properties: {
-            since: { type: 'string', description: 'ISO 8601. Omit for everything changed today.' },
+            since: {
+              type: 'string',
+              description:
+                'ISO 8601 — when you last spoke about the care plan. Omit for the last 24 hours; ' +
+                'without it no retraction is rendered, because nothing is known to have been said.',
+            },
           },
         },
         outputSchema: {
@@ -537,6 +569,7 @@ export function buildServer(opts: BuildOptions) {
                 type: 'object',
                 properties: {
                   uri: { type: 'string' },
+                  audience: { type: 'string', enum: ['user', 'assistant'] },
                   value: { type: 'string' },
                   // What the value REPLACED, and the sentence that withdraws it.
                   // Without these a host on this path can state the new fact and
@@ -548,7 +581,7 @@ export function buildServer(opts: BuildOptions) {
                   changedAt: { type: 'string' },
                   ageSeconds: { type: 'number' },
                 },
-                required: ['uri', 'value', 'author', 'changedAt', 'ageSeconds'],
+                required: ['uri', 'audience', 'value', 'author', 'changedAt', 'ageSeconds'],
               },
             },
           },
@@ -565,10 +598,18 @@ export function buildServer(opts: BuildOptions) {
     if (req.params.name !== 'whats_changed') {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${req.params.name}`)
     }
-    const since = new Date(
-      (req.params.arguments?.since as string | undefined) ??
-        new Date(now().getTime() - 86_400_000).toISOString(),
-    )
+    const rawSince = req.params.arguments?.since
+    // A malformed `since` is an error, never "nothing changed": an Invalid Date
+    // compares false against every writtenAt and used to return `changed: []`.
+    if (rawSince !== undefined && (typeof rawSince !== 'string' || Number.isNaN(Date.parse(rawSince)))) {
+      return {
+        isError: true,
+        content: [
+          { type: 'text' as const, text: `"since" must be an ISO 8601 timestamp, e.g. ${now().toISOString()}` },
+        ],
+      }
+    }
+    const since = rawSince === undefined ? new Date(now().getTime() - 86_400_000) : new Date(rawSince)
     const p = opts.principal()
     const at = now()
     const changed = store
@@ -576,21 +617,30 @@ export function buildServer(opts: BuildOptions) {
       .filter(({ record }) => new Date(record.writtenAt) > since)
       .map(({ record, uri }) => {
         const parsed = parseUri(uri)!
+        // What was current at `since` is what a host that last spoke at `since` said.
+        // Without `since` nothing is known to have been said, so nothing is retracted.
         const previous =
-          record.version > 1
-            ? store.versions(parsed.subject, parsed.topic).find((r) => r.version === record.version - 1)
-            : undefined
+          rawSince === undefined
+            ? undefined
+            : store
+                .versions(parsed.subject, parsed.topic)
+                .filter((r) => new Date(r.writtenAt) <= since)
+                .at(-1)
+        heard.set(uri, record.version)
         return {
           uri,
+          audience: record.audience,
           value: record.value,
           author: record.authorLabel,
           changedAt: record.writtenAt,
           ageSeconds: Math.round((at.getTime() - new Date(record.writtenAt).getTime()) / 1000),
-          ...(previous
+          ...(previous && previous.value !== record.value
             ? {
                 previousVersion: previous.version,
                 previousValue: previous.value,
-                retraction: renderRetraction(previous, record, { now: at }),
+                ...(record.audience === 'user'
+                  ? { retraction: renderRetraction(previous, record, { now: at }) }
+                  : {}),
               }
             : {}),
         }

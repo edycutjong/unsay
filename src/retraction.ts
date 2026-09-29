@@ -81,9 +81,27 @@ export function spokenAge(ms: number): string {
   return d === 1 ? 'yesterday' : `${d} days ago`
 }
 
-/** Every glossed term present in `text`, in the order the table declares them. */
+/**
+ * A sentence that qualifies its term. The glosses are worded as instructions, so a
+ * lexical match on "Do NOT progress to full weight-bearing as tolerated" would read
+ * the prohibition back as permission. Fail safe: such a sentence is quoted verbatim
+ * and not glossed.
+ */
+const QUALIFIED = /\b(?:not|never|avoid|until|unless|except|instead|rather than|no longer)\b|n['’]t\b/i
+
+/** Weight-bearing terms that, together, describe a progression rather than one instruction. */
+const WEIGHT_BEARING = new Set(['full weight-bearing as tolerated', 'partial weight-bearing', 'non-weight-bearing'])
+
+/**
+ * Every glossed term present in `text`, in the order the table declares them — or
+ * none, when the sentence negates or conditions its instruction, or names more than
+ * one weight-bearing level (a gloss per term would read as two instructions).
+ */
 export function glossesFor(text: string): { label: string; gloss: string }[] {
-  return GLOSSARY.filter((g) => g.term.test(text)).map(({ label, gloss }) => ({ label, gloss }))
+  if (QUALIFIED.test(text)) return []
+  const hits = GLOSSARY.filter((g) => g.term.test(text))
+  if (hits.filter((g) => WEIGHT_BEARING.has(g.label)).length > 1) return []
+  return hits.map(({ label, gloss }) => ({ label, gloss }))
 }
 
 const quote = (s: string) => `“${s.replace(/\s+$/, '').replace(/\.$/, '')}.”`
@@ -105,6 +123,12 @@ export function renderRetraction(
   next: CareRecord,
   opts: RetractionOptions = {},
 ): string {
+  // SERVER_INSTRUCTIONS: assistant-audience content is never spoken, quoted or
+  // paraphrased. Enforced here, not only at the call sites, so no future caller
+  // can build speakable words out of it.
+  if (prev.audience !== 'user' || next.audience !== 'user') {
+    throw new Error('renderRetraction: refusing to build speakable words from assistant-audience content')
+  }
   const now = opts.now ?? new Date(next.writtenAt)
   const age = spokenAge(now.getTime() - new Date(next.writtenAt).getTime())
   const glosses = glossesFor(next.value)

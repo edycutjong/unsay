@@ -719,3 +719,89 @@ describe('the version a host is told', () => {
     expect(readFileSync(new URL('../src/server.ts', import.meta.url), 'utf8')).not.toMatch(/name: 'unsay', version: '/)
   })
 })
+
+/**
+ * a2a r01. A retraction withdraws a sentence the host actually said: never on a
+ * first read, never a version it skipped, never out of never-speak content.
+ */
+describe('retractions follow what this session heard', () => {
+  const retractionOf = (res: { contents: { _meta?: Record<string, unknown> }[] }) =>
+    res.contents[0]!._meta?.['unsay/retraction'] as string | undefined
+  const revise = (store: LiveResourceStore, value: string, minutes: number) =>
+    store.publish({
+      ...STAGED_REVISION,
+      value,
+      writtenAt: new Date(DEMO_NOW.getTime() + minutes * 60_000).toISOString(),
+    })
+
+  it('carries no retraction on a first read — nothing has been said yet', async () => {
+    const { client } = await harness()
+    expect(retractionOf(await client.readResource({ uri: WB }))).toBeUndefined()
+  })
+
+  it('withdraws the version this host heard, not version n-1', async () => {
+    const h = await harness()
+    await h.client.readResource({ uri: WB }) // hears v2
+    revise(h.store, 'Non weight-bearing until the X-ray is reviewed.', 1) // v3, never heard
+    revise(h.store, STAGED_REVISION.value, 2) // v4
+    const spoken = retractionOf(await h.client.readResource({ uri: WB }))!
+    expect(spoken).toContain('about half your body weight')
+    expect(spoken).not.toContain('X-ray')
+  })
+
+  it('never renders a speakable retraction from assistant-audience content', async () => {
+    const h = await harness()
+    await h.client.readResource({ uri: RISK })
+    h.store.publish({
+      subject: RAY,
+      topic: 'risk',
+      audience: 'assistant',
+      value: 'Fall risk: MODERATE.',
+      authorId: 'dr-adeyemi',
+      authorLabel: 'Mr Adeyemi',
+      writtenAt: DEMO_NOW.toISOString(),
+    })
+    const res = await h.client.readResource({ uri: RISK })
+    expect(res.contents[0]!._meta?.['unsay/previousValue']).toBeDefined()
+    expect(retractionOf(res)).toBeUndefined()
+
+    await h.client.listTools()
+    const tool = await h.client.callTool({
+      name: 'whats_changed',
+      arguments: { since: new Date(DEMO_NOW.getTime() - 60_000).toISOString() },
+    })
+    const item = (tool.structuredContent as { changed: Record<string, unknown>[] }).changed.find(
+      (c) => c.uri === RISK,
+    )!
+    expect(item.audience).toBe('assistant')
+    expect(item.retraction).toBeUndefined()
+  })
+
+  it('whats_changed rejects a malformed since instead of reporting nothing changed', async () => {
+    const { client } = await harness()
+    await client.listTools()
+    const res = await client.callTool({ name: 'whats_changed', arguments: { since: 'yesterday' } })
+    expect(res.isError).toBe(true)
+  })
+
+  it('whats_changed without since renders no retraction', async () => {
+    const h = await harness()
+    await h.client.listTools()
+    revise(h.store, STAGED_REVISION.value, 0)
+    const res = await h.client.callTool({ name: 'whats_changed', arguments: {} })
+    const item = (res.structuredContent as { changed: Record<string, unknown>[] }).changed.find(
+      (c) => c.uri === WB,
+    )!
+    expect(item.retraction).toBeUndefined()
+  })
+
+  it('a superseded version says so in its text and carries no retraction', async () => {
+    const h = await harness()
+    await h.client.readResource({ uri: WB })
+    const res = await h.client.readResource({ uri: `${WB}/v1` })
+    const text = (res.contents[0] as { text: string }).text
+    expect(text.startsWith('[SUPERSEDED')).toBe(true)
+    expect(res.contents[0]!._meta?.['unsay/superseded']).toBe(true)
+    expect(retractionOf(res)).toBeUndefined()
+  })
+})

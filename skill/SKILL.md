@@ -38,9 +38,10 @@ from. If `notifications/resources/updated` arrives **while you are answering**:
 **2 · If you cannot subscribe, call `whats_changed` first.**
 
 Before answering *any* question about the care plan, call the `whats_changed`
-tool. It returns everything revised since a timestamp, each entry carrying
-`previousValue` as well as `value` — so a retraction is possible on this path too,
-not merely a restatement.
+tool. Pass `since` = when you last spoke about the plan. Each entry revised since
+then carries `previousValue` as well as `value` — so a retraction is possible on this
+path too, not merely a restatement. Without `since` there is nothing known to have
+been said, so there is no retraction to say.
 
 ## What a retraction has to contain
 
