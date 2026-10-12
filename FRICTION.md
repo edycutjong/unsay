@@ -4,8 +4,8 @@ Every entry written **the day it was hit**, not assembled before submission.
 Format per entry: task attempted · steps taken · expected vs actual · severity · workaround ·
 actionable suggestion.
 
-Tools covered so far: `@modelcontextprotocol/sdk` (TypeScript), MCP spec 2025-11-25,
-Amazon Developer account onboarding.
+Tools covered: `@modelcontextprotocol/sdk` (TypeScript), MCP spec 2025-11-25, the MCP Apps
+extension, Node 22 type stripping with TypeScript 5.7, Amazon Developer account onboarding.
 
 ---
 
