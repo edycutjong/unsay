@@ -19,7 +19,7 @@ both screens side by side; do step 3 there. The longer path below opens them ful
    not need one.
 2. From it, open **The Echo Show screen** and **The clinician write screen** side by side.
 3. On the clinician screen, type a new weight-bearing instruction and publish it.
-4. Watch the Echo Show: the line it was speaking strikes through, the new one replaces it, and the
+4. Watch the Echo Show: the line it was showing strikes through, the new one replaces it, and the
    provenance line names the physio and how long ago the change was made.
 5. Open [api.unsay.edycu.dev/verify](https://api.unsay.edycu.dev/verify) — the public receipt. Every resource's version chain,
    its hash, and whether it is intact, with no token.

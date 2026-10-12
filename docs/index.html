@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unsay — the assistant that takes back what it just said</title>
-<meta name="description" content="An MCP server for Alexa+: when a physio changes an instruction, Alexa retracts it mid-sentence, and notes Ray must not hear are never spoken.">
+<meta name="description" content="An MCP server for Alexa+: when a physio changes an instruction, the assistant is handed the correction in time to retract it mid-sentence, and notes Ray must not hear are never spoken.">
 <meta name="author" content="Edy Cu">
 <meta name="theme-color" content="#F4F1E8">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://unsay.edycu.dev/">
 <meta property="og:site_name" content="Unsay">
 <meta property="og:title" content="Unsay — the assistant that takes back what it just said">
-<meta property="og:description" content="A physio changes the plan while Alexa is still reading the old one. Unsay makes it stop, mid-sentence, and say so.">
+<meta property="og:description" content="A physio changes the plan while the assistant is still reading the old one. Unsay hands it the correction in time to take the sentence back.">
 <meta property="og:image" content="https://api.unsay.edycu.dev/og.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -396,7 +396,7 @@ footer ul a:hover { text-decoration-color: var(--changed); }
   <div>
     <p class="eyebrow st">Alexa+ track · <b>Care chart</b> · Ray Dunn · post-op day 5</p>
     <h1 class="st">The assistant that <em>takes back<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M1 7 C 25 2, 50 9, 99 4"/></svg></em> what it just said.</h1>
-    <p class="sub st">Ray is 68, five days home after a hip replacement. His physio changes the plan while Alexa is still reading him the old one. Unsay publishes his care plan as live MCP resources, so the correction reaches the speaker <b>mid-sentence, 200/200 times, p95&nbsp;461&nbsp;ms</b> across the public internet. The notes his family wrote about him shape the answer and are <b>never spoken</b>. The server enforces that, not the model.</p>
+    <p class="sub st">Ray is 68, five days home after a hip replacement. His physio changes the plan while the assistant is still reading him the old one. Unsay publishes his care plan as live MCP resources, so the correction reaches a subscribed client <b>inside an assumed sentence, 200/200 times, p95&nbsp;461&nbsp;ms</b> across the public internet. The notes his family wrote about him shape the answer and are <b>never spoken</b>. The server enforces that, not the model.</p>
     <div class="ctas st">
       <a class="btn primary" href="https://github.com/edycutjong/unsay"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.81.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>View on GitHub</a>
       <a class="btn" href="https://youtu.be/jJM5LWHONDU"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/></svg>Demo video (2:49)</a>
@@ -442,7 +442,7 @@ footer ul a:hover { text-decoration-color: var(--changed); }
 
 <section class="s" id="demo">
   <p class="label rv">§1 · The demo</p>
-  <h2 class="rv">It stops. It says <em>what changed</em>, who changed it, and how long ago.</h2>
+  <h2 class="rv">The old line is struck. It says <em>what changed</em>, who changed it, and how long ago.</h2>
   <p class="lede rv">The physio’s write is a real signed HTTP request, and the notification is a real Streamable HTTP frame. Left, the Echo Show at the moment the correction lands. Right, the same demo as code, typed out from a real <code>npm run e2e</code> run.</p>
   <div class="pair">
     <figure class="rv">
@@ -501,7 +501,7 @@ footer ul a:hover { text-decoration-color: var(--changed); }
     </div>
   </div>
   <div class="result rv">
-    <span>Alexa’s answer, <b>shaped by</b> the risk note:</span>
+    <span>The host’s answer, <b>shaped by</b> the risk note:</span>
     <span><span class="q">“Take it slowly the first time, and have someone nearby.”</span><br>← scripted host reply, shaped by care-internal://ray/risk; the reason is never spoken</span>
   </div>
 </section>
