@@ -366,9 +366,9 @@ rec('unsay/retraction', { uri: WB, rendered: spoken, from: 'src/retraction.ts' }
 
 sayq(`\n  POST /write               HTTP ${writeRes.status} · v${written.version} · ${written.subscribers} subscribed host(s)`)
 sayq(`  notifications/resources/updated  ${latencyMs.toFixed(2)} ms`)
-sayq(`  ALEXA "You can put about half your weight on it—"`)
+sayq(`  HOST (simulated Alexa+) "You can put about half your weight on it—"`)
 for (const line of wrap(spoken, 66)) sayq(`        ${line}`)
-say(`        "Take it slowly the first time, and have someone nearby."   ← from ${RISK}, reason never spoken`)
+say(`        "Take it slowly the first time, and have someone nearby."   ← scripted host reply, shaped by ${RISK}; the reason is never spoken`)
 sayq(`  _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script`)
 sayq(`  v${afterMeta['unsay/version']}.prevHash === v${beforeMeta['unsay/version']}.versionHash  ${chained ? 'YES — the retraction is auditable' : 'NO'}`)
 

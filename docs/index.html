@@ -434,10 +434,10 @@ footer ul a:hover { text-decoration-color: var(--changed); }
 </section>
 
 <div class="receipts" aria-label="Receipts">
-  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="200" data-suffix="/200">200/200</b><span class="l">corrections landed inside a spoken sentence, on the deployed server</span><span class="p">docs/proof/bench.remote.txt →</span></a>
-  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="461" data-unit=" ms">461<span class="u">ms</span></b><span class="l">p95 from the physio’s write to the speaker holding the correction, across the Pacific</span><span class="p">docs/proof/bench.remote.txt →</span></a>
+  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="200" data-suffix="/200">200/200</b><span class="l">corrections delivered inside an assumed 3,400 ms sentence, on the deployed server</span><span class="p">docs/proof/bench.remote.txt →</span></a>
+  <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/bench.remote.txt"><b data-count="461" data-unit=" ms">461<span class="u">ms</span></b><span class="l">p95 from the physio’s write to a subscribed client holding the correction, across the Pacific</span><span class="p">docs/proof/bench.remote.txt →</span></a>
   <a class="receipt rv" href="https://api.unsay.edycu.dev/docs/proof/verify.json"><b data-count="34" data-suffix="/34">34/34</b><span class="l">safety assertions passing, 15 in process and 19 over HTTP</span><span class="p">docs/proof/verify.json →</span></a>
-  <a class="receipt rv" href="https://github.com/edycutjong/unsay#-testing--ci"><b data-count="345">345</b><span class="l">tests, including 58 that run the Echo Show’s own MCP client against a live server</span><span class="p">npm test →</span></a>
+  <a class="receipt rv" href="https://github.com/edycutjong/unsay#-testing--ci"><b data-count="346">346</b><span class="l">tests, including 58 that run the Echo Show’s own MCP client against a live server</span><span class="p">npm test →</span></a>
 </div>
 
 <section class="s" id="demo">
@@ -459,7 +459,7 @@ footer ul a:hover { text-decoration-color: var(--changed); }
 
 <section class="s" id="try">
   <p class="label rv">§2 · Try it live</p>
-  <h2 class="rv">Be Sarah. <em>Change Ray’s plan</em> and watch Alexa take it back.</h2>
+  <h2 class="rv">Be Sarah. <em>Change Ray’s plan</em> and watch Ray’s screen take it back.</h2>
   <p class="lede rv">These are the real screens, served by the deployed server at <code>api.unsay.edycu.dev</code> with a read token it mints for you. Nothing on this page simulates them.</p>
   <div class="try rv">
     <div class="try-head">
@@ -502,7 +502,7 @@ footer ul a:hover { text-decoration-color: var(--changed); }
   </div>
   <div class="result rv">
     <span>Alexa’s answer, <b>shaped by</b> the risk note:</span>
-    <span><span class="q">“Take it slowly the first time, and have someone nearby.”</span><br>← from care-internal://ray/risk, reason never spoken</span>
+    <span><span class="q">“Take it slowly the first time, and have someone nearby.”</span><br>← scripted host reply, shaped by care-internal://ray/risk; the reason is never spoken</span>
   </div>
 </section>
 
@@ -669,10 +669,10 @@ footer ul a:hover { text-decoration-color: var(--changed); }
     ['', '  tampered write            HTTP 401 · refused, and says nothing about why'],
     ['g', '  POST /write               HTTP 200 · v3 · 1 subscribed host(s)'],
     ['a', '  notifications/resources/updated  1.43 ms'],
-    ['w', '  ALEXA "You can put about half your weight on it—"'],
+    ['w', '  HOST (simulated Alexa+) "You can put about half your weight on it—"'],
     ['a', '        Wait — don’t do that. What I just told you is out of date.'],
     ['a', '        Sarah Okafor, physio changed it just now: “Full weight-bearing as tolerated.”'],
-    ['', '        "Take it slowly the first time, and have someone nearby."   ← from care-internal://ray/risk, reason never spoken'],
+    ['', '        "Take it slowly the first time, and have someone nearby."   ← scripted host reply, shaped by care-internal://ray/risk; the reason is never spoken'],
     ['g', '  v3.prevHash === v2.versionHash  YES — the retraction is auditable'],
     ['', ''],
     ['g', '  PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)'],

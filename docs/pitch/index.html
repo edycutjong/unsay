@@ -232,7 +232,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <div class="row new"><span class="k">Weight<br>bearing · v3</span><span class="t">Full weight-bearing as tolerated.<small>just now · Sarah Okafor</small></span><span class="sig">SO</span></div>
     <div class="speech"><s>“You can put about half your weight on it—”</s><span>“Wait — don’t do that.”</span></div>
   </div>
-  <aside class="speaker-notes">Unsay is an MCP server for the Alexa+ track. The one thing it does: when a clinician changes Ray's care plan while Alexa is still reading it to him, Alexa stops and takes the sentence back. Watch the chart — that line is struck while it is being spoken.</aside>
+  <aside class="speaker-notes">Unsay is an MCP server for the Alexa+ track. The one thing it does: when a clinician changes Ray's care plan while the assistant is still reading it to him, the assistant is handed what it needs to stop and take the sentence back. Watch the chart — that line is struck while it is being spoken.</aside>
   <p class="folio"><span>Unsay · v1.0.5</span><span>Sheet <b>01</b> / 10</span></p>
 </section>
 
@@ -276,7 +276,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <p class="cap"><s>“You can put about half your weight on it—”</s><span>“Wait — don’t do that. Full weight-bearing as tolerated.”</span></p>
   </div>
   </div>
-  <aside class="speaker-notes">This is the real Echo Show screen, captured from the running server. One: the old instruction is struck, never erased. Two: the new one stands. Three: it names who changed it and how long ago — which is what makes the retraction trustworthy.</aside>
+  <aside class="speaker-notes">This is a real capture of web/echo.html — the Echo Show screen — from the running server. One: the old instruction is struck, never erased. Two: the new one stands. Three: it names who changed it and how long ago — which is what makes the retraction trustworthy.</aside>
   <p class="folio"><span>Unsay · v1.0.5</span><span>Sheet <b>04</b> / 10</span></p>
 </section>
 
@@ -284,13 +284,13 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
   <p class="sec">§3 · How it works</p>
   <h2>One signed write. <em>One MCP frame.</em></h2>
   <div class="main">
-  <svg viewBox="0 0 1590 470" aria-label="Clinician POST /write, HMAC signed, to the Unsay MCP server; the server appends v3 to a hash chain and sends notifications/resources/updated over Streamable HTTP to the Alexa+ host; the host re-reads care://ray/weight_bearing and speaks the retraction. care-internal:// answers the user scope with -32002.">
+  <svg viewBox="0 0 1590 470" aria-label="Clinician POST /write, HMAC signed, to the Unsay MCP server; the server appends v3 to a hash chain and sends notifications/resources/updated over Streamable HTTP to a subscribed host (simulated here; the Alexa+ host is the target); the host re-reads care://ray/weight_bearing and holds the correction. care-internal:// answers the user scope with -32002.">
     <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10z" fill="#16201B"/></marker>
     <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10z" fill="#A25C07"/></marker></defs>
     <g fill="#FFFDF6" stroke="#16201B" stroke-width="3">
       <rect x="2" y="60" width="330" height="170"/><rect x="560" y="30" width="470" height="230"/><rect x="1180" y="60" width="408" height="170"/>
     </g>
-    <g font-size="22" fill="#5D6660" letter-spacing="2"><text x="26" y="98">CLINICIAN</text><text x="584" y="68">UNSAY · MCP SERVER</text><text x="1204" y="98">ALEXA+ HOST</text></g>
+    <g font-size="22" fill="#5D6660" letter-spacing="2"><text x="26" y="98">CLINICIAN</text><text x="584" y="68">UNSAY · MCP SERVER</text><text x="1204" y="98">HOST (SIMULATED)</text></g>
     <g font-size="26" fill="#16201B"><text x="26" y="146">Sarah Okafor</text><text x="26" y="186">physio</text>
       <text x="584" y="116">LiveResourceStore</text><text x="584" y="158">v3.prevHash = v2.hash</text><text x="584" y="200">care://  ·  care-internal://</text>
       <text x="1204" y="146">re-reads</text><text x="1204" y="186" font-size="22">care://ray/weight_bearing</text></g>
@@ -302,7 +302,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <text x="1040" y="206" font-size="19" fill="#5D6660">resources/read</text>
     <path d="M1384 232V330" stroke="#16201B" stroke-width="3" marker-end="url(#ar)"/>
     <rect x="1170" y="340" width="418" height="110" fill="#F8F3E3" stroke="#16201B" stroke-width="3"/>
-    <text x="1192" y="386" font-size="24" fill="#16201B">speaks the retraction</text><text x="1192" y="424" font-size="20" fill="#A25C07">p95 461 ms</text>
+    <text x="1192" y="386" font-size="24" fill="#16201B">holds the correction</text><text x="1192" y="424" font-size="20" fill="#A25C07">p95 461 ms</text>
     <path d="M795 262V360" stroke="#B03A2E" stroke-width="3" stroke-dasharray="8 8"/>
     <text x="620" y="400" font-size="22" fill="#B03A2E">care-internal:// → −32002</text>
   </svg>
@@ -320,7 +320,7 @@ body.debug .slide * { outline: 1px solid rgba(255,0,0,.25); }
     <div class="wall"><span>−32002</span></div>
     <div class="lane int"><span class="u">care-internal://ray/risk</span><p>“Fall risk: HIGH. Lives alone.”</p></div>
   </div>
-  <div class="answer"><q>Take it slowly the first time, and have someone nearby.</q>← shaped by the risk note, never spoken</div>
+  <div class="answer"><q>Take it slowly the first time, and have someone nearby.</q>← a scripted host reply, shaped by the risk note; the reason is never spoken</div>
   </div>
   <aside class="speaker-notes">A care chart holds what the patient should hear and what only his carers should know. Unsay splits them into two URI schemes behind two scopes, enforced where the server reads. The assistant still uses the risk note — it just never says it.</aside>
   <p class="folio"><span>Unsay · v1.0.5</span><span>Sheet <b>06</b> / 10</span></p>
