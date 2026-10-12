@@ -9,7 +9,7 @@
 An MCP server whose resources can be revised mid-sentence — so an assistant can stop,
 retract what it just said, and name what changed, who changed it, and how long ago.
 
-<img src="docs/assets/readme-hero-animated.svg" alt="Unsay — retracts what Alexa just said. The spoken instruction is struck through in amber the instant the update frame lands; the new line stands white beneath." width="1280">
+<img src="docs/assets/readme-hero-animated.svg" alt="Unsay — takes back what the assistant just said. The instruction is struck through in amber the instant the update frame lands; the new line stands white beneath." width="1280">
 
 [![Reproduce it](https://img.shields.io/badge/Reproduce%20it-DEMO.md-0B0D0E?style=for-the-badge)](DEMO.md)
 [![Spec & threat model](https://img.shields.io/badge/Spec%20%26%20threat%20model-SPEC.md-262B2E?style=for-the-badge)](docs/SPEC.md)
@@ -144,7 +144,7 @@ package is consumed from source by relative import.
 | Protocol | MCP `2025-11-25` over **Streamable HTTP**, `@modelcontextprotocol/sdk` — the one runtime dependency | [`src/server.ts`](src/server.ts) |
 | Transport & auth | One Node `http` server: `/mcp`, RFC 9728 metadata, HMAC-signed `/write`, public `/verify`, the three pages, and the rendered documents | [`src/http.ts`](src/http.ts) |
 | Mechanism | Versioned records, the SHA-256 chain, the audience/scope partition, the notifier | [`packages/live-resources`](packages/live-resources) |
-| At rest | AES-256-GCM with `patient\|domain\|version\|audience` as AAD; local HKDF or AWS KMS — off by default and on the deployment, which `/verify` says | [`src/envelope.ts`](src/envelope.ts) |
+| At rest | AES-256-GCM with `patient\|domain\|version\|audience` as AAD; local HKDF or AWS KMS — off by default, and off on the deployment too (`/verify` prints `PLAINTEXT`) | [`src/envelope.ts`](src/envelope.ts) |
 | Surfaces | Three single-file pages, no framework, no build step, no script loaded from anywhere | [`web/`](web) |
 | Runtime | Node ≥ 22 native type stripping — `tsc --strict` type-checks it, nothing compiles it | `package.json` |
 
@@ -193,7 +193,7 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.97 ms
+  notifications/resources/updated  1.44 ms
   HOST (simulated Alexa+) "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.97 ms` will differ on your machine and between two runs on this one;
+The `1.44 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -265,8 +265,8 @@ revisions while the SSE stream is down and asserts all three are replayed on `La
   PASS  all 3 missed notifications/resources/updated replayed
   PASS  replay arrived on the resumed stream, not the old one
 
-  offline window              818 ms
-  write → replayed at client  816 ms
+  offline window              807 ms
+  write → replayed at client  810 ms
 
   VERDICT: PASS   (6/6 checks)
 ```

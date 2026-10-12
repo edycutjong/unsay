@@ -225,6 +225,24 @@ writeFileSync(
 )
 log('  receipt → docs/proof/resume.json')
 
+/**
+ * README.md and DEMO.md quote this run's two timings, written from it rather than
+ * pasted after it. They were pasted, and said 803 ms over a receipt saying 818
+ * (a2a r05); the test that caught that then failed for anyone who ran this probe
+ * before `npm test`, as DEMO.md tells them to (a2a r06). Only a PASS writes.
+ */
+if (pass) {
+  for (const rel of ['README.md', 'DEMO.md']) {
+    const file = new URL(`../${rel}`, import.meta.url)
+    const body = readFileSync(file, 'utf8')
+    const next = body
+      .replace(/^( {2}offline window {14})\d+ ms$/m, `$1${timing.offlineWindowMs} ms`)
+      .replace(/^( {2}write → replayed at client {2})\d+ ms$/m, `$1${timing.writeToReplayedAtClientMs} ms`)
+    if (next !== body) writeFileSync(file, next)
+  }
+  log('  quoted in                   README.md · DEMO.md — written by this run')
+}
+
 await client.close().catch(() => {})
 await srv.close()
 process.exit(pass ? 0 : 1)

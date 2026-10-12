@@ -189,7 +189,7 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  1.97 ms
+  notifications/resources/updated  1.44 ms
   HOST (simulated Alexa+) "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
@@ -216,7 +216,7 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `1.97 ms` will differ on your machine and between two runs on this one;
+The `1.44 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
 <!-- e2e:end -->
 
@@ -225,7 +225,7 @@ exchange and a summary line.
 
 Three of those steps are new and are the ones worth reading. `read ui://unsay/echo` is the Echo
 Show card fetched **through MCP** as an MCP Apps resource rather than off a static HTTP route.
-`_meta unsay/retraction` is the spoken sentence, rendered by `src/retraction.ts` from the two
+`_meta unsay/retraction` is the sentence a host would speak, rendered by `src/retraction.ts` from the two
 record versions — this script prints the server's output and does not contain the wording.
 `logging/setLevel` is the eleventh method: the run sets the level to `emergency`, writes again,
 and asserts the revision notice is suppressed while `notifications/resources/updated` still
@@ -287,14 +287,15 @@ field.
   PASS  replay arrived on the resumed stream, not the old one
   PASS  chain advanced by exactly 4 versions
 
-  offline window              818 ms
-  write → replayed at client  816 ms
+  offline window              807 ms
+  write → replayed at client  810 ms
 
   VERDICT: PASS   (6/6 checks)
   receipt → docs/proof/resume.json
+  quoted in                   README.md · DEMO.md — written by this run
 ```
 
-Exit code 0. Receipt: `docs/proof/resume.json`. The two timings vary run to run — the client's
+Exit code 0. Receipt: `docs/proof/resume.json`; a passing run also rewrites the two timing lines above. The two timings vary run to run — the client's
 reconnection delay is pinned at 800 ms so the probe stays quick — but the six checks do not. The
 replay is checked against the **server-side** timestamp of the resume request, so a live send
 cannot be mistaken for a replay.
