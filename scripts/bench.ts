@@ -50,7 +50,7 @@ const WB = uriFor(RAY, 'weight_bearing', 'user')
 const WRITE_SECRET = process.env.UNSAY_WRITE_SECRET ?? DEV_WRITE_SECRET
 
 /**
- * A 12-word Alexa utterance at ~150 wpm ≈ 3.4 s of speech. This is the window a
+ * A 12-word Alexa utterance at ~210 wpm ≈ 3.4 s of speech. This is the window a
  * correction must land inside to interrupt rather than follow. It is an
  * ASSUMPTION about speech rate, not a measurement of Alexa+ text-to-speech.
  */

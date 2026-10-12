@@ -586,16 +586,16 @@ unauthorized client" is a rule the transport's own resume path makes impossible 
 
 ---
 
-*Filed to the submission's product-feedback field, and F-002/F-003 additionally to the MCP
-specification repository. Send-by date for upstream filing: **2026-09-20** — a draft with no send
-date is a loss in progress.*
+*Filed to the submission's product-feedback field. **Not yet filed upstream:** F-002/F-003 are
+written for the MCP specification repository and F-010 is drafted as a patch to the TypeScript SDK;
+none has been opened there as of 2026-10-12. The original send-by date, 2026-09-20, was missed.*
 
 *Fourteen entries. **Seven** ask for a change to the MCP specification or one of its extensions —
 F-002, F-003, F-005, F-007, F-008, F-012, F-013. **Six** ask for a change to the reference
 TypeScript SDK — F-001, F-006, F-009, F-010, F-011, F-014. F-005 asks both, and is counted in the
 seven. **One**, F-004, is Amazon account onboarding. 7 + 6 + 1 = 14. F-005 through F-014 were found
 by building against the spec and the reference SDK, not by reading about them; each names the file
-or the measurement it came from, and all carry the same send-by date.*
+or the measurement it came from, and none is filed upstream yet.*
 
 ---
 
@@ -803,7 +803,7 @@ Each item names where to look, so none of it has to be taken on trust.
   store → notification → authorized re-read, all on 127.0.0.1. A deployed path adds network
   and infrastructure and this figure is never quoted as a production number.
 - The 3,400 ms "speech window" every latency claim is measured against is an **assumption** —
-  twelve words at roughly 150 wpm, a constant in `scripts/bench.ts`. It is not a measurement of
+  twelve words at roughly 210 wpm, a constant in `scripts/bench.ts`. It is not a measurement of
   Alexa+ text-to-speech.
 
 ### The Alexa+ surfaces

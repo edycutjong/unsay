@@ -5,9 +5,9 @@
 > in `src/` or `packages/`. Two sections are authored rather than derived — the diagram
 > and [Not built](#not-built) — and both say so where they appear, because a shape and an
 > absence cannot be parsed out of code.
-> LESSONS R6: eight prior submissions documented routes that were never built.
+> A document that lists a route the code does not serve is worse than no document.
 
-_Generated: 2026-09-29T06:38:48.340Z_
+_Generated: 2026-10-12T09:34:19.493Z_
 
 ## Protocol
 
@@ -176,7 +176,8 @@ The one authored section in this file — every table above is derived from the
 source, this list is written by hand in `scripts/gen_architecture.ts` because
 absence cannot be parsed out of code. Stated so this document cannot imply otherwise:
 
-- **No AWS deployment.** `npm start` runs the server locally and nothing is hosted. The KMS
+- **No AWS deployment.** The live server is one in-memory Railway process (`api.unsay.edycu.dev`);
+  no AWS resource is hosted. The KMS
   provider in `src/envelope.ts` is SigV4-signed and shaped correctly but has never been
   executed against a live CMK — see FRICTION.md F-004, the payment-verification hold.
 - **No authorization server.** Unsay is an OAuth 2.1 protected RESOURCE only: no `/authorize`,

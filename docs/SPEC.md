@@ -33,7 +33,7 @@ history lost points for documenting behaviour that was never built:
 | **speakable** | audience `user`; URI scheme `care://`; scope `care.read.user` |
 | **internal** | audience `assistant`; URI scheme `care-internal://`; scope `care.read.assistant` |
 | **revision** | a new version appended to a domain's chain; fires `notifications/resources/updated` |
-| **the speech window** | 3400 ms — a 12-word utterance at ~150 wpm. An **assumption**, declared as a constant in `scripts/bench.ts`, not a measurement of Alexa+ TTS |
+| **the speech window** | 3400 ms — a 12-word utterance at ~210 wpm. An **assumption**, declared as a constant in `scripts/bench.ts`, not a measurement of Alexa+ TTS |
 
 The scheme→audience→scope mapping is two tables, `SCHEME` and `SCOPE`, in `src/types.ts`. They
 are the only place that mapping exists; nothing else in the codebase puts a scheme string next
@@ -819,7 +819,7 @@ Three honesties about that number:
 
 1. **Loopback.** Both processes are on one machine. The script prints this and refuses to let the
    figure be quoted as production.
-2. **The window is an assumption.** 3400 ms is 12 words at ~150 wpm, a constant in
+2. **The window is an assumption.** 3400 ms is 12 words at ~210 wpm, a constant in
    `scripts/bench.ts`. It is not a measurement of Alexa+ speech synthesis, and a shorter real
    utterance shrinks the margin.
 3. **The measurement stops at the client.** It ends when the MCP client holds the new value. It
