@@ -189,15 +189,15 @@ unsay · end-to-end · the demo as code
   tampered write            HTTP 401 · refused, and says nothing about why
 
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  2.09 ms
-  ALEXA "You can put about half your weight on it—"
+  notifications/resources/updated  1.97 ms
+  HOST (simulated Alexa+) "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
         operated leg.” Sarah Okafor, physio changed it just now: “Full
         weight-bearing as tolerated.” In plain terms, full weight-bearing
         as tolerated means you can put as much weight through that leg as
         is comfortable.
-        "Take it slowly the first time, and have someone nearby."   ← from care-internal://ray/risk, reason never spoken
+        "Take it slowly the first time, and have someone nearby."   ← scripted host reply, shaped by care-internal://ray/risk; the reason is never spoken
   _meta unsay/retraction    rendered by src/retraction.ts, not typed into this script
   v3.prevHash === v2.versionHash  YES — the retraction is auditable
 
@@ -216,7 +216,7 @@ unsay · end-to-end · the demo as code
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `2.09 ms` will differ on your machine and between two runs on this one;
+The `1.97 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and `npm run e2e` rewrites this block and the receipt from the same run.
 <!-- e2e:end -->
 
@@ -287,8 +287,8 @@ field.
   PASS  replay arrived on the resumed stream, not the old one
   PASS  chain advanced by exactly 4 versions
 
-  offline window              803 ms
-  write → replayed at client  801 ms
+  offline window              818 ms
+  write → replayed at client  816 ms
 
   VERDICT: PASS   (6/6 checks)
   receipt → docs/proof/resume.json
@@ -366,7 +366,7 @@ open these:
 ```
 
 Open the Echo Show link and the clinician link side by side, type a new instruction on the
-clinician screen and publish it: the device screen strikes through the old line and speaks the
+clinician screen and publish it: the device screen strikes through the old line and shows the
 retraction, and the receipt underneath the write reports the round trip it measured.
 
 The Echo Show link carries `care.read.user` **only**. It cannot read a `care-internal://`
@@ -455,14 +455,14 @@ npm test
 npm run typecheck
 ```
 
-**295 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
+**346 tests**, all passing, across `test/**` (the server, the store, the envelope, the HTTP face,
 the retraction wording, and the documents themselves), `web/**` (the three pages — including a run
 of `echo.html`'s own hand-rolled MCP client, sliced out of the page and executed against a live
 server), and `packages/live-resources/test/**` (the extracted package, imported through its public
 entry point only, against a scenario it was not extracted from).
 
-Coverage is deliberately not headlined — two projects in this builder's history shipped 458 and
-404 passing tests at 100 % coverage over demos that were broken from a fresh clone. Which is why:
+Coverage is deliberately not headlined — a suite can be green at 100 % coverage over a demo that is
+broken from a fresh clone. Which is why:
 
 ```bash
 ./scripts/fresh_clone_check.sh

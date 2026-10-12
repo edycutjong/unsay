@@ -205,6 +205,18 @@ describe('the counts in the documents are the counts', () => {
       .toContain(`**${words[resume.revisions.missedCount]}** further revisions`)
   })
 
+  it('quotes the resume receipt\'s own timings, not an earlier run\'s', () => {
+    /**
+     * README and DEMO said "offline window 803 ms" while the committed receipt said 818:
+     * the block was pasted from a run that was never committed (a2a r05).
+     */
+    const resume = JSON.parse(read('docs/proof/resume.json'))
+    for (const [name, doc] of [['README', README], ['DEMO', DEMO]] as const) {
+      expect(doc, `${name} offline window`).toContain(`offline window              ${resume.offlineWindowMs} ms`)
+      expect(doc, `${name} replay time`).toContain(`write → replayed at client  ${resume.writeToReplayedAtClientMs} ms`)
+    }
+  })
+
   it('quotes the staleness header the server actually prints, everywhere', () => {
     /**
      * FRICTION.md F-005 quoted `[STALE — last changed 4 days ago by Dr Mensah, GP;

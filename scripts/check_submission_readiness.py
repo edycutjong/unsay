@@ -96,8 +96,10 @@ try:
     rep = json.loads(report.read_text())
     actual = rep.get("numTotalTests")
     failed = rep.get("numFailedTests")
+    pkg_actual = sum(len(r.get("assertionResults", [])) for r in rep.get("testResults", [])
+                     if "/packages/live-resources/" in r.get("name", ""))
 except Exception as e:                                   # noqa: BLE001
-    actual = failed = None
+    actual = failed = pkg_actual = None
     warns.append(f"could not run vitest ({e})")
 check("README states an exact test count", declared is not None, f"declared {declared}")
 check("README carries a vitest badge with a count", badged is not None, f"badge {badged}")
@@ -105,6 +107,16 @@ check("declared test count matches the suite", declared == actual,
       f"README {declared} vs actual {actual}")
 check("the test badge matches the suite", badged == actual,
       f"badge {badged} vs actual {actual}")
+# DEMO.md said 295 for the length of judging while the README said 345 (a2a r05): the
+# gate read one document, so it caught one document. Every count a judge reads, compared.
+demo = read("DEMO.md") or ""
+dm = re.search(r"\*\*(\d+) tests\*\*", demo)
+check("DEMO.md's test count matches the suite", dm is not None and int(dm.group(1)) == actual,
+      f"DEMO {dm.group(1) if dm else None} vs actual {actual}")
+pkg_claims = [int(x) for x in re.findall(r"suite\s+of (\d+) whose|\n(\d+) of them belong to", readme) for x in x if x]
+check("README's package test counts match the package suite",
+      bool(pkg_claims) and all(c == pkg_actual for c in pkg_claims),
+      f"README {pkg_claims} vs actual {pkg_actual}")
 # A count is not a pass. c9275ee shipped "304 tests, all passing" with two red.
 check("the suite passes", failed == 0, f"{failed} failing")
 

@@ -27,7 +27,7 @@ retract what it just said, and name what changed, who changed it, and how long a
 ![Streamable HTTP](https://img.shields.io/badge/transport-Streamable%20HTTP-5B8DEF?style=flat)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat)
 ![Node 22](https://img.shields.io/badge/Node-22-339933?style=flat)
-![tests](https://img.shields.io/badge/vitest-345%20passing-3F9E63?style=flat)
+![tests](https://img.shields.io/badge/vitest-346%20passing-3F9E63?style=flat)
 ![licence MIT](https://img.shields.io/badge/licence-MIT-F2A93B?style=flat)
 [![ci](https://github.com/edycutjong/unsay/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/unsay/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/edycutjong/unsay?style=flat&color=F2A93B)](https://github.com/edycutjong/unsay/releases/latest)
@@ -38,8 +38,8 @@ retract what it just said, and name what changed, who changed it, and how long a
 
 ---
 
-> **Ray Dunn is 68, five days home after a hip replacement, and he is about to put his full
-> weight on a leg his physio changed the instructions for thirty seconds ago.**
+> **Ray Dunn is 68, five days home after a hip replacement, and the speaker by his bed is about to
+> read him a weight-bearing instruction his physio changed thirty seconds ago.**
 
 Built for the **Alexa+** track of the Amazon Developer Hackathon (Build, Ship, Shape):
 a **self-hosted MCP server implementing spec `2025-11-25` over Streamable HTTP**, plus an
@@ -110,16 +110,16 @@ claim the project actually makes.
 
 **Beyond healthcare, shown rather than asserted.** The mechanism is domain-free and it already
 runs somewhere else: [`packages/live-resources`](packages/live-resources) ships a standalone suite
-of 29 whose scenario is an **incident channel** — a status page an on-call engineer reads while the root
+of 30 whose scenario is an **incident channel** — a status page an on-call engineer reads while the root
 cause is still being written, with a `incident-internal://` lane for the half that is under legal
 review. The same shape fits an on-call runbook that changes mid-incident, and a price or
 inventory an agent is quoting while it moves. Each would need its own two schemes and two scopes;
 nothing else changes.
 
-**After 2026-10-23.** Publish `@unsay/live-resources` to npm. File F-002 and F-003 to the MCP
-specification repository by **2026-09-20** — the send-by date is in `FRICTION.md`, because a
-draft with no send date is a loss in progress. Put the fresh-clone demo in front of five
-clinicians who did not build it.
+**Next.** File F-002 and F-003 to the MCP specification repository and F-010 to the TypeScript
+SDK — none is filed yet; the status is in `FRICTION.md`. After 2026-10-23, publish
+`@unsay/live-resources` to npm and put the fresh-clone demo in front of five clinicians who did not
+build it.
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -144,8 +144,8 @@ package is consumed from source by relative import.
 | Protocol | MCP `2025-11-25` over **Streamable HTTP**, `@modelcontextprotocol/sdk` — the one runtime dependency | [`src/server.ts`](src/server.ts) |
 | Transport & auth | One Node `http` server: `/mcp`, RFC 9728 metadata, HMAC-signed `/write`, public `/verify`, the three pages, and the rendered documents | [`src/http.ts`](src/http.ts) |
 | Mechanism | Versioned records, the SHA-256 chain, the audience/scope partition, the notifier | [`packages/live-resources`](packages/live-resources) |
-| At rest | AES-256-GCM with `patient\|domain\|version\|audience` as AAD; local HKDF or AWS KMS | [`src/envelope.ts`](src/envelope.ts) |
-| Surfaces | Three single-file pages, no framework, no build step, no network fetch | [`web/`](web) |
+| At rest | AES-256-GCM with `patient\|domain\|version\|audience` as AAD; local HKDF or AWS KMS — off by default and on the deployment, which `/verify` says | [`src/envelope.ts`](src/envelope.ts) |
+| Surfaces | Three single-file pages, no framework, no build step, no script loaded from anywhere | [`web/`](web) |
 | Runtime | Node ≥ 22 native type stripping — `tsc --strict` type-checks it, nothing compiles it | `package.json` |
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) is **generated** from the handler registrations by
@@ -169,7 +169,7 @@ That is F-013, and it is disclosed here for the same reason the KMS provider is.
 
 ## 📊 Engineering Rigor
 
-🚧 In development, deadline 2026-10-23. Deployed at [https://api.unsay.edycu.dev](https://api.unsay.edycu.dev/) — one process, in memory, on
+Submitted to the Alexa+ track on 2026-09-29, ahead of the deadline 2026-10-23. Deployed at [https://api.unsay.edycu.dev](https://api.unsay.edycu.dev/) — one process, in memory, on
 Railway (us-west2) — and `npm start` runs the same thing locally; [`DEMO.md`](DEMO.md) reproduces every block below from an empty clone, and
 [`FRICTION.md`](FRICTION.md) ends with the full list of what this build does **not** do.
 
@@ -193,8 +193,8 @@ write path, and the retraction rendered server-side:
 
   tampered write            HTTP 401 · refused, and says nothing about why
   POST /write               HTTP 200 · v3 · 1 subscribed host(s)
-  notifications/resources/updated  2.09 ms
-  ALEXA "You can put about half your weight on it—"
+  notifications/resources/updated  1.97 ms
+  HOST (simulated Alexa+) "You can put about half your weight on it—"
         Wait — don’t do that. What I just told you is out of date. I said
         “Partial weight-bearing, about half your body weight through the
         operated leg.” Sarah Okafor, physio changed it just now: “Full
@@ -210,7 +210,7 @@ write path, and the retraction rendered server-side:
   PASS — receipt → docs/proof/live_run.jsonl (20 frames + summary)
 ```
 
-The `2.09 ms` will differ on your machine and between two runs on this one;
+The `1.97 ms` will differ on your machine and between two runs on this one;
 it is the only figure in this block that moves, and it is not the headline number — [the bench](#the-number) is.
 <!-- e2e:end -->
 
@@ -265,8 +265,8 @@ revisions while the SSE stream is down and asserts all three are replayed on `La
   PASS  all 3 missed notifications/resources/updated replayed
   PASS  replay arrived on the resumed stream, not the old one
 
-  offline window              803 ms
-  write → replayed at client  801 ms
+  offline window              818 ms
+  write → replayed at client  816 ms
 
   VERDICT: PASS   (6/6 checks)
 ```
@@ -335,7 +335,7 @@ Full walkthrough, verbatim from an empty clone: [`DEMO.md`](DEMO.md).
 
 ## 🧪 Testing & CI
 
-**345 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
+**346 tests**, all passing (`npm test`), plus `npm run typecheck` clean under `tsc --strict`.
 30 of them belong to [`packages/live-resources`](packages/live-resources) and import only its
 public entry point, so they prove that half stands up without the rest of this repo. Another
 group runs `web/echo.html`'s own hand-rolled MCP client — sliced verbatim out of the page and

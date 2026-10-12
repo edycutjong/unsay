@@ -12,6 +12,9 @@ No account, no clone, no key. Everything on this page is live at
 
 Rather watch first? The [2:49 demo video](https://youtu.be/jJM5LWHONDU) films this path, then the protocol under it.
 
+**One click:** [unsay.edycu.dev/#try](https://unsay.edycu.dev/#try) → **Connect to the live server** loads
+both screens side by side; do step 3 there. The longer path below opens them full-size.
+
 1. Open the landing page, [api.unsay.edycu.dev/](https://api.unsay.edycu.dev/). It mints its own demo tokens; you do
    not need one.
 2. From it, open **The Echo Show screen** and **The clinician write screen** side by side.
@@ -30,7 +33,7 @@ is real for everyone until the next restart resets it to the seed.
 |---|---|---|
 | Retraction lands inside the speech window, over the public internet | **200/200**, end-to-end p95 **461 ms** | [`docs/proof/bench.remote.txt`](docs/proof/bench.remote.txt) |
 | Safety assertions that MUST fail, and do | **34/34** (15 in-process, 19 over HTTP) | [`docs/proof/verify.json`](docs/proof/verify.json) |
-| Test suite | **345 passing**, `tsc --strict` clean | `npm test` · `npm run typecheck` |
+| Test suite | **346 passing**, `tsc --strict` clean | `npm test` · `npm run typecheck` |
 | Real protocol frames of the whole demo | one JSONL line per frame | [`docs/proof/live_run.jsonl`](docs/proof/live_run.jsonl) |
 | A correction survives the connection dropping under it | resumed with `Last-Event-ID` | [`docs/proof/resume.json`](docs/proof/resume.json) |
 
